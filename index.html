@@ -18,7 +18,7 @@
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD/Arrows • Mobile: drag thumb (FAST analog) • Dot shows thumb target • Patterns enabled</div>
+  <div class="hint">PC: WASD/Arrows • Mobile: drag thumb (FAST analog) • Dot shows thumb target • Timed Worlds (3×5)</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -29,13 +29,93 @@
         clearInterval(wait);
 
         const W = 420, H = 760;
-
-        // --- UI helpers ---
         const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
 
-        function addTitle(scene, text, yFrac = 0.22) {
+        // ======== PROGRESSION DATA ========
+        const LEVELS_PER_WORLD = 5;
+
+        const WORLDS = [
+          {
+            id: 0,
+            name: "Neon Alley",
+            subtitle: "Learn the lanes. Find your rhythm.",
+            bg: 0x0a0a12,
+            gridLine: 0x20204a,
+            border: 0x2a2a55,
+            playerColor: 0x6ef3ff,
+            obstacleColor: 0xff4d7d,
+            baseScroll: 110,
+            scrollRamp: 18,          // speed increase per second
+            spawnStartMs: 900,
+            spawnRampMsPerSec: 12,   // spawn interval shrinks over time
+            spawnMinMs: 360,
+            levelSeconds: 45
+          },
+          {
+            id: 1,
+            name: "Overclock District",
+            subtitle: "Faster drops. Tighter reactions.",
+            bg: 0x070814,
+            gridLine: 0x243056,
+            border: 0x3a4a88,
+            playerColor: 0x7cffd2,
+            obstacleColor: 0xff6aa2,
+            baseScroll: 135,
+            scrollRamp: 24,
+            spawnStartMs: 820,
+            spawnRampMsPerSec: 14,
+            spawnMinMs: 320,
+            levelSeconds: 50
+          },
+          {
+            id: 2,
+            name: "Blackout Sector",
+            subtitle: "No mercy. Stay alive.",
+            bg: 0x04050b,
+            gridLine: 0x1e1f3f,
+            border: 0x4b4bb0,
+            playerColor: 0x9aa7ff,
+            obstacleColor: 0xff4d7d,
+            baseScroll: 155,
+            scrollRamp: 30,
+            spawnStartMs: 760,
+            spawnRampMsPerSec: 16,
+            spawnMinMs: 290,
+            levelSeconds: 55
+          }
+        ];
+
+        // ======== STORAGE (Save/Continue) ========
+        const SAVE_KEY = "gridrun_progress_v1";
+
+        function loadProgress() {
+          try {
+            const raw = localStorage.getItem(SAVE_KEY);
+            if (!raw) return { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
+            const p = JSON.parse(raw);
+            return {
+              unlockedWorld: Number.isFinite(p.unlockedWorld) ? p.unlockedWorld : 0,
+              unlockedLevel: Number.isFinite(p.unlockedLevel) ? p.unlockedLevel : 0,
+              currentWorld: Number.isFinite(p.currentWorld) ? p.currentWorld : 0,
+              currentLevel: Number.isFinite(p.currentLevel) ? p.currentLevel : 0
+            };
+          } catch {
+            return { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
+          }
+        }
+
+        function saveProgress(p) {
+          localStorage.setItem(SAVE_KEY, JSON.stringify(p));
+        }
+
+        function resetProgress() {
+          localStorage.removeItem(SAVE_KEY);
+        }
+
+        // ======== UI HELPERS ========
+        function addTitle(scene, text, yFrac = 0.22, size = 40) {
           return scene.add.text(W/2, H*yFrac, text, {
-            fontFamily: uiFont, fontSize: "40px", color: "#ffffff",
+            fontFamily: uiFont, fontSize: `${size}px`, color: "#ffffff",
           }).setOrigin(0.5).setAlpha(0.95);
         }
 
@@ -75,15 +155,13 @@
           return btn;
         }
 
-        // --- Gameplay constants ---
+        // ======== GRID CONSTANTS ========
         const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
         const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
         const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
 
+        // Movement
         const PLAYER_SPEED = 320;
-        const BASE_SCROLL = 120;
-        const SPAWN_START_MS = 850;
-        const SPAWN_MIN_MS = 320;
 
         // ✅ Mobile analog tuning
         const ANALOG_MAX_DIST = 110;   // smaller = faster response
@@ -93,33 +171,45 @@
 
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-        // --- Scenes ---
+        // ======== SCENES ========
         class MenuScene extends Phaser.Scene {
           constructor() { super("Menu"); }
+
           create() {
             this.cameras.main.setBackgroundColor(0x0a0a12);
 
+            // Backdrop grid
             const g = this.add.graphics();
             g.lineStyle(1, 0x20204a, 0.8);
-            for (let i = 0; i < 30; i++) {
-              const y = i * 28;
-              g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.strokePath();
-            }
-            for (let i = 0; i < 20; i++) {
-              const x = i * 28;
-              g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.strokePath();
-            }
+            for (let i = 0; i < 30; i++) { const y = i * 28; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.strokePath(); }
+            for (let i = 0; i < 20; i++) { const x = i * 28; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.strokePath(); }
 
-            addTitle(this, "GRIDRUN", 0.22);
-            addSubtitle(this, "Fast neon dodging. Skill only. Fun first.", 0.285);
+            addTitle(this, "GRIDRUN", 0.22, 44);
+            addSubtitle(this, "Timed Worlds • 3 Worlds × 5 Levels", 0.285);
 
-            makeButton(this, "PLAY", W/2, H*0.46, () => this.scene.start("Play"));
-            makeGhostButton(this, "COSMETICS", W/2, H*0.56, () => this.scene.start("Cosmetics"));
-            makeGhostButton(this, "EVENTS", W/2, H*0.66, () => this.scene.start("Events"));
+            const p = loadProgress();
+            const hasProgress = (p.unlockedWorld > 0) || (p.unlockedLevel > 0);
 
-            this.add.text(W/2, H*0.82, "Wallet integration comes later.\nGameplay is fully playable without it.", {
-              fontFamily: uiFont, fontSize: "12px", color: "#ffffff", align: "center",
-            }).setOrigin(0.5).setAlpha(0.55);
+            makeButton(this, "PLAY (NEW RUN)", W/2, H*0.46, () => {
+              const fresh = { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
+              saveProgress(fresh);
+              this.scene.start("WorldIntro", { world: 0, level: 0, fromContinue: false });
+            });
+
+            const contBtn = makeGhostButton(this, hasProgress ? "CONTINUE" : "CONTINUE (LOCKED)", W/2, H*0.56, () => {
+              if (!hasProgress) return;
+              const p2 = loadProgress();
+              this.scene.start("WorldIntro", { world: p2.currentWorld, level: p2.currentLevel, fromContinue: true });
+            });
+            contBtn.setAlpha(hasProgress ? 1 : 0.45);
+
+            makeGhostButton(this, "COSMETICS (PLACEHOLDER)", W/2, H*0.66, () => this.scene.start("Cosmetics"));
+            makeGhostButton(this, "EVENTS (PLACEHOLDER)", W/2, H*0.74, () => this.scene.start("Events"));
+
+            makeGhostButton(this, "RESET SAVE", W/2, H*0.86, () => {
+              resetProgress();
+              this.scene.restart();
+            }).setAlpha(0.7);
           }
         }
 
@@ -128,10 +218,10 @@
           create() {
             this.cameras.main.setBackgroundColor(0x070710);
             addTitle(this, "COSMETICS", 0.22);
-            addSubtitle(this, "Placeholder screen (no wallet required yet).", 0.29);
+            addSubtitle(this, "Placeholder screen (cosmetic-only later).", 0.29);
 
             this.add.text(W/2, H*0.43,
-              "Coming soon:\n• Trails\n• Color palettes\n• Avatars\n\nCosmetic only — no gameplay advantage.",
+              "Later:\n• Trails\n• Color palettes\n• Avatars\n\nCosmetic only — no gameplay advantage.",
               { fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff", align: "center" }
             ).setOrigin(0.5);
 
@@ -144,10 +234,10 @@
           create() {
             this.cameras.main.setBackgroundColor(0x070710);
             addTitle(this, "EVENTS", 0.22);
-            addSubtitle(this, "Placeholder screen (no rewards, no earnings).", 0.29);
+            addSubtitle(this, "Placeholder screen (access later).", 0.29);
 
             this.add.text(W/2, H*0.43,
-              "Coming soon:\n• Weekly challenges\n• Limited-time modes\n• Prestige leaderboards\n\nFun + bragging rights only.",
+              "Later:\n• Weekly challenges\n• Limited-time modes\n• Prestige leaderboards\n\nFun + bragging rights only.",
               { fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff", align: "center" }
             ).setOrigin(0.5);
 
@@ -155,36 +245,81 @@
           }
         }
 
+        class WorldIntroScene extends Phaser.Scene {
+          constructor() { super("WorldIntro"); }
+
+          create(data) {
+            const world = clamp(data?.world ?? 0, 0, WORLDS.length - 1);
+            const level = clamp(data?.level ?? 0, 0, LEVELS_PER_WORLD - 1);
+            const cfg = WORLDS[world];
+
+            this.cameras.main.setBackgroundColor(cfg.bg);
+
+            addTitle(this, cfg.name, 0.24, 36);
+            addSubtitle(this, cfg.subtitle, 0.30);
+
+            this.add.text(W/2, H*0.43,
+              `Level ${level + 1} / ${LEVELS_PER_WORLD}\nTime: ${cfg.levelSeconds}s`,
+              { fontFamily: uiFont, fontSize: "16px", color: "#ffffff", align: "center" }
+            ).setOrigin(0.5).setAlpha(0.9);
+
+            makeButton(this, "START", W/2, H*0.60, () => {
+              // update current position in save
+              const p = loadProgress();
+              p.currentWorld = world;
+              p.currentLevel = level;
+              // ensure unlock baseline
+              p.unlockedWorld = Math.max(p.unlockedWorld, world);
+              if (world === p.unlockedWorld) p.unlockedLevel = Math.max(p.unlockedLevel, level);
+              saveProgress(p);
+
+              this.scene.start("Play", { world, level });
+            });
+
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.70, () => this.scene.start("Menu"));
+          }
+        }
+
         class PlayScene extends Phaser.Scene {
           constructor() {
             super("Play");
-            this.scrollSpeed = BASE_SCROLL;
-            this.spawnEvery = SPAWN_START_MS;
+            this.world = 0;
+            this.level = 0;
+            this.cfg = WORLDS[0];
+
+            this.scrollSpeed = 0;
+            this.spawnEvery = 0;
             this.spawnTimer = 0;
+
             this.elapsed = 0;
             this.score = 0;
 
+            this.levelTime = 0;
+            this.levelDuration = 45;
+
             this.touchTarget = null;
             this.touchDot = null;
+          }
 
-            this.lastGapCol = 0;
+          init(data) {
+            this.world = clamp(data?.world ?? 0, 0, WORLDS.length - 1);
+            this.level = clamp(data?.level ?? 0, 0, LEVELS_PER_WORLD - 1);
+            this.cfg = WORLDS[this.world];
+            this.levelDuration = this.cfg.levelSeconds;
           }
 
           create() {
-            this.cameras.main.setBackgroundColor(0x0a0a12);
+            this.cameras.main.setBackgroundColor(this.cfg.bg);
 
             this.gridGraphics = this.add.graphics();
             this.gridOffset = 0;
 
             this.obstacles = this.physics.add.group({ immovable: true, allowGravity: false });
 
-            // Pattern state
-            this.lastGapCol = Phaser.Math.Between(0, GRID_COLS - 1);
-
             const startX = GRID_X + GRID_W / 2;
             const startY = GRID_Y + GRID_H * 0.72;
 
-            this.player = this.add.rectangle(startX, startY, 28, 28, 0x6ef3ff);
+            this.player = this.add.rectangle(startX, startY, 28, 28, this.cfg.playerColor);
             this.physics.add.existing(this.player);
             this.player.body.setAllowGravity(false);
 
@@ -193,10 +328,10 @@
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D");
 
-            // ✅ Debug thumb target dot (only visible while touching)
-            this.touchDot = this.add.circle(0, 0, 6, 0x6ef3ff).setAlpha(0);
+            // Thumb target dot (only while touching)
+            this.touchDot = this.add.circle(0, 0, 6, this.cfg.playerColor).setAlpha(0);
 
-            // ✅ Analog thumb-follow input (drag to steer)
+            // Analog thumb-follow input
             this.touchTarget = null;
             this.input.on("pointerdown", (p) => {
               this.touchTarget = { x: p.x, y: p.y };
@@ -212,35 +347,46 @@
               this.touchDot.setAlpha(0);
             });
 
-            this.uiText = this.add.text(14, 12, "Score: 0", {
-              fontFamily: uiFont, fontSize: "16px", color: "#ffffff",
-            }).setAlpha(0.9);
+            // HUD
+            this.uiTop = this.add.text(14, 10, "", { fontFamily: uiFont, fontSize: "14px", color: "#ffffff" }).setAlpha(0.95);
+            this.uiTime = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95);
 
-            this.add.text(14, 34, "Patterns enabled. Speed ramps up.", {
-              fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff",
-            }).setAlpha(0.9);
-
-            // reset
-            this.scrollSpeed = BASE_SCROLL;
-            this.spawnEvery = SPAWN_START_MS;
-            this.spawnTimer = 0;
+            // Reset run state
             this.elapsed = 0;
             this.score = 0;
+            this.levelTime = 0;
+
+            this.scrollSpeed = this.cfg.baseScroll;
+            this.spawnEvery = this.cfg.spawnStartMs;
+            this.spawnTimer = 0;
+
+            this.updateHud();
           }
 
           update(_, deltaMs) {
             const dt = deltaMs / 1000;
             this.elapsed += dt;
+            this.levelTime += dt;
 
-            // difficulty ramp
-            this.scrollSpeed = BASE_SCROLL + this.elapsed * 22;
-            this.spawnEvery = clamp(SPAWN_START_MS - this.elapsed * 18, SPAWN_MIN_MS, SPAWN_START_MS);
+            // Level complete
+            if (this.levelTime >= this.levelDuration) {
+              this.levelComplete();
+              return;
+            }
 
-            // score
+            // Difficulty ramps for this world
+            this.scrollSpeed = this.cfg.baseScroll + this.elapsed * this.cfg.scrollRamp;
+
+            const targetSpawn = this.cfg.spawnStartMs - this.elapsed * this.cfg.spawnRampMsPerSec;
+            this.spawnEvery = clamp(targetSpawn, this.cfg.spawnMinMs, this.cfg.spawnStartMs);
+
+            // Score (still “endless” feeling inside a level)
             this.score += dt * 10;
-            this.uiText.setText("Score: " + Math.floor(this.score));
 
-            // keyboard movement
+            // HUD
+            this.updateHud();
+
+            // Movement input
             let vx = 0, vy = 0;
             const left = this.cursors.left.isDown || this.keys.A.isDown;
             const right = this.cursors.right.isDown || this.keys.D.isDown;
@@ -252,11 +398,10 @@
             if (up) vy -= 1;
             if (down) vy += 1;
 
-            // ✅ Mobile fairness: boost increases as speed ramps
+            // Mobile fairness: boost increases over time
             const dynamicBoost = ANALOG_BOOST + (this.elapsed * 0.02);
             const boost = Phaser.Math.Clamp(dynamicBoost, ANALOG_BOOST, ANALOG_BOOST + ANALOG_MAX_EXTRA);
 
-            // ✅ FAST analog thumb-follow steering
             if (this.touchTarget) {
               const dx = this.touchTarget.x - this.player.x;
               const dy = this.touchTarget.y - this.player.y;
@@ -268,13 +413,13 @@
               vy += Phaser.Math.Clamp((ay / ANALOG_MAX_DIST) * boost, -1, 1);
             }
 
-            // normalize (prevents diagonal speed boost)
+            // Normalize (no diagonal speed boost)
             const mag = Math.hypot(vx, vy);
             if (mag > 1) { vx /= mag; vy /= mag; }
 
             this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
 
-            // keep inside grid
+            // Clamp to grid
             const pad = 14;
             const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
             const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
@@ -283,22 +428,29 @@
               this.player.body.reset(nx, ny);
             }
 
-            // spawn patterns
+            // Spawn obstacles (simple random, since you preferred it)
             this.spawnTimer += deltaMs;
             while (this.spawnTimer >= this.spawnEvery) {
               this.spawnTimer -= this.spawnEvery;
-              this.spawnPattern();
+              this.spawnObstacle();
             }
 
-            // move obstacles down
+            // Move obstacles
             this.obstacles.children.iterate((o) => {
               if (!o) return;
               o.y += this.scrollSpeed * dt;
               if (o.y > GRID_Y + GRID_H + 80) o.destroy();
             });
 
-            // draw grid
+            // Draw grid
             this.drawGrid(dt);
+          }
+
+          updateHud() {
+            const cfg = this.cfg;
+            const timeLeft = Math.max(0, Math.ceil(this.levelDuration - this.levelTime));
+            this.uiTop.setText(`${cfg.name} • Level ${this.level + 1}/${LEVELS_PER_WORLD} • Score: ${Math.floor(this.score)}`);
+            this.uiTime.setText(`Time Left: ${timeLeft}s`);
           }
 
           drawGrid(dt) {
@@ -306,10 +458,10 @@
             const g = this.gridGraphics;
             g.clear();
 
-            g.lineStyle(2, 0x2a2a55, 0.9);
+            g.lineStyle(2, this.cfg.border, 0.92);
             g.strokeRoundedRect(GRID_X - 6, GRID_Y - 6, GRID_W + 12, GRID_H + 12, 14);
 
-            g.lineStyle(1, 0x20204a, 0.9);
+            g.lineStyle(1, this.cfg.gridLine, 0.9);
 
             for (let c = 0; c <= GRID_COLS; c++) {
               const x = GRID_X + c * TILE;
@@ -321,111 +473,210 @@
             }
           }
 
-          spawnPattern() {
-            const t = this.elapsed;
-
-            // Weighted pattern selection (fair + ramps over time)
-            const wSingle = Math.max(55 - t * 1.2, 18);
-            const wDouble = Math.max(25 - t * 0.3, 12);
-            const wWallGap = Math.min(10 + t * 0.7, 32);
-            const wZigzag = Math.min(6 + t * 0.5, 26);
-            const wTriple = Math.min(4 + t * 0.25, 12);
-
-            const total = wSingle + wDouble + wWallGap + wZigzag + wTriple;
-            let r = Phaser.Math.FloatBetween(0, total);
-
-            let type = "single";
-            if ((r -= wSingle) <= 0) type = "single";
-            else if ((r -= wDouble) <= 0) type = "double";
-            else if ((r -= wWallGap) <= 0) type = "wallgap";
-            else if ((r -= wZigzag) <= 0) type = "zigzag";
-            else type = "triple";
-
+          spawnObstacle() {
+            const col = Phaser.Math.Between(0, GRID_COLS - 1);
+            const x = GRID_X + col * TILE + TILE / 2;
             const y = GRID_Y - 40;
 
-            const spawnAtCol = (col, sizeMin = 22, sizeMax = 34) => {
-              const x = GRID_X + col * TILE + TILE / 2;
-              const size = Phaser.Math.Between(sizeMin, sizeMax);
-              const rect = this.add.rectangle(x, y, size, size, 0xff4d7d);
-              this.physics.add.existing(rect);
-              rect.body.setAllowGravity(false);
-              rect.body.setImmovable(true);
-              this.obstacles.add(rect);
-            };
+            // Slight variety per world (still “random” feeling, not pattern-y)
+            const sizeMin = 22;
+            const sizeMax = 34;
+            const size = Phaser.Math.Between(sizeMin, sizeMax);
 
-            if (type === "single") {
-              spawnAtCol(Phaser.Math.Between(0, GRID_COLS - 1));
-              return;
+            const rect = this.add.rectangle(x, y, size, size, this.cfg.obstacleColor);
+            this.physics.add.existing(rect);
+            rect.body.setAllowGravity(false);
+            rect.body.setImmovable(true);
+            this.obstacles.add(rect);
+          }
+
+          levelComplete() {
+            // Save unlock/progress
+            const p = loadProgress();
+
+            // Determine next level/world
+            let nextWorld = this.world;
+            let nextLevel = this.level + 1;
+            let worldComplete = false;
+
+            if (nextLevel >= LEVELS_PER_WORLD) {
+              worldComplete = true;
+              nextLevel = 0;
+              nextWorld = this.world + 1;
             }
 
-            if (type === "double") {
-              let c1 = Phaser.Math.Between(0, GRID_COLS - 1);
-              let c2 = Phaser.Math.Between(0, GRID_COLS - 1);
-              if (c2 === c1) c2 = (c1 + Phaser.Math.Between(2, GRID_COLS - 2)) % GRID_COLS;
-              spawnAtCol(c1);
-              spawnAtCol(c2);
-              return;
+            // Update unlocks
+            if (worldComplete) {
+              // Completed last level of this world
+              p.unlockedWorld = Math.max(p.unlockedWorld, this.world + 1);
+              p.unlockedLevel = 0;
+            } else {
+              // Completed a level within this world
+              if (p.unlockedWorld < this.world) p.unlockedWorld = this.world;
+              if (p.unlockedWorld === this.world) p.unlockedLevel = Math.max(p.unlockedLevel, this.level + 1);
             }
 
-            if (type === "triple") {
-              const cols = new Set();
-              while (cols.size < 3) cols.add(Phaser.Math.Between(0, GRID_COLS - 1));
-              for (const c of cols) spawnAtCol(c, 20, 32);
-              return;
+            // Set current to next playable (or clamp if finished all worlds)
+            if (nextWorld >= WORLDS.length) {
+              // finished all content — keep them at last world/level
+              p.currentWorld = WORLDS.length - 1;
+              p.currentLevel = LEVELS_PER_WORLD - 1;
+            } else {
+              p.currentWorld = nextWorld;
+              p.currentLevel = nextLevel;
             }
 
-            if (type === "wallgap") {
-              const gap = Phaser.Math.Between(0, GRID_COLS - 1);
-              for (let c = 0; c < GRID_COLS; c++) {
-                if (c === gap) continue;
-                spawnAtCol(c, 22, 34);
-              }
-              this.lastGapCol = gap;
-              return;
-            }
+            saveProgress(p);
 
-            if (type === "zigzag") {
-              const dir = Phaser.Math.Between(0, 1) ? 1 : -1;
-              let gap = this.lastGapCol + dir;
-              if (gap < 0) gap = 1;
-              if (gap > GRID_COLS - 1) gap = GRID_COLS - 2;
-
-              for (let c = 0; c < GRID_COLS; c++) {
-                if (c === gap) continue;
-                spawnAtCol(c, 22, 34);
-              }
-              this.lastGapCol = gap;
-              return;
+            // Go to completion scene
+            if (nextWorld >= WORLDS.length) {
+              this.scene.start("CampaignComplete", { score: Math.floor(this.score) });
+            } else if (worldComplete) {
+              this.scene.start("WorldComplete", { world: this.world, nextWorld, score: Math.floor(this.score) });
+            } else {
+              this.scene.start("LevelComplete", { world: this.world, level: this.level, nextWorld, nextLevel, score: Math.floor(this.score) });
             }
           }
 
           gameOver() {
-            this.scene.start("GameOver", { score: Math.floor(this.score) });
+            this.scene.start("GameOver", {
+              world: this.world,
+              level: this.level,
+              score: Math.floor(this.score),
+              timeLeft: Math.max(0, Math.ceil(this.levelDuration - this.levelTime))
+            });
+          }
+        }
+
+        class LevelCompleteScene extends Phaser.Scene {
+          constructor() { super("LevelComplete"); }
+          create(data) {
+            const world = data?.world ?? 0;
+            const level = data?.level ?? 0;
+            const score = data?.score ?? 0;
+            const nextWorld = data?.nextWorld ?? world;
+            const nextLevel = data?.nextLevel ?? (level + 1);
+
+            const cfg = WORLDS[clamp(world, 0, WORLDS.length - 1)];
+            this.cameras.main.setBackgroundColor(cfg.bg);
+
+            addTitle(this, "LEVEL CLEAR", 0.30, 34);
+            this.add.text(W/2, H*0.40, `${cfg.name} • Level ${level + 1}/${LEVELS_PER_WORLD}`, {
+              fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff"
+            }).setOrigin(0.5);
+
+            this.add.text(W/2, H*0.47, `Score: ${score}`, {
+              fontFamily: uiFont, fontSize: "18px", color: "#ffffff"
+            }).setOrigin(0.5);
+
+            makeButton(this, "NEXT LEVEL", W/2, H*0.60, () => {
+              this.scene.start("WorldIntro", { world: nextWorld, level: nextLevel, fromContinue: false });
+            });
+
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.70, () => this.scene.start("Menu"));
+          }
+        }
+
+        class WorldCompleteScene extends Phaser.Scene {
+          constructor() { super("WorldComplete"); }
+          create(data) {
+            const world = data?.world ?? 0;
+            const nextWorld = data?.nextWorld ?? (world + 1);
+            const score = data?.score ?? 0;
+
+            const cfg = WORLDS[clamp(world, 0, WORLDS.length - 1)];
+            this.cameras.main.setBackgroundColor(cfg.bg);
+
+            addTitle(this, "WORLD CLEAR", 0.30, 34);
+            this.add.text(W/2, H*0.40, `${cfg.name} completed`, {
+              fontFamily: uiFont, fontSize: "16px", color: "#ffffff"
+            }).setOrigin(0.5);
+
+            this.add.text(W/2, H*0.48, `Score: ${score}`, {
+              fontFamily: uiFont, fontSize: "18px", color: "#b7b7ff"
+            }).setOrigin(0.5);
+
+            makeButton(this, "NEXT WORLD", W/2, H*0.62, () => {
+              this.scene.start("WorldIntro", { world: nextWorld, level: 0, fromContinue: false });
+            });
+
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.72, () => this.scene.start("Menu"));
+          }
+        }
+
+        class CampaignCompleteScene extends Phaser.Scene {
+          constructor() { super("CampaignComplete"); }
+          create(data) {
+            this.cameras.main.setBackgroundColor(0x020208);
+
+            addTitle(this, "CAMPAIGN CLEAR", 0.30, 32);
+            this.add.text(W/2, H*0.42, `You cleared all worlds.`, {
+              fontFamily: uiFont, fontSize: "16px", color: "#ffffff"
+            }).setOrigin(0.5);
+
+            this.add.text(W/2, H*0.50, `Final Score: ${data?.score ?? 0}`, {
+              fontFamily: uiFont, fontSize: "18px", color: "#b7b7ff"
+            }).setOrigin(0.5);
+
+            makeButton(this, "PLAY AGAIN", W/2, H*0.64, () => {
+              const fresh = { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
+              saveProgress(fresh);
+              this.scene.start("WorldIntro", { world: 0, level: 0, fromContinue: false });
+            });
+
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.74, () => this.scene.start("Menu"));
           }
         }
 
         class GameOverScene extends Phaser.Scene {
           constructor() { super("GameOver"); }
           create(data) {
-            this.cameras.main.setBackgroundColor(0x070710);
+            const world = data?.world ?? 0;
+            const level = data?.level ?? 0;
             const score = data?.score ?? 0;
+            const timeLeft = data?.timeLeft ?? 0;
 
-            addTitle(this, "RUN ENDED", 0.35);
-            this.add.text(W/2, H*0.43, "Score: " + score, {
-              fontFamily: uiFont, fontSize: "18px", color: "#b7b7ff",
+            const cfg = WORLDS[clamp(world, 0, WORLDS.length - 1)];
+            this.cameras.main.setBackgroundColor(0x070710);
+
+            addTitle(this, "RUN ENDED", 0.33, 34);
+            this.add.text(W/2, H*0.42, `${cfg.name} • Level ${level + 1}/${LEVELS_PER_WORLD}`, {
+              fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff"
             }).setOrigin(0.5);
 
-            makeButton(this, "RETRY", W/2, H*0.55, () => this.scene.start("Play"));
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.65, () => this.scene.start("Menu"));
+            this.add.text(W/2, H*0.48, `Score: ${score}`, {
+              fontFamily: uiFont, fontSize: "18px", color: "#ffffff"
+            }).setOrigin(0.5);
+
+            this.add.text(W/2, H*0.54, `Time left: ${timeLeft}s`, {
+              fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff"
+            }).setOrigin(0.5).setAlpha(0.85);
+
+            makeButton(this, "RETRY LEVEL", W/2, H*0.66, () => {
+              this.scene.start("Play", { world, level });
+            });
+
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.76, () => this.scene.start("Menu"));
           }
         }
 
+        // ======== GAME INIT ========
         new Phaser.Game({
           type: Phaser.AUTO,
           width: W,
           height: H,
           physics: { default: "arcade", arcade: { debug: false } },
-          scene: [MenuScene, CosmeticsScene, EventsScene, PlayScene, GameOverScene],
+          scene: [
+            MenuScene,
+            CosmeticsScene,
+            EventsScene,
+            WorldIntroScene,
+            PlayScene,
+            LevelCompleteScene,
+            WorldCompleteScene,
+            CampaignCompleteScene,
+            GameOverScene
+          ],
         });
 
       }, 50);

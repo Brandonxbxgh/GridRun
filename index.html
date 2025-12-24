@@ -13,356 +13,120 @@
       color:rgba(255,255,255,.75);
       background:rgba(0,0,0,.35);
       padding:8px 10px; border-radius:10px;
-      user-select:none;
-      z-index: 10;
+      user-select:none; z-index:10;
     }
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD / Arrow Keys • Mobile: drag thumb to steer (analog) • Survive as long as possible</div>
+<div class="hint">PC: WASD / Arrows • Mobile: drag thumb (fast analog)</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
-  <script>
-    window.addEventListener("load", () => {
-      const wait = setInterval(() => {
-        if (typeof window.Phaser === "undefined") return;
-        clearInterval(wait);
+<script>
+window.addEventListener("load", () => {
+  const wait = setInterval(() => {
+    if (typeof Phaser === "undefined") return;
+    clearInterval(wait);
 
-        const W = 420, H = 760;
+    const W = 420, H = 760;
+    const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
 
-        // ----- Shared UI helpers -----
-        const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+    const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
+    const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
+    const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
 
-        function addTitle(scene, text, yFrac = 0.22) {
-          return scene.add.text(W/2, H*yFrac, text, {
-            fontFamily: uiFont,
-            fontSize: "40px",
-            color: "#ffffff",
-          }).setOrigin(0.5).setAlpha(0.95);
+    const PLAYER_SPEED = 320;
+    const BASE_SCROLL = 120;
+    const SPAWN_START_MS = 850;
+    const SPAWN_MIN_MS = 320;
+
+    // 🔥 Faster mobile response
+    const ANALOG_MAX_DIST = 110;
+    const ANALOG_DEADZONE = 4;
+    const ANALOG_BOOST = 1.25; // extra punch
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+    class PlayScene extends Phaser.Scene {
+      constructor() {
+        super("Play");
+        this.touchTarget = null;
+      }
+
+      create() {
+        this.cameras.main.setBackgroundColor(0x0a0a12);
+        this.gridGraphics = this.add.graphics();
+        this.gridOffset = 0;
+
+        this.obstacles = this.physics.add.group({ immovable:true, allowGravity:false });
+
+        const startX = GRID_X + GRID_W / 2;
+        const startY = GRID_Y + GRID_H * 0.72;
+        this.player = this.add.rectangle(startX, startY, 28, 28, 0x6ef3ff);
+        this.physics.add.existing(this.player);
+        this.player.body.setAllowGravity(false);
+
+        this.physics.add.overlap(this.player, this.obstacles, () => this.scene.restart());
+
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.keys = this.input.keyboard.addKeys("W,A,S,D");
+
+        this.input.on("pointerdown", p => this.touchTarget = { x:p.x, y:p.y });
+        this.input.on("pointermove", p => { if (p.isDown) this.touchTarget = { x:p.x, y:p.y }; });
+        this.input.on("pointerup", () => this.touchTarget = null);
+
+        this.scoreText = this.add.text(14,12,"Score: 0",{ fontFamily:uiFont, fontSize:"16px", color:"#fff" });
+
+        this.elapsed = 0;
+        this.spawnEvery = SPAWN_START_MS;
+        this.spawnTimer = 0;
+      }
+
+      update(_, deltaMs) {
+        const dt = deltaMs / 1000;
+        this.elapsed += dt;
+
+        let vx = 0, vy = 0;
+        if (this.cursors.left.isDown || this.keys.A.isDown) vx -= 1;
+        if (this.cursors.right.isDown || this.keys.D.isDown) vx += 1;
+        if (this.cursors.up.isDown || this.keys.W.isDown) vy -= 1;
+        if (this.cursors.down.isDown || this.keys.S.isDown) vy += 1;
+
+        // ⚡ FAST analog thumb-follow
+        if (this.touchTarget) {
+          const dx = this.touchTarget.x - this.player.x;
+          const dy = this.touchTarget.y - this.player.y;
+
+          const ax = Math.abs(dx) > ANALOG_DEADZONE ? dx : 0;
+          const ay = Math.abs(dy) > ANALOG_DEADZONE ? dy : 0;
+
+          vx += Phaser.Math.Clamp((ax / ANALOG_MAX_DIST) * ANALOG_BOOST, -1, 1);
+          vy += Phaser.Math.Clamp((ay / ANALOG_MAX_DIST) * ANALOG_BOOST, -1, 1);
         }
 
-        function addSubtitle(scene, text, yFrac = 0.28) {
-          return scene.add.text(W/2, H*yFrac, text, {
-            fontFamily: uiFont,
-            fontSize: "14px",
-            color: "#b7b7ff",
-          }).setOrigin(0.5).setAlpha(0.9);
-        }
+        const mag = Math.hypot(vx, vy);
+        if (mag > 1) { vx /= mag; vy /= mag; }
 
-        function makeButton(scene, label, x, y, onClick) {
-          const btn = scene.add.text(x, y, label, {
-            fontFamily: uiFont,
-            fontSize: "18px",
-            color: "#0a0a12",
-            backgroundColor: "#6ef3ff",
-            padding: { left: 18, right: 18, top: 10, bottom: 10 },
-          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
 
-          btn.on("pointerdown", onClick);
-          btn.on("pointerover", () => btn.setAlpha(0.92));
-          btn.on("pointerout", () => btn.setAlpha(1));
-          return btn;
-        }
+        const pad = 14;
+        this.player.x = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
+        this.player.y = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
+        this.player.body.reset(this.player.x, this.player.y);
 
-        function makeGhostButton(scene, label, x, y, onClick) {
-          const btn = scene.add.text(x, y, label, {
-            fontFamily: uiFont,
-            fontSize: "16px",
-            color: "#ffffff",
-            backgroundColor: "rgba(255,255,255,0.10)",
-            padding: { left: 16, right: 16, top: 10, bottom: 10 },
-          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        this.scoreText.setText("Score: " + Math.floor(this.elapsed * 10));
+      }
+    }
 
-          btn.on("pointerdown", onClick);
-          btn.on("pointerover", () => btn.setAlpha(0.85));
-          btn.on("pointerout", () => btn.setAlpha(1));
-          return btn;
-        }
-
-        // ----- GAMEPLAY constants -----
-        const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
-        const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
-        const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
-
-        const PLAYER_SPEED = 320;
-        const BASE_SCROLL = 120;
-        const SPAWN_START_MS = 850;
-        const SPAWN_MIN_MS = 320;
-
-        // How “analog” the thumb-follow feels:
-        // Larger = slower response; smaller = snappier.
-        const ANALOG_MAX_DIST = 180;
-        const ANALOG_DEADZONE = 10;
-
-        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-        // ----- Scenes -----
-        class MenuScene extends Phaser.Scene {
-          constructor() { super("Menu"); }
-          create() {
-            this.cameras.main.setBackgroundColor(0x0a0a12);
-
-            const g = this.add.graphics();
-            g.lineStyle(1, 0x20204a, 0.8);
-            for (let i = 0; i < 30; i++) {
-              const y = i * 28;
-              g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.strokePath();
-            }
-            for (let i = 0; i < 20; i++) {
-              const x = i * 28;
-              g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.strokePath();
-            }
-
-            addTitle(this, "GRIDRUN", 0.22);
-            addSubtitle(this, "Fast neon dodging. Skill only. Fun first.", 0.285);
-
-            makeButton(this, "PLAY", W/2, H*0.46, () => this.scene.start("Play"));
-            makeGhostButton(this, "COSMETICS", W/2, H*0.56, () => this.scene.start("Cosmetics"));
-            makeGhostButton(this, "EVENTS", W/2, H*0.66, () => this.scene.start("Events"));
-
-            this.add.text(W/2, H*0.82, "Wallet integration comes later.\nGameplay is fully playable without it.", {
-              fontFamily: uiFont,
-              fontSize: "12px",
-              color: "#ffffff",
-              align: "center",
-            }).setOrigin(0.5).setAlpha(0.55);
-          }
-        }
-
-        class CosmeticsScene extends Phaser.Scene {
-          constructor() { super("Cosmetics"); }
-          create() {
-            this.cameras.main.setBackgroundColor(0x070710);
-            addTitle(this, "COSMETICS", 0.22);
-            addSubtitle(this, "Placeholder screen (no wallet required yet).", 0.29);
-
-            this.add.text(W/2, H*0.43,
-              "Coming soon:\n• Trails\n• Color palettes\n• Avatars\n\nCosmetic only — no gameplay advantage.",
-              { fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff", align: "center" }
-            ).setOrigin(0.5);
-
-            makeGhostButton(this, "BACK", W/2, H*0.72, () => this.scene.start("Menu"));
-          }
-        }
-
-        class EventsScene extends Phaser.Scene {
-          constructor() { super("Events"); }
-          create() {
-            this.cameras.main.setBackgroundColor(0x070710);
-            addTitle(this, "EVENTS", 0.22);
-            addSubtitle(this, "Placeholder screen (no rewards, no earnings).", 0.29);
-
-            this.add.text(W/2, H*0.43,
-              "Coming soon:\n• Weekly challenges\n• Limited-time modes\n• Prestige leaderboards\n\nFun + bragging rights only.",
-              { fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff", align: "center" }
-            ).setOrigin(0.5);
-
-            makeGhostButton(this, "BACK", W/2, H*0.72, () => this.scene.start("Menu"));
-          }
-        }
-
-        class PlayScene extends Phaser.Scene {
-          constructor() {
-            super("Play");
-            this.scrollSpeed = BASE_SCROLL;
-            this.spawnEvery = SPAWN_START_MS;
-            this.spawnTimer = 0;
-            this.elapsed = 0;
-            this.score = 0;
-            this.touchTarget = null; // analog thumb-follow target
-          }
-
-          create() {
-            this.cameras.main.setBackgroundColor(0x0a0a12);
-
-            this.gridGraphics = this.add.graphics();
-            this.gridOffset = 0;
-
-            this.obstacles = this.physics.add.group({ immovable: true, allowGravity: false });
-
-            const startX = GRID_X + GRID_W / 2;
-            const startY = GRID_Y + GRID_H * 0.72;
-
-            this.player = this.add.rectangle(startX, startY, 28, 28, 0x6ef3ff);
-            this.physics.add.existing(this.player);
-            this.player.body.setAllowGravity(false);
-
-            this.physics.add.overlap(this.player, this.obstacles, () => this.gameOver());
-
-            this.cursors = this.input.keyboard.createCursorKeys();
-            this.keys = this.input.keyboard.addKeys("W,A,S,D");
-
-            // Analog thumb-follow: touch/drag sets a target point.
-            // Player steers toward finger position while pressed.
-            this.touchTarget = null;
-            this.input.on("pointerdown", (p) => {
-              this.touchTarget = { x: p.x, y: p.y };
-            });
-            this.input.on("pointermove", (p) => {
-              if (!p.isDown) return;
-              this.touchTarget = { x: p.x, y: p.y };
-            });
-            this.input.on("pointerup", () => {
-              this.touchTarget = null;
-            });
-
-            this.uiText = this.add.text(14, 12, "Score: 0", {
-              fontFamily: uiFont,
-              fontSize: "16px",
-              color: "#ffffff",
-            }).setAlpha(0.9);
-
-            this.add.text(14, 34, "Survive. Speed ramps up.", {
-              fontFamily: uiFont,
-              fontSize: "12px",
-              color: "#b7b7ff",
-            }).setAlpha(0.9);
-
-            // reset
-            this.scrollSpeed = BASE_SCROLL;
-            this.spawnEvery = SPAWN_START_MS;
-            this.spawnTimer = 0;
-            this.elapsed = 0;
-            this.score = 0;
-          }
-
-          update(_, deltaMs) {
-            const dt = deltaMs / 1000;
-            this.elapsed += dt;
-
-            // difficulty ramp
-            this.scrollSpeed = BASE_SCROLL + this.elapsed * 22;
-            this.spawnEvery = clamp(SPAWN_START_MS - this.elapsed * 18, SPAWN_MIN_MS, SPAWN_START_MS);
-
-            // score
-            this.score += dt * 10;
-            this.uiText.setText("Score: " + Math.floor(this.score));
-
-            // keyboard movement (smooth)
-            let vx = 0, vy = 0;
-            const left = this.cursors.left.isDown || this.keys.A.isDown;
-            const right = this.cursors.right.isDown || this.keys.D.isDown;
-            const up = this.cursors.up.isDown || this.keys.W.isDown;
-            const down = this.cursors.down.isDown || this.keys.S.isDown;
-
-            if (left) vx -= 1;
-            if (right) vx += 1;
-            if (up) vy -= 1;
-            if (down) vy += 1;
-
-            // Analog thumb-follow (mobile): adds steering toward finger.
-            if (this.touchTarget) {
-              const dx = this.touchTarget.x - this.player.x;
-              const dy = this.touchTarget.y - this.player.y;
-
-              // deadzone to avoid jitter
-              const ax = Math.abs(dx) > ANALOG_DEADZONE ? dx : 0;
-              const ay = Math.abs(dy) > ANALOG_DEADZONE ? dy : 0;
-
-              // scale by distance (clamped), so farther finger = stronger steering
-              vx += Phaser.Math.Clamp(ax / ANALOG_MAX_DIST, -1, 1);
-              vy += Phaser.Math.Clamp(ay / ANALOG_MAX_DIST, -1, 1);
-            }
-
-            // Normalize if both axes have movement (prevents diagonal speed boost)
-            const mag = Math.hypot(vx, vy);
-            if (mag > 1) { vx /= mag; vy /= mag; }
-
-            this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
-
-            // keep inside grid
-            const pad = 14;
-            const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
-            const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
-            if (nx !== this.player.x || ny !== this.player.y) {
-              this.player.x = nx; this.player.y = ny;
-              this.player.body.reset(nx, ny);
-            }
-
-            // spawn obstacles
-            this.spawnTimer += deltaMs;
-            while (this.spawnTimer >= this.spawnEvery) {
-              this.spawnTimer -= this.spawnEvery;
-              this.spawnObstacle();
-            }
-
-            // move obstacles
-            this.obstacles.children.iterate((o) => {
-              if (!o) return;
-              o.y += this.scrollSpeed * dt;
-              if (o.y > GRID_Y + GRID_H + 80) o.destroy();
-            });
-
-            // draw grid
-            this.drawGrid(dt);
-          }
-
-          drawGrid(dt) {
-            this.gridOffset = (this.gridOffset + this.scrollSpeed * dt) % TILE;
-            const g = this.gridGraphics;
-            g.clear();
-
-            g.lineStyle(2, 0x2a2a55, 0.9);
-            g.strokeRoundedRect(GRID_X - 6, GRID_Y - 6, GRID_W + 12, GRID_H + 12, 14);
-
-            g.lineStyle(1, 0x20204a, 0.9);
-
-            for (let c = 0; c <= GRID_COLS; c++) {
-              const x = GRID_X + c * TILE;
-              g.beginPath(); g.moveTo(x, GRID_Y); g.lineTo(x, GRID_Y + GRID_H); g.strokePath();
-            }
-            for (let r = -1; r <= GRID_ROWS + 1; r++) {
-              const y = GRID_Y + r * TILE + this.gridOffset - TILE;
-              g.beginPath(); g.moveTo(GRID_X, y); g.lineTo(GRID_X + GRID_W, y); g.strokePath();
-            }
-          }
-
-          spawnObstacle() {
-            const col = Phaser.Math.Between(0, GRID_COLS - 1);
-            const x = GRID_X + col * TILE + TILE / 2;
-            const y = GRID_Y - 40;
-            const size = Phaser.Math.Between(22, 34);
-
-            const rect = this.add.rectangle(x, y, size, size, 0xff4d7d);
-            this.physics.add.existing(rect);
-            rect.body.setAllowGravity(false);
-            rect.body.setImmovable(true);
-            this.obstacles.add(rect);
-          }
-
-          gameOver() {
-            this.scene.start("GameOver", { score: Math.floor(this.score) });
-          }
-        }
-
-        class GameOverScene extends Phaser.Scene {
-          constructor() { super("GameOver"); }
-          create(data) {
-            this.cameras.main.setBackgroundColor(0x070710);
-            const score = data?.score ?? 0;
-
-            addTitle(this, "RUN ENDED", 0.35);
-            this.add.text(W/2, H*0.43, "Score: " + score, {
-              fontFamily: uiFont,
-              fontSize: "18px",
-              color: "#b7b7ff",
-            }).setOrigin(0.5);
-
-            makeButton(this, "RETRY", W/2, H*0.55, () => this.scene.start("Play"));
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.65, () => this.scene.start("Menu"));
-          }
-        }
-
-        new Phaser.Game({
-          type: Phaser.AUTO,
-          width: W,
-          height: H,
-          physics: { default: "arcade", arcade: { debug: false } },
-          scene: [MenuScene, CosmeticsScene, EventsScene, PlayScene, GameOverScene],
-        });
-      }, 50);
+    new Phaser.Game({
+      type: Phaser.AUTO,
+      width: W,
+      height: H,
+      physics: { default:"arcade", arcade:{ debug:false } },
+      scene: [PlayScene]
     });
-  </script>
+  }, 50);
+});
+</script>
 </body>
 </html>

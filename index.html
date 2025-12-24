@@ -18,7 +18,7 @@
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD/Arrows • Mobile: DIRECT FOLLOW (drag) • 3 Worlds • 5 Levels • W3 Laser Boss</div>
+  <div class="hint">PC: WASD/Arrows • Mobile: DIRECT FOLLOW (drag) • Campaign + Endless • Separate Leaderboards • Same scoring rules</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -36,43 +36,118 @@
         const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
         const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
 
-        // Movement
+        // ===== Movement =====
         const PLAYER_SPEED = 320;
 
-        // ✅ Mobile DIRECT FOLLOW only
+        // ✅ Mobile DIRECT FOLLOW only (tunable in Settings)
         const FOLLOW_RADIUS = 7;
-        const FOLLOW_LERP = 0.38;
-        const FOLLOW_MAX_SPEED_MULT = 2.8;
+        const DEFAULT_FOLLOW_LERP = 0.38;
+        const DEFAULT_FOLLOW_MAX_MULT = 2.8;
 
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+        const lerp = (a,b,t) => a + (b-a)*t;
         const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
 
-        // ===== SAVE / PROGRESS =====
-        const LEVELS_PER_WORLD = 5;
-        const SAVE_KEY = "gridrun_progress_v4";
+        // ===== Storage =====
+        const SAVE_KEY = "gridrun_progress_v5";
+        const SETTINGS_KEY = "gridrun_settings_v1";
+        const LEADER_KEY = "gridrun_leaderboards_v1";
 
+        const LEVELS_PER_WORLD = 5;
+        const WORLDS_COUNT = 3;
+        const TOTAL_LEVELS = WORLDS_COUNT * LEVELS_PER_WORLD;
+
+        // ===== Settings =====
+        function loadSettings() {
+          try {
+            const raw = localStorage.getItem(SETTINGS_KEY);
+            if (!raw) return {
+              shake: true,
+              sfx: false,
+              followLerp: DEFAULT_FOLLOW_LERP,
+              followMaxMult: DEFAULT_FOLLOW_MAX_MULT
+            };
+            const s = JSON.parse(raw);
+            return {
+              shake: s.shake !== false,
+              sfx: s.sfx === true,
+              followLerp: Number.isFinite(s.followLerp) ? clamp(s.followLerp, 0.18, 0.70) : DEFAULT_FOLLOW_LERP,
+              followMaxMult: Number.isFinite(s.followMaxMult) ? clamp(s.followMaxMult, 1.6, 4.0) : DEFAULT_FOLLOW_MAX_MULT
+            };
+          } catch {
+            return { shake:true, sfx:false, followLerp: DEFAULT_FOLLOW_LERP, followMaxMult: DEFAULT_FOLLOW_MAX_MULT };
+          }
+        }
+        function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+        // ===== Progress =====
         function loadProgress() {
           try {
             const raw = localStorage.getItem(SAVE_KEY);
-            if (!raw) return { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
+            if (!raw) {
+              return {
+                unlockedWorld: 0,
+                unlockedLevel: 0,
+                currentWorld: 0,
+                currentLevel: 0,
+                // per-level best score (campaign)
+                levelBest: Array(TOTAL_LEVELS).fill(0)
+              };
+            }
             const p = JSON.parse(raw);
+            const levelBest = Array.isArray(p.levelBest) ? p.levelBest.map(x => Math.max(0, Math.floor(x||0))) : Array(TOTAL_LEVELS).fill(0);
+            while (levelBest.length < TOTAL_LEVELS) levelBest.push(0);
             return {
-              unlockedWorld: Number.isFinite(p.unlockedWorld) ? p.unlockedWorld : 0,
-              unlockedLevel: Number.isFinite(p.unlockedLevel) ? p.unlockedLevel : 0,
-              currentWorld: Number.isFinite(p.currentWorld) ? p.currentWorld : 0,
-              currentLevel: Number.isFinite(p.currentLevel) ? p.currentLevel : 0
+              unlockedWorld: Number.isFinite(p.unlockedWorld) ? clamp(p.unlockedWorld, 0, WORLDS_COUNT-1) : 0,
+              unlockedLevel: Number.isFinite(p.unlockedLevel) ? clamp(p.unlockedLevel, 0, LEVELS_PER_WORLD-1) : 0,
+              currentWorld: Number.isFinite(p.currentWorld) ? clamp(p.currentWorld, 0, WORLDS_COUNT-1) : 0,
+              currentLevel: Number.isFinite(p.currentLevel) ? clamp(p.currentLevel, 0, LEVELS_PER_WORLD-1) : 0,
+              levelBest
             };
           } catch {
-            return { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
+            return { unlockedWorld:0, unlockedLevel:0, currentWorld:0, currentLevel:0, levelBest: Array(TOTAL_LEVELS).fill(0) };
           }
         }
         function saveProgress(p) { localStorage.setItem(SAVE_KEY, JSON.stringify(p)); }
-        function resetProgress() { localStorage.removeItem(SAVE_KEY); }
+        function resetAllSaves() {
+          localStorage.removeItem(SAVE_KEY);
+          localStorage.removeItem(LEADER_KEY);
+        }
 
+        function levelId(world, level) { return world * LEVELS_PER_WORLD + level; }
+        function campaignTotalScore(p) { return p.levelBest.reduce((a,b)=>a+b, 0); }
+        function worldSubtotal(p, world) {
+          const start = world * LEVELS_PER_WORLD;
+          let sum = 0;
+          for (let i=0;i<LEVELS_PER_WORLD;i++) sum += (p.levelBest[start+i]||0);
+          return sum;
+        }
         function isLevelUnlocked(p, world, level) {
           if (world < p.unlockedWorld) return true;
           if (world > p.unlockedWorld) return false;
           return level <= p.unlockedLevel;
+        }
+
+        // ===== Leaderboards (local) =====
+        // Separate: Campaign Total and Endless Best Run
+        function loadLeaderboards() {
+          try {
+            const raw = localStorage.getItem(LEADER_KEY);
+            if (!raw) return { campaignTop: [], endlessTop: [] };
+            const lb = JSON.parse(raw);
+            const normalize = (arr) => (Array.isArray(arr) ? arr : [])
+              .map(x => ({ score: Math.max(0, Math.floor(x?.score||0)), meta: x?.meta || "" }))
+              .sort((a,b)=>b.score-a.score)
+              .slice(0,10);
+            return { campaignTop: normalize(lb.campaignTop), endlessTop: normalize(lb.endlessTop) };
+          } catch {
+            return { campaignTop: [], endlessTop: [] };
+          }
+        }
+        function saveLeaderboards(lb) { localStorage.setItem(LEADER_KEY, JSON.stringify(lb)); }
+        function maybeInsertTop(list, entry) {
+          const next = [...list, entry].sort((a,b)=>b.score-a.score).slice(0,10);
+          return next;
         }
 
         // ===== UI helpers =====
@@ -115,31 +190,25 @@
           return btn;
         }
 
-        // ===== Level times (fixed) =====
+        // ===== Level times =====
         const DUR = [20, 25, 30, 38, 45];
 
-        // Difficulty builder:
-        // baseScroll + scrollRamp control obstacle travel speed.
-        // spawnStart/spawnMin/spawnRamp control density (lower = denser).
+        // Difficulty builder
         function mkLevels(cfg) {
           return DUR.map((seconds, i) => ({
             seconds,
             baseScroll: cfg.baseScroll0 + cfg.baseScrollStep * i,
             scrollRamp: cfg.ramp0 + cfg.rampStep * i,
 
-            // density
             spawnStart: cfg.spawnStart0 - cfg.spawnStep * i,
             spawnRamp: cfg.spawnRamp0 + cfg.spawnRampStep * i,
             spawnMin: Math.max(cfg.spawnMinFloor, cfg.spawnMin0 - cfg.spawnMinStep * i),
 
-            // obstacle footprint
             size: [cfg.sizeMin0 - cfg.sizeMinStep*i, cfg.sizeMax0 - cfg.sizeMaxStep*i]
           }));
         }
 
-        // ===== Worlds (A+B+C mixed) with your new difficulty intent =====
-        // Rule: World2 > World1, World3 > World2 across matching levels.
-        // Also: W1/W2 L2-L5 bumped; W3 L1-L4 bumped slightly.
+        // ===== Worlds =====
         const WORLDS = [
           {
             id: 0,
@@ -152,17 +221,13 @@
             fx: "scanlines",
             gridStyle: "circuit",
             obstacleStyle: { palette: [0xff4d7d, 0xff6aa2, 0xff7bd0], shapes: ["tri","hex","frame","rect"] },
-
-            // ✅ World 1: easy L1, stronger L2-L5
             levels: mkLevels({
-              baseScroll0: 80, baseScrollStep: 18,     // speed ramps harder by level
+              baseScroll0: 80, baseScrollStep: 18,
               ramp0: 8.0, rampStep: 3.0,
-
-              spawnStart0: 1020, spawnStep: 105,       // L2-5 noticeably denser
+              spawnStart0: 1020, spawnStep: 105,
               spawnRamp0: 10, spawnRampStep: 3,
               spawnMin0: 520, spawnMinStep: 55,
               spawnMinFloor: 300,
-
               sizeMin0: 22, sizeMinStep: 1,
               sizeMax0: 34, sizeMaxStep: 1
             })
@@ -178,17 +243,13 @@
             fx: "rain",
             gridStyle: "industrial",
             obstacleStyle: { palette: [0xffd166, 0xff4d7d, 0x7cffd2], shapes: ["bar","plus","rect","frame"] },
-
-            // ✅ World 2: Level 1 is harder than World 1 Level 1 (and so on)
             levels: mkLevels({
               baseScroll0: 92, baseScrollStep: 20,
               ramp0: 9.0, rampStep: 3.3,
-
               spawnStart0: 980, spawnStep: 115,
               spawnRamp0: 11, spawnRampStep: 3.4,
               spawnMin0: 500, spawnMinStep: 60,
               spawnMinFloor: 285,
-
               sizeMin0: 21, sizeMinStep: 1,
               sizeMax0: 33, sizeMaxStep: 1
             })
@@ -204,17 +265,13 @@
             fx: "stars",
             gridStyle: "glitch",
             obstacleStyle: { palette: [0xff4d7d, 0xffb0ff, 0x9aa7ff], shapes: ["hex","tri","bar","frame"] },
-
-            // ✅ World 3: slightly harder across L1-L4 (and still hardest overall)
             levels: mkLevels({
               baseScroll0: 98, baseScrollStep: 22,
               ramp0: 9.6, rampStep: 3.6,
-
               spawnStart0: 940, spawnStep: 120,
               spawnRamp0: 12, spawnRampStep: 3.6,
               spawnMin0: 480, spawnMinStep: 62,
               spawnMinFloor: 270,
-
               sizeMin0: 21, sizeMinStep: 1,
               sizeMax0: 33, sizeMaxStep: 1
             }),
@@ -232,7 +289,6 @@
         // ===== Background FX =====
         function buildBackdrop(scene, fxType, colorA, colorB) {
           const items = [];
-
           if (fxType === "scanlines") {
             const g = scene.add.graphics();
             g.setAlpha(0.22);
@@ -242,7 +298,6 @@
             }
             items.push(g);
           }
-
           if (fxType === "rain") {
             const drops = [];
             for (let i = 0; i < 42; i++) {
@@ -265,7 +320,6 @@
             });
             items.push(...drops);
           }
-
           if (fxType === "stars") {
             const stars = [];
             for (let i = 0; i < 62; i++) {
@@ -286,11 +340,10 @@
             });
             items.push(...stars);
           }
-
           return items;
         }
 
-        // ===== Obstacle texture factory =====
+        // ===== Obstacle textures =====
         function ensureObstacleTextures(scene) {
           const makeTex = (key, drawFn) => {
             if (scene.textures.exists(key)) return;
@@ -364,36 +417,194 @@
           plus: "obs_plus"
         };
 
+        // ===== Scoring (shared rules; separate totals per mode) =====
+        // Survival points per second
+        const SCORE_PPS = 12;
+
+        // Near miss: if obstacle passes within NEAR_DIST of player center, award points; chain multiplier
+        const NEAR_DIST = 30; // pixels
+        const NEAR_POINTS = 20;
+        const COMBO_DECAY_SEC = 1.35;  // if no near-miss in this time, combo resets
+        const COMBO_STEP = 0.12;       // multiplier increase per near-miss
+        const COMBO_MAX = 3.25;
+
+        // Campaign clear bonus per level (small, consistent)
+        const LEVEL_CLEAR_BONUS = 160;
+
+        function formatTime(sec) {
+          const m = Math.floor(sec / 60);
+          const s = Math.floor(sec % 60);
+          return m > 0 ? `${m}:${String(s).padStart(2,"0")}` : `${s}s`;
+        }
+
+        // ===== Endless blending model =====
+        // Starts at >= World 1 Level 1 difficulty (your requirement).
+        // We blend visuals & hazards over time and ramp difficulty forever.
+        const ENDLESS = {
+          // baseline anchored to World 1 L1
+          baseScroll0: WORLDS[0].levels[0].baseScroll,
+          ramp0: WORLDS[0].levels[0].scrollRamp,
+          spawnStart0: WORLDS[0].levels[0].spawnStart,
+          spawnRamp0: WORLDS[0].levels[0].spawnRamp,
+          spawnMinFloor: 230,
+
+          // how fast endless increases over time
+          scrollRampGrowth: 0.010,   // extra ramp per second
+          scrollBaseGrowth: 0.020,   // base speed growth per second
+          spawnTighten: 0.20,        // ms per second tighten
+          spawnRampGrowth: 0.010,    // extra spawnRamp per second
+
+          // stage timeline (seconds)
+          t_industrial: 70,
+          t_glitch: 150,
+          t_laserWarnOnly: 220,
+          t_laserActive: 320
+        };
+
+        function getEndlessBlend(t) {
+          // returns blend weights for world styles + hazard unlocks
+          const w1 = 1;
+          const w2 = clamp((t - ENDLESS.t_industrial) / 80, 0, 1);
+          const w3 = clamp((t - ENDLESS.t_glitch) / 90, 0, 1);
+          // normalize feel (not strictly necessary)
+          const total = w1 + w2 + w3;
+          return {
+            a1: w1/total, a2: w2/total, a3: w3/total,
+            laserWarn: t >= ENDLESS.t_laserWarnOnly,
+            laserActive: t >= ENDLESS.t_laserActive
+          };
+        }
+
+        function mixColor(c1, c2, t) {
+          const r1 = (c1>>16)&255, g1 = (c1>>8)&255, b1 = c1&255;
+          const r2 = (c2>>16)&255, g2 = (c2>>8)&255, b2 = c2&255;
+          const r = Math.floor(lerp(r1,r2,t));
+          const g = Math.floor(lerp(g1,g2,t));
+          const b = Math.floor(lerp(b1,b2,t));
+          return (r<<16)|(g<<8)|b;
+        }
+
         // ===== Scenes =====
         class MenuScene extends Phaser.Scene {
           constructor() { super("Menu"); }
           create() {
             this.cameras.main.setBackgroundColor(0x0a0a12);
-            addTitle(this, "GRIDRUN", 0.22, 46);
-            addSubtitle(this, "3 Worlds • 5 Levels • Skill-only arcade run", 0.285);
+            addTitle(this, "GRIDRUN", 0.20, 46);
+            addSubtitle(this, "Campaign + Endless • Skill-only • Separate leaderboards", 0.27);
+
+            makeButton(this, "CAMPAIGN", W/2, H*0.44, () => this.scene.start("WorldMap"));
+            makeGhostButton(this, "ENDLESS", W/2, H*0.54, () => this.scene.start("EndlessIntro"));
+            makeGhostButton(this, "LEADERBOARDS", W/2, H*0.64, () => this.scene.start("Leaderboards"));
+            makeGhostButton(this, "SETTINGS", W/2, H*0.74, () => this.scene.start("Settings"));
+            makeGhostButton(this, "RESET SAVES", W/2, H*0.84, () => { resetAllSaves(); this.scene.restart(); }).setAlpha(0.75);
 
             const p = loadProgress();
-            const hasProgress = (p.unlockedWorld > 0) || (p.unlockedLevel > 0);
-
-            makeButton(this, "PLAY (NEW RUN)", W/2, H*0.46, () => {
-              const fresh = { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
-              saveProgress(fresh);
-              this.scene.start("WorldMap");
-            });
-
-            const cont = makeGhostButton(this, hasProgress ? "CONTINUE" : "CONTINUE (LOCKED)", W/2, H*0.56, () => {
-              if (!hasProgress) return;
-              const p2 = loadProgress();
-              this.scene.start("WorldIntro", { world: p2.currentWorld, level: p2.currentLevel });
-            });
-            cont.setAlpha(hasProgress ? 1 : 0.45);
-
-            makeGhostButton(this, "WORLD MAP / LEVEL SELECT", W/2, H*0.66, () => this.scene.start("WorldMap"));
-            makeGhostButton(this, "RESET SAVE", W/2, H*0.78, () => { resetProgress(); this.scene.restart(); }).setAlpha(0.75);
-
-            this.add.text(W/2, H*0.88, "No login needed: progress saves locally on your device.", {
-              fontFamily: uiFont, fontSize: "12px", color: "#ffffff", align: "center"
+            const total = campaignTotalScore(p);
+            this.add.text(W/2, H*0.92, `Campaign Total: ${total}`, {
+              fontFamily: uiFont, fontSize: "12px", color: "#ffffff"
             }).setOrigin(0.5).setAlpha(0.55);
+          }
+        }
+
+        class SettingsScene extends Phaser.Scene {
+          constructor() { super("Settings"); }
+          create() {
+            this.cameras.main.setBackgroundColor(0x070710);
+            addTitle(this, "SETTINGS", 0.16, 34);
+            addSubtitle(this, "Tweak feel • Saved locally", 0.22);
+
+            const s = loadSettings();
+
+            const mkToggle = (label, y, value, onToggle) => {
+              const t = this.add.text(W/2, y, `${label}: ${value ? "ON" : "OFF"}`, {
+                fontFamily: uiFont, fontSize: "16px", color: "#ffffff",
+                backgroundColor: "rgba(255,255,255,0.10)",
+                padding: { left: 16, right: 16, top: 10, bottom: 10 },
+              }).setOrigin(0.5).setInteractive({ useHandCursor:true });
+              t.on("pointerdown", () => onToggle(t));
+              return t;
+            };
+
+            const mkSlider = (label, y, min, max, step, get, set) => {
+              const text = this.add.text(W/2, y, "", {
+                fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff"
+              }).setOrigin(0.5);
+
+              const minus = makeGhostButton(this, "−", W/2 - 110, y + 40, () => {
+                const v = clamp(get() - step, min, max); set(v); refresh();
+              });
+              const plus  = makeGhostButton(this, "+", W/2 + 110, y + 40, () => {
+                const v = clamp(get() + step, min, max); set(v); refresh();
+              });
+
+              const refresh = () => text.setText(`${label}: ${get().toFixed(2)}  (− / +)`);
+              refresh();
+              return { text, minus, plus, refresh };
+            };
+
+            const tShake = mkToggle("Screen Shake", H*0.32, s.shake, (t)=>{
+              s.shake = !s.shake; t.setText(`Screen Shake: ${s.shake?"ON":"OFF"}`); saveSettings(s);
+            });
+
+            const tSfx = mkToggle("SFX (stub)", H*0.40, s.sfx, (t)=>{
+              s.sfx = !s.sfx; t.setText(`SFX (stub): ${s.sfx?"ON":"OFF"}`); saveSettings(s);
+            });
+
+            mkSlider("Touch Follow Lerp", H*0.50, 0.18, 0.70, 0.02,
+              ()=>s.followLerp, (v)=>{ s.followLerp=v; saveSettings(s); }
+            );
+
+            mkSlider("Touch Max Speed Mult", H*0.63, 1.60, 4.00, 0.10,
+              ()=>s.followMaxMult, (v)=>{ s.followMaxMult=v; saveSettings(s); }
+            );
+
+            makeGhostButton(this, "BACK", W/2, H*0.90, () => this.scene.start("Menu"));
+          }
+        }
+
+        class LeaderboardsScene extends Phaser.Scene {
+          constructor() { super("Leaderboards"); }
+          create() {
+            this.cameras.main.setBackgroundColor(0x070710);
+            addTitle(this, "LEADERBOARDS", 0.14, 32);
+            addSubtitle(this, "Local device scores (global later)", 0.20);
+
+            const p = loadProgress();
+            const lb = loadLeaderboards();
+
+            const campaignNow = campaignTotalScore(p);
+            const endlessBest = lb.endlessTop[0]?.score || 0;
+
+            this.add.text(W/2, H*0.27, `Your Campaign Total: ${campaignNow}`, { fontFamily: uiFont, fontSize:"14px", color:"#ffffff" })
+              .setOrigin(0.5).setAlpha(0.9);
+
+            this.add.text(W/2, H*0.31, `Your Endless Best: ${endlessBest}`, { fontFamily: uiFont, fontSize:"14px", color:"#ffffff" })
+              .setOrigin(0.5).setAlpha(0.85);
+
+            const drawList = (title, arr, x, y) => {
+              this.add.text(x, y, title, { fontFamily: uiFont, fontSize:"14px", color:"#b7b7ff" }).setOrigin(0,0);
+              let yy = y + 18;
+              if (!arr.length) {
+                this.add.text(x, yy, "— none yet —", { fontFamily: uiFont, fontSize:"12px", color:"rgba(255,255,255,0.55)" }).setOrigin(0,0);
+                return;
+              }
+              arr.forEach((e, i) => {
+                this.add.text(x, yy, `${i+1}. ${e.score}`, {
+                  fontFamily: uiFont, fontSize:"12px", color:"#ffffff"
+                }).setOrigin(0,0).setAlpha(0.9);
+                if (e.meta) {
+                  this.add.text(x+70, yy, e.meta, {
+                    fontFamily: uiFont, fontSize:"11px", color:"rgba(255,255,255,0.55)"
+                  }).setOrigin(0,0);
+                }
+                yy += 18;
+              });
+            };
+
+            drawList("Campaign Total Top 10", lb.campaignTop, 34, H*0.38);
+            drawList("Endless Top 10", lb.endlessTop, 240, H*0.38);
+
+            makeGhostButton(this, "BACK", W/2, H*0.92, () => this.scene.start("Menu"));
           }
         }
 
@@ -403,20 +614,29 @@
             const p = loadProgress();
             this.cameras.main.setBackgroundColor(0x070710);
 
-            addTitle(this, "WORLD MAP", 0.14, 34);
-            addSubtitle(this, "Select an unlocked level • Replay anytime", 0.20);
+            addTitle(this, "CAMPAIGN", 0.14, 34);
+            addSubtitle(this, "Replay unlocked levels • Total = sum of level bests", 0.20);
+
+            const total = campaignTotalScore(p);
+            this.add.text(W/2, H*0.24, `Campaign Total: ${total}`, { fontFamily: uiFont, fontSize:"14px", color:"#ffffff" })
+              .setOrigin(0.5).setAlpha(0.85);
 
             const marginX = 18;
             const colW = (W - marginX*2);
-            let y = H*0.26;
+            let y = H*0.28;
 
             WORLDS.forEach((w, wi) => {
               const unlockedWorld = wi <= p.unlockedWorld;
 
+              const sub = worldSubtotal(p, wi);
               this.add.text(marginX, y, `${wi+1}. ${w.name}`, {
                 fontFamily: uiFont, fontSize: "16px",
                 color: unlockedWorld ? "#ffffff" : "rgba(255,255,255,0.40)"
               }).setAlpha(0.95);
+
+              this.add.text(W - marginX, y, `Subtotal: ${sub}`, {
+                fontFamily: uiFont, fontSize: "12px", color: "rgba(255,255,255,0.65)"
+              }).setOrigin(1,0).setAlpha(0.9);
 
               y += 26;
 
@@ -427,14 +647,19 @@
                 const bx = marginX + li * (btnW + gap);
                 const by = y;
 
-                const b = this.add.text(bx + btnW/2, by + 18, `${li+1}`, {
-                  fontFamily: uiFont, fontSize: "16px",
+                const best = p.levelBest[levelId(wi, li)] || 0;
+                const label = `${li+1}\n${best}`;
+
+                const b = this.add.text(bx + btnW/2, by + 22, label, {
+                  fontFamily: uiFont,
+                  fontSize: "12px",
+                  align: "center",
                   color: unlocked ? "#0a0a12" : "rgba(255,255,255,0.55)",
                   backgroundColor: unlocked ? "#6ef3ff" : "rgba(255,255,255,0.08)",
                   padding: { left: 0, right: 0, top: 8, bottom: 8 }
                 }).setOrigin(0.5);
 
-                b.setFixedSize(btnW, 36);
+                b.setFixedSize(btnW, 44);
                 if (unlocked) {
                   b.setInteractive({ useHandCursor: true });
                   b.on("pointerdown", () => {
@@ -448,7 +673,8 @@
                   b.setAlpha(0.6);
                 }
               }
-              y += 58;
+
+              y += 68;
             });
 
             makeGhostButton(this, "BACK", W/2, H*0.92, () => this.scene.start("Menu"));
@@ -467,70 +693,130 @@
             this.cameras.main.setBackgroundColor(w.bg);
             buildBackdrop(this, w.fx, w.player, w.border);
 
-            addTitle(this, w.name, 0.22, 34);
-            addSubtitle(this, w.subtitle, 0.285);
+            addTitle(this, w.name, 0.20, 34);
+            addSubtitle(this, w.subtitle, 0.26);
+
+            const p = loadProgress();
+            const best = p.levelBest[levelId(world, level)] || 0;
 
             this.add.text(W/2, H*0.40,
-              `Level ${level + 1}/${LEVELS_PER_WORLD}\nTime: ${lv.seconds}s`,
+              `Level ${level + 1}/${LEVELS_PER_WORLD} • ${lv.seconds}s\nBest: ${best}`,
               { fontFamily: uiFont, fontSize: "16px", color: "#ffffff", align: "center" }
             ).setOrigin(0.5).setAlpha(0.92);
 
-            const p = loadProgress();
-            p.currentWorld = world;
-            p.currentLevel = level;
-            saveProgress(p);
+            const p2 = loadProgress();
+            p2.currentWorld = world;
+            p2.currentLevel = level;
+            saveProgress(p2);
 
-            makeButton(this, "START", W/2, H*0.60, () => this.scene.start("Play", { world, level }));
-            makeGhostButton(this, "WORLD MAP", W/2, H*0.70, () => this.scene.start("WorldMap"));
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.79, () => this.scene.start("Menu"));
+            makeButton(this, "START", W/2, H*0.58, () => this.scene.start("Play", { mode:"campaign", world, level }));
+            makeGhostButton(this, "CAMPAIGN MAP", W/2, H*0.70, () => this.scene.start("WorldMap"));
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.80, () => this.scene.start("Menu"));
           }
         }
 
+        class EndlessIntroScene extends Phaser.Scene {
+          constructor() { super("EndlessIntro"); }
+          create() {
+            this.cameras.main.setBackgroundColor(0x050512);
+            addTitle(this, "ENDLESS", 0.20, 36);
+            addSubtitle(this, "Starts at World 1 Level 1 difficulty • Ramps forever • Blends all worlds", 0.27);
+
+            const lb = loadLeaderboards();
+            const best = lb.endlessTop[0]?.score || 0;
+
+            this.add.text(W/2, H*0.40, `Best: ${best}`, {
+              fontFamily: uiFont, fontSize:"18px", color:"#ffffff"
+            }).setOrigin(0.5).setAlpha(0.9);
+
+            makeButton(this, "START ENDLESS", W/2, H*0.58, () => this.scene.start("Play", { mode:"endless" }));
+            makeGhostButton(this, "LEADERBOARDS", W/2, H*0.70, () => this.scene.start("Leaderboards"));
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.80, () => this.scene.start("Menu"));
+          }
+        }
+
+        // ===== Play Scene (Campaign + Endless) =====
         class PlayScene extends Phaser.Scene {
           constructor() {
             super("Play");
+            this.mode = "campaign"; // or "endless"
             this.world = 0;
             this.level = 0;
+
             this.wcfg = WORLDS[0];
             this.lcfg = WORLDS[0].levels[0];
 
-            this.elapsed = 0;
+            // runtime
+            this.t = 0;
             this.score = 0;
-            this.levelTime = 0;
+            this.paused = false;
 
+            // scoring breakdown
+            this.survivalPts = 0;
+            this.nearPts = 0;
+            this.clearBonusPts = 0;
+            this.combo = 1;
+            this.comboTimer = 0;
+            this.maxCombo = 1;
+
+            // pacing
             this.scrollSpeed = 0;
             this.spawnEvery = 0;
             this.spawnTimer = 0;
 
+            // rendering
             this.gridGraphics = null;
             this.gridOffset = 0;
 
+            // entities
             this.obstacles = null;
             this.player = null;
 
+            // touch
             this.touchTarget = null;
             this.touchDot = null;
 
-            // boss
+            // pause UI
+            this.pauseOverlay = null;
+
+            // boss laser (campaign W3 + endless later)
             this.laser = null;
             this.laserWarn = null;
             this.bossT = 0;
+            this.laserEnabled = false;
+            this.laserWarnOnly = false;
 
-            // world dressing
+            // decor
             this.decor = [];
             this.glitchFlash = null;
+
+            // settings
+            this.settings = loadSettings();
+
+            // near-miss bookkeeping
+            this.nearSeen = new WeakSet();
           }
 
           init(data) {
-            this.world = clamp(data?.world ?? 0, 0, WORLDS.length - 1);
-            this.level = clamp(data?.level ?? 0, 0, LEVELS_PER_WORLD - 1);
-            this.wcfg = WORLDS[this.world];
-            this.lcfg = this.wcfg.levels[this.level];
+            this.mode = data?.mode || "campaign";
+            if (this.mode === "campaign") {
+              this.world = clamp(data?.world ?? 0, 0, WORLDS.length - 1);
+              this.level = clamp(data?.level ?? 0, 0, LEVELS_PER_WORLD - 1);
+              this.wcfg = WORLDS[this.world];
+              this.lcfg = this.wcfg.levels[this.level];
+            } else {
+              // endless starts at >= world1 level1 difficulty
+              this.world = 0;
+              this.level = 0;
+              this.wcfg = WORLDS[0];
+              this.lcfg = WORLDS[0].levels[0];
+            }
           }
 
           create() {
             ensureObstacleTextures(this);
 
+            this.settings = loadSettings();
             this.cameras.main.setBackgroundColor(this.wcfg.bg);
             buildBackdrop(this, this.wcfg.fx, this.wcfg.player, this.wcfg.border);
 
@@ -546,22 +832,26 @@
             this.physics.add.existing(this.player);
             this.player.body.setAllowGravity(false);
 
-            this.physics.add.overlap(this.player, this.obstacles, () => this.gameOver());
+            this.physics.add.overlap(this.player, this.obstacles, (_, o) => {
+              // obstacle hit
+              this.endRun({ reason: "OBSTACLE" });
+            });
 
-            // PC keyboard
+            // keyboard
             this.cursors = this.input.keyboard.createCursorKeys();
-            this.keys = this.input.keyboard.addKeys("W,A,S,D");
+            this.keys = this.input.keyboard.addKeys("W,A,S,D,ESC");
 
-            // Touch target dot
+            // touch indicator
             this.touchDot = this.add.circle(0, 0, 6, this.wcfg.player).setAlpha(0);
             this.touchTarget = null;
 
             this.input.on("pointerdown", (p) => {
+              if (this.paused) { this.togglePause(false); return; }
               this.touchTarget = { x: p.x, y: p.y };
               this.touchDot.setPosition(p.x, p.y).setAlpha(0.85);
             });
             this.input.on("pointermove", (p) => {
-              if (!p.isDown) return;
+              if (!p.isDown || this.paused) return;
               this.touchTarget = { x: p.x, y: p.y };
               this.touchDot.setPosition(p.x, p.y).setAlpha(0.85);
             });
@@ -572,23 +862,67 @@
 
             // HUD
             this.uiTop = this.add.text(14, 10, "", { fontFamily: uiFont, fontSize: "14px", color: "#ffffff" }).setAlpha(0.95);
-            this.uiTime = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95);
+            this.uiSub = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95);
+            this.uiCombo = this.add.text(W-14, 10, "", { fontFamily: uiFont, fontSize: "12px", color: "#ffffff" })
+              .setOrigin(1,0).setAlpha(0.85);
 
-            // glitch overlay (W3)
+            // pause button (mobile)
+            this.pauseBtn = this.add.text(W-14, 30, "PAUSE", {
+              fontFamily: uiFont, fontSize: "12px",
+              color: "#ffffff", backgroundColor: "rgba(255,255,255,0.10)",
+              padding: { left: 10, right: 10, top: 6, bottom: 6 }
+            }).setOrigin(1,0).setInteractive({ useHandCursor:true }).setAlpha(0.9);
+            this.pauseBtn.on("pointerdown", () => this.togglePause(!this.paused));
+
+            // overlay for glitch flash
             this.glitchFlash = this.add.rectangle(W/2, H/2, W, H, 0xffffff).setAlpha(0).setDepth(50);
 
-            // run state
-            this.elapsed = 0;
+            // reset state
+            this.t = 0;
             this.score = 0;
-            this.levelTime = 0;
+            this.paused = false;
 
-            this.scrollSpeed = this.lcfg.baseScroll;
-            this.spawnEvery = this.lcfg.spawnStart;
+            this.survivalPts = 0;
+            this.nearPts = 0;
+            this.clearBonusPts = 0;
+            this.combo = 1;
+            this.comboTimer = 0;
+            this.maxCombo = 1;
+
             this.spawnTimer = 0;
+            this.nearSeen = new WeakSet();
+
+            // initial pacing
+            if (this.mode === "campaign") {
+              this.scrollSpeed = this.lcfg.baseScroll;
+              this.spawnEvery = this.lcfg.spawnStart;
+            } else {
+              this.scrollSpeed = ENDLESS.baseScroll0;
+              this.spawnEvery = ENDLESS.spawnStart0;
+            }
 
             this.setupBoss();
             this.setupDecor();
             this.updateHud();
+
+            // ESC pause
+            this.input.keyboard.on("keydown-ESC", () => this.togglePause(!this.paused));
+          }
+
+          togglePause(on) {
+            this.paused = on;
+            if (on) {
+              this.pauseOverlay = this.add.rectangle(W/2, H/2, W, H, 0x000000).setAlpha(0.55).setDepth(90);
+              this.pauseText = this.add.text(W/2, H*0.44, "PAUSED", { fontFamily: uiFont, fontSize:"28px", color:"#ffffff" })
+                .setOrigin(0.5).setDepth(91);
+              this.pauseSub = this.add.text(W/2, H*0.52, "Tap / Press ESC to resume", { fontFamily: uiFont, fontSize:"14px", color:"#b7b7ff" })
+                .setOrigin(0.5).setDepth(91).setAlpha(0.9);
+            } else {
+              if (this.pauseOverlay) this.pauseOverlay.destroy();
+              if (this.pauseText) this.pauseText.destroy();
+              if (this.pauseSub) this.pauseSub.destroy();
+              this.pauseOverlay = null;
+            }
           }
 
           setupDecor() {
@@ -622,43 +956,88 @@
             this.bossT = 0;
             if (this.laser) this.laser.destroy();
             if (this.laserWarn) this.laserWarn.destroy();
+            this.laser = null;
+            this.laserWarn = null;
 
-            const boss = this.wcfg.boss;
-            if (!boss || !boss.enabled) return;
+            // campaign: boss enabled only in world 3
+            if (this.mode === "campaign") {
+              const boss = this.wcfg.boss;
+              this.laserEnabled = !!(boss && boss.enabled);
+              this.laserWarnOnly = false;
+              if (!this.laserEnabled) return;
 
-            this.laserWarn = this.add.rectangle(
-              GRID_X + GRID_W/2, GRID_Y + GRID_H/2,
-              GRID_W, boss.warnThickness, 0xffffff
-            ).setAlpha(0).setDepth(20);
-
-            this.laser = this.add.rectangle(
-              GRID_X + GRID_W/2, GRID_Y + GRID_H/2,
-              GRID_W, boss.thickness, 0xff4d7d
-            ).setAlpha(0).setDepth(21);
-          }
-
-          update(_, deltaMs) {
-            const dt = deltaMs / 1000;
-            this.elapsed += dt;
-            this.levelTime += dt;
-
-            if (this.levelTime >= this.lcfg.seconds) {
-              this.levelComplete();
+              this.laserWarn = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.warnThickness, 0xffffff)
+                .setAlpha(0).setDepth(20);
+              this.laser = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.thickness, 0xff4d7d)
+                .setAlpha(0).setDepth(21);
               return;
             }
 
-            // speed curve
-            this.scrollSpeed = this.lcfg.baseScroll + this.elapsed * this.lcfg.scrollRamp;
+            // endless: created now but may be warn-only or active based on time
+            const boss = WORLDS[2].boss;
+            this.laserEnabled = false;
+            this.laserWarnOnly = false;
 
-            // spawn curve
-            const targetSpawn = this.lcfg.spawnStart - this.elapsed * this.lcfg.spawnRamp;
-            this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
+            this.laserWarn = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.warnThickness, 0xffffff)
+              .setAlpha(0).setDepth(20);
+            this.laser = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.thickness, 0xff4d7d)
+              .setAlpha(0).setDepth(21);
+          }
 
-            // score
-            this.score += dt * 10;
-            this.updateHud();
+          update(_, deltaMs) {
+            if (this.paused) return;
 
-            // ===== Movement =====
+            const dt = deltaMs / 1000;
+            this.t += dt;
+
+            // combo decay
+            this.comboTimer += dt;
+            if (this.comboTimer > COMBO_DECAY_SEC) {
+              this.combo = 1;
+            }
+
+            // === Mode pacing ===
+            let timeLeft = 0;
+            if (this.mode === "campaign") {
+              timeLeft = Math.max(0, this.lcfg.seconds - this.t);
+
+              // end level
+              if (this.t >= this.lcfg.seconds) {
+                this.clearBonusPts += LEVEL_CLEAR_BONUS;
+                this.score += LEVEL_CLEAR_BONUS;
+                this.levelComplete();
+                return;
+              }
+
+              // campaign curve
+              this.scrollSpeed = this.lcfg.baseScroll + this.t * this.lcfg.scrollRamp;
+              const targetSpawn = this.lcfg.spawnStart - this.t * this.lcfg.spawnRamp;
+              this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
+
+            } else {
+              // endless ramps forever, starts at >= W1 L1
+              const base = ENDLESS.baseScroll0 + (this.t * ENDLESS.scrollBaseGrowth * 60) / 60; // keep simple
+              const ramp = ENDLESS.ramp0 + this.t * ENDLESS.scrollRampGrowth;
+              this.scrollSpeed = base + this.t * ramp;
+
+              const spawnStart = ENDLESS.spawnStart0 - this.t * (ENDLESS.spawnTighten);
+              const spawnRamp = ENDLESS.spawnRamp0 + this.t * ENDLESS.spawnRampGrowth;
+              const targetSpawn = spawnStart - this.t * spawnRamp;
+
+              this.spawnEvery = clamp(targetSpawn, ENDLESS.spawnMinFloor, ENDLESS.spawnStart0);
+
+              // blend world feel over time
+              const b = getEndlessBlend(this.t);
+              this.applyEndlessBlend(b);
+              timeLeft = 0;
+            }
+
+            // === Survival scoring ===
+            const add = SCORE_PPS * dt;
+            this.survivalPts += add;
+            this.score += add;
+
+            // === Movement ===
             if (!IS_TOUCH) {
               let kvx = 0, kvy = 0;
               const left = this.cursors.left.isDown || this.keys.A.isDown;
@@ -673,7 +1052,6 @@
               if (mag > 1) { kvx /= mag; kvy /= mag; }
               this.player.body.setVelocity(kvx * PLAYER_SPEED, kvy * PLAYER_SPEED);
             } else {
-              // ✅ Mobile direct follow only
               if (this.touchTarget) {
                 const tx = clamp(this.touchTarget.x, GRID_X + 14, GRID_X + GRID_W - 14);
                 const ty = clamp(this.touchTarget.y, GRID_Y + 14, GRID_Y + GRID_H - 14);
@@ -683,10 +1061,10 @@
                 const dist = Math.hypot(dx, dy);
 
                 if (dist > FOLLOW_RADIUS) {
-                  const nx = this.player.x + dx * FOLLOW_LERP;
-                  const ny = this.player.y + dy * FOLLOW_LERP;
+                  const nx = this.player.x + dx * this.settings.followLerp;
+                  const ny = this.player.y + dy * this.settings.followLerp;
 
-                  const maxStep = PLAYER_SPEED * FOLLOW_MAX_SPEED_MULT * dt;
+                  const maxStep = PLAYER_SPEED * this.settings.followMaxMult * dt;
                   const stepDist = Math.hypot(nx - this.player.x, ny - this.player.y);
 
                   if (stepDist > maxStep) {
@@ -709,50 +1087,112 @@
 
             // clamp to grid
             const pad = 14;
-            const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
-            const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
-            if (nx !== this.player.x || ny !== this.player.y) {
-              this.player.x = nx; this.player.y = ny;
-              this.player.body.reset(nx, ny);
+            const px = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
+            const py = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
+            if (px !== this.player.x || py !== this.player.y) {
+              this.player.x = px; this.player.y = py;
+              this.player.body.reset(px, py);
             }
 
-            // decor
+            // decor updates (glitch)
             if (this.wcfg.gridStyle === "glitch") {
               for (const b of this.decor) {
                 b.y += b._vy * dt;
                 if (b.y > H + 20) { b.y = -20; b.x = Phaser.Math.Between(0, W); }
               }
-              if (Math.random() < 0.015) {
-                this.glitchFlash.setAlpha(0.07);
+              if (Math.random() < 0.012) {
+                this.glitchFlash.setAlpha(0.06);
                 this.tweens.add({ targets: this.glitchFlash, alpha: 0, duration: 120, ease: "Linear" });
               }
             }
 
-            // spawn
+            // spawn obstacles
             this.spawnTimer += deltaMs;
             while (this.spawnTimer >= this.spawnEvery) {
               this.spawnTimer -= this.spawnEvery;
               this.spawnObstacle();
             }
 
-            // move obstacles
+            // move obstacles + near-miss scoring
             this.obstacles.children.iterate((o) => {
               if (!o) return;
               o.y += this.scrollSpeed * dt;
-              if (o.y > GRID_Y + GRID_H + 140) o.destroy();
+              if (o.y > GRID_Y + GRID_H + 140) { o.destroy(); return; }
+              this.checkNearMiss(o);
             });
 
-            // boss
+            // boss laser update
             this.updateBoss(dt);
 
-            // grid
+            // draw grid
             this.drawGrid(dt);
+
+            // HUD
+            this.updateHud(timeLeft);
           }
 
-          updateHud() {
-            const timeLeft = Math.max(0, Math.ceil(this.lcfg.seconds - this.levelTime));
-            this.uiTop.setText(`${this.wcfg.name} • Level ${this.level+1}/${LEVELS_PER_WORLD} • Score: ${Math.floor(this.score)}`);
-            this.uiTime.setText(`Time Left: ${timeLeft}s`);
+          applyEndlessBlend(blend) {
+            // Blend visuals toward W2/W3 over time
+            const w1 = WORLDS[0], w2 = WORLDS[1], w3 = WORLDS[2];
+
+            // background / border / grid line / player tint blend
+            const bg12 = mixColor(w1.bg, w2.bg, blend.a2);
+            const bg = mixColor(bg12, w3.bg, blend.a3);
+            const border12 = mixColor(w1.border, w2.border, blend.a2);
+            const border = mixColor(border12, w3.border, blend.a3);
+            const grid12 = mixColor(w1.gridLine, w2.gridLine, blend.a2);
+            const grid = mixColor(grid12, w3.gridLine, blend.a3);
+            const player12 = mixColor(w1.player, w2.player, blend.a2);
+            const player = mixColor(player12, w3.player, blend.a3);
+
+            // choose dominant style for grid style + fx
+            let gridStyle = "circuit";
+            if (blend.a3 > 0.40) gridStyle = "glitch";
+            else if (blend.a2 > 0.45) gridStyle = "industrial";
+
+            this.wcfg = {
+              id: 99,
+              name: "Endless",
+              subtitle: "",
+              bg, border, gridLine: grid, player,
+              fx: (gridStyle==="glitch") ? "stars" : (gridStyle==="industrial" ? "rain" : "scanlines"),
+              gridStyle,
+              obstacleStyle: {
+                palette: [...w1.obstacleStyle.palette, ...w2.obstacleStyle.palette, ...w3.obstacleStyle.palette],
+                shapes: [
+                  ...w1.obstacleStyle.shapes,
+                  ...(blend.a2>0.2 ? w2.obstacleStyle.shapes : []),
+                  ...(blend.a3>0.2 ? w3.obstacleStyle.shapes : [])
+                ]
+              },
+              boss: WORLDS[2].boss
+            };
+
+            // Update player color
+            this.player.fillColor = player;
+            this.touchDot.fillColor = player;
+
+            // Laser unlocks
+            this.laserWarnOnly = blend.laserWarn && !blend.laserActive;
+            this.laserEnabled = blend.laserActive;
+
+            // Adjust decor style when crossing thresholds (cheap approach)
+            // If we just switched into industrial/glitch, re-init decor occasionally
+            if (!this._lastGridStyle) this._lastGridStyle = this.wcfg.gridStyle;
+            if (this._lastGridStyle !== this.wcfg.gridStyle) {
+              this._lastGridStyle = this.wcfg.gridStyle;
+              this.setupDecor();
+            }
+          }
+
+          updateHud(timeLeft) {
+            const modeLabel = this.mode === "campaign" ? `Campaign • ${this.wcfg.name} L${this.level+1}` : "Endless";
+            const tLabel = this.mode === "campaign" ? `Time: ${Math.ceil(timeLeft)}s` : `Time: ${formatTime(this.t)}`;
+
+            this.uiTop.setText(`${modeLabel} • Score: ${Math.floor(this.score)}`);
+            this.uiSub.setText(`${tLabel} • Near: ${Math.floor(this.nearPts)} • PPS: ${SCORE_PPS}`);
+            const cm = Math.min(COMBO_MAX, this.combo);
+            this.uiCombo.setText(cm > 1.01 ? `x${cm.toFixed(2)}` : "");
           }
 
           drawGrid(dt) {
@@ -802,7 +1242,7 @@
             }
 
             if (this.wcfg.gridStyle === "glitch") {
-              const flick = 0.75 + Math.sin(this.elapsed * 8) * 0.10;
+              const flick = 0.75 + Math.sin(this.t * 8) * 0.10;
               g.lineStyle(1, this.wcfg.gridLine, flick);
 
               for (let c = 0; c <= GRID_COLS; c++) {
@@ -845,11 +1285,23 @@
             const y = GRID_Y - 70;
 
             const style = this.wcfg.obstacleStyle;
-            const shape = style.shapes[Phaser.Math.Between(0, style.shapes.length - 1)];
+            const shapes = style.shapes;
+            const shape = shapes[Phaser.Math.Between(0, shapes.length - 1)];
             const tex = shapeToTex[shape] || "obs_rect";
-            const color = style.palette[Phaser.Math.Between(0, style.palette.length - 1)];
+            const palette = style.palette;
+            const color = palette[Phaser.Math.Between(0, palette.length - 1)];
 
-            const [smin, smax] = this.lcfg.size;
+            // size depends on campaign level, or slowly shrinks in endless
+            let smin = 20, smax = 32;
+            if (this.mode === "campaign") {
+              const [a,b] = this.lcfg.size;
+              smin = a; smax = b;
+            } else {
+              // very gentle shrink over time (readability preserved)
+              smin = clamp(22 - Math.floor(this.t/120), 16, 22);
+              smax = clamp(34 - Math.floor(this.t/140), 22, 34);
+            }
+
             let w = Phaser.Math.Between(smin, smax);
             let h = Phaser.Math.Between(smin, smax);
 
@@ -868,20 +1320,30 @@
             s.body.setAllowGravity(false);
             s.body.setImmovable(true);
             s.body.setSize(w * 0.88, h * 0.88, true);
+
+            // mark for near-miss scoring
+            s._nearAwarded = false;
+
             this.obstacles.add(s);
 
-            // extra piece (mild, increases later + in harder worlds)
-            const worldBonus = this.world * 0.02; // W2/W3 get a touch more
-            const later = this.level >= 2 ? 1 : 0;
-            const chance = Phaser.Math.Clamp(0.05 + later*0.06 + worldBonus + (this.elapsed * 0.0025), 0.05, 0.24);
-            if (Math.random() < chance && this.levelTime > 5) {
+            // extra piece chance increases later / harder worlds; in endless increases slowly with time
+            let chance = 0.06;
+            if (this.mode === "campaign") {
+              const worldBonus = this.world * 0.02;
+              const later = this.level >= 2 ? 1 : 0;
+              chance = Phaser.Math.Clamp(0.05 + later*0.06 + worldBonus + (this.t * 0.0022), 0.05, 0.24);
+            } else {
+              chance = Phaser.Math.Clamp(0.06 + (this.t * 0.0016), 0.06, 0.22);
+            }
+
+            if (Math.random() < chance && this.t > 5) {
               let col2 = Phaser.Math.Between(0, GRID_COLS - 1);
               if (col2 === col) col2 = (col + Phaser.Math.Between(1, GRID_COLS-1)) % GRID_COLS;
               const x2 = GRID_X + col2 * TILE + TILE / 2;
 
-              const shape2 = style.shapes[Phaser.Math.Between(0, style.shapes.length - 1)];
+              const shape2 = shapes[Phaser.Math.Between(0, shapes.length - 1)];
               const tex2 = shapeToTex[shape2] || "obs_rect";
-              const color2 = style.palette[Phaser.Math.Between(0, style.palette.length - 1)];
+              const color2 = palette[Phaser.Math.Between(0, palette.length - 1)];
 
               const s2 = this.add.image(x2, y - Phaser.Math.Between(22, 90), tex2);
               s2.setTint(color2);
@@ -893,13 +1355,52 @@
               s2.body.setAllowGravity(false);
               s2.body.setImmovable(true);
               s2.body.setSize(s2.displayWidth * 0.88, s2.displayHeight * 0.88, true);
+              s2._nearAwarded = false;
+
               this.obstacles.add(s2);
             }
           }
 
+          checkNearMiss(o) {
+            if (!o || o._nearAwarded) return;
+
+            // Only score near miss when obstacle is near player's y-band (passes by)
+            const dy = Math.abs(o.y - this.player.y);
+            if (dy > 28) return;
+
+            const dx = Math.abs(o.x - this.player.x);
+            const dist = Math.hypot(dx, dy);
+
+            if (dist <= NEAR_DIST) {
+              // award once
+              o._nearAwarded = true;
+
+              this.comboTimer = 0;
+              this.combo = Math.min(COMBO_MAX, this.combo + COMBO_STEP);
+              this.maxCombo = Math.max(this.maxCombo, this.combo);
+
+              const award = NEAR_POINTS * this.combo;
+              this.nearPts += award;
+              this.score += award;
+
+              if (this.settings.shake) this.cameras.main.shake(60, 0.002);
+            }
+          }
+
           updateBoss(dt) {
-            const boss = this.wcfg.boss;
-            if (!boss || !boss.enabled || !this.laser || !this.laserWarn) return;
+            // campaign: only in W3. endless: unlocked by time stages.
+            const boss = WORLDS[2].boss;
+            if (!boss || !this.laser || !this.laserWarn) return;
+
+            // If campaign and boss not enabled, keep hidden
+            if (this.mode === "campaign") {
+              if (!this.laserEnabled) { this.laserWarn.setAlpha(0); this.laser.setAlpha(0); return; }
+            }
+
+            // endless: show warn or active depending on unlock
+            if (this.mode === "endless") {
+              if (!this.laserEnabled && !this.laserWarnOnly) { this.laserWarn.setAlpha(0); this.laser.setAlpha(0); return; }
+            }
 
             this.bossT += dt;
             const cycle = boss.cycleSeconds;
@@ -914,19 +1415,40 @@
             const warnOn = t < boss.warnSeconds;
             const activeOn = (t >= boss.warnSeconds) && (t < boss.warnSeconds + boss.activeSeconds);
 
+            // endless warn-only stage: show warning, no active beam
+            if (this.mode === "endless" && this.laserWarnOnly) {
+              this.laserWarn.setAlpha(warnOn ? 0.35 : 0);
+              this.laser.setAlpha(0);
+              return;
+            }
+
+            // active stage (campaign W3 OR endless active)
             this.laserWarn.setAlpha(warnOn ? 0.35 : 0);
             this.laser.setAlpha(activeOn ? 0.85 : 0);
 
             if (activeOn) {
               const pr = this.player.getBounds();
               const lr = this.laser.getBounds();
-              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, lr)) this.gameOver();
+              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, lr)) {
+                this.endRun({ reason: "LASER" });
+              }
             }
           }
 
           levelComplete() {
+            // update per-level best, campaign total leaderboard, unlock next
             const p = loadProgress();
+            const id = levelId(this.world, this.level);
+            const thisScore = Math.floor(this.score);
+            const prevBest = p.levelBest[id] || 0;
 
+            let pbLevel = false;
+            if (thisScore > prevBest) {
+              p.levelBest[id] = thisScore;
+              pbLevel = true;
+            }
+
+            // unlock logic
             let nextWorld = this.world;
             let nextLevel = this.level + 1;
             let worldClear = false;
@@ -938,13 +1460,14 @@
             }
 
             if (worldClear) {
-              p.unlockedWorld = Math.max(p.unlockedWorld, this.world + 1);
+              p.unlockedWorld = Math.max(p.unlockedWorld, Math.min(WORLDS_COUNT-1, this.world + 1));
               p.unlockedLevel = 0;
             } else {
               if (p.unlockedWorld < this.world) p.unlockedWorld = this.world;
               if (p.unlockedWorld === this.world) p.unlockedLevel = Math.max(p.unlockedLevel, this.level + 1);
             }
 
+            // set current selection
             if (nextWorld >= WORLDS.length) {
               p.currentWorld = WORLDS.length - 1;
               p.currentLevel = LEVELS_PER_WORLD - 1;
@@ -952,135 +1475,142 @@
               p.currentWorld = nextWorld;
               p.currentLevel = nextLevel;
             }
+
             saveProgress(p);
 
-            if (nextWorld >= WORLDS.length) this.scene.start("CampaignComplete", { score: Math.floor(this.score) });
-            else if (worldClear) this.scene.start("WorldComplete", { world: this.world, score: Math.floor(this.score) });
-            else this.scene.start("LevelComplete", { world: this.world, level: this.level, score: Math.floor(this.score) });
-          }
+            // update campaign leaderboard with TOTAL (separate from endless)
+            const total = campaignTotalScore(p);
+            const lb = loadLeaderboards();
+            lb.campaignTop = maybeInsertTop(lb.campaignTop, { score: total, meta: "Total" });
+            saveLeaderboards(lb);
 
-          gameOver() {
-            this.scene.start("GameOver", {
+            this.scene.start("Results", {
+              mode: "campaign",
               world: this.world,
               level: this.level,
-              score: Math.floor(this.score),
-              timeLeft: Math.max(0, Math.ceil(this.lcfg.seconds - this.levelTime))
+              score: thisScore,
+              prevBest,
+              pb: pbLevel,
+              total,
+              breakdown: this.getBreakdown(),
+              reason: "CLEAR"
+            });
+          }
+
+          getBreakdown() {
+            return {
+              survival: Math.floor(this.survivalPts),
+              near: Math.floor(this.nearPts),
+              clear: Math.floor(this.clearBonusPts),
+              maxCombo: Number(this.maxCombo.toFixed(2))
+            };
+          }
+
+          endRun({ reason }) {
+            const thisScore = Math.floor(this.score);
+
+            if (this.settings.shake) this.cameras.main.shake(120, 0.006);
+            this.glitchFlash.setAlpha(0.10);
+            this.tweens.add({ targets: this.glitchFlash, alpha: 0, duration: 150, ease: "Linear" });
+
+            if (this.mode === "endless") {
+              const lb = loadLeaderboards();
+              const prevBest = lb.endlessTop[0]?.score || 0;
+              const pb = thisScore > prevBest;
+              lb.endlessTop = maybeInsertTop(lb.endlessTop, { score: thisScore, meta: formatTime(this.t) });
+              saveLeaderboards(lb);
+
+              this.scene.start("Results", {
+                mode: "endless",
+                score: thisScore,
+                prevBest,
+                pb,
+                total: null,
+                breakdown: this.getBreakdown(),
+                reason
+              });
+              return;
+            }
+
+            // campaign death: no level best update (only on clear), keep it simple
+            const p = loadProgress();
+            const id = levelId(this.world, this.level);
+            const prevBest = p.levelBest[id] || 0;
+            const total = campaignTotalScore(p);
+
+            this.scene.start("Results", {
+              mode: "campaign",
+              world: this.world,
+              level: this.level,
+              score: thisScore,
+              prevBest,
+              pb: false,
+              total,
+              breakdown: this.getBreakdown(),
+              reason
             });
           }
         }
 
-        class LevelCompleteScene extends Phaser.Scene {
-          constructor() { super("LevelComplete"); }
+        class ResultsScene extends Phaser.Scene {
+          constructor() { super("Results"); }
           create(data) {
-            const world = data?.world ?? 0;
-            const level = data?.level ?? 0;
-            const score = data?.score ?? 0;
-
-            const w = WORLDS[clamp(world, 0, WORLDS.length-1)];
-            this.cameras.main.setBackgroundColor(w.bg);
-            buildBackdrop(this, w.fx, w.player, w.border);
-
-            addTitle(this, "LEVEL CLEAR", 0.30, 34);
-            this.add.text(W/2, H*0.40, `${w.name} • Level ${level + 1}/${LEVELS_PER_WORLD}`, {
-              fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff"
-            }).setOrigin(0.5);
-
-            this.add.text(W/2, H*0.48, `Score: ${score}`, {
-              fontFamily: uiFont, fontSize: "18px", color: "#ffffff"
-            }).setOrigin(0.5);
-
-            makeButton(this, "NEXT", W/2, H*0.60, () => {
-              const p = loadProgress();
-              this.scene.start("WorldIntro", { world: p.currentWorld, level: p.currentLevel });
-            });
-
-            makeGhostButton(this, "WORLD MAP", W/2, H*0.70, () => this.scene.start("WorldMap"));
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.79, () => this.scene.start("Menu"));
-          }
-        }
-
-        class WorldCompleteScene extends Phaser.Scene {
-          constructor() { super("WorldComplete"); }
-          create(data) {
-            const world = data?.world ?? 0;
-            const score = data?.score ?? 0;
-
-            const w = WORLDS[clamp(world, 0, WORLDS.length-1)];
-            this.cameras.main.setBackgroundColor(w.bg);
-            buildBackdrop(this, w.fx, w.player, w.border);
-
-            addTitle(this, "WORLD CLEAR", 0.30, 34);
-            this.add.text(W/2, H*0.40, `${w.name} completed`, {
-              fontFamily: uiFont, fontSize: "16px", color: "#ffffff"
-            }).setOrigin(0.5);
-
-            this.add.text(W/2, H*0.48, `Score: ${score}`, {
-              fontFamily: uiFont, fontSize: "18px", color: "#b7b7ff"
-            }).setOrigin(0.5);
-
-            makeButton(this, "NEXT WORLD", W/2, H*0.62, () => {
-              const p = loadProgress();
-              this.scene.start("WorldIntro", { world: p.currentWorld, level: p.currentLevel });
-            });
-
-            makeGhostButton(this, "WORLD MAP", W/2, H*0.72, () => this.scene.start("WorldMap"));
-          }
-        }
-
-        class CampaignCompleteScene extends Phaser.Scene {
-          constructor() { super("CampaignComplete"); }
-          create(data) {
-            this.cameras.main.setBackgroundColor(0x020208);
-
-            addTitle(this, "CAMPAIGN CLEAR", 0.30, 32);
-            this.add.text(W/2, H*0.42, "You cleared all worlds.", {
-              fontFamily: uiFont, fontSize: "16px", color: "#ffffff"
-            }).setOrigin(0.5);
-
-            this.add.text(W/2, H*0.50, `Final Score: ${data?.score ?? 0}`, {
-              fontFamily: uiFont, fontSize: "18px", color: "#b7b7ff"
-            }).setOrigin(0.5);
-
-            makeButton(this, "PLAY AGAIN", W/2, H*0.64, () => {
-              const fresh = { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
-              saveProgress(fresh);
-              this.scene.start("WorldMap");
-            });
-
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.74, () => this.scene.start("Menu"));
-          }
-        }
-
-        class GameOverScene extends Phaser.Scene {
-          constructor() { super("GameOver"); }
-          create(data) {
-            const world = data?.world ?? 0;
-            const level = data?.level ?? 0;
-            const score = data?.score ?? 0;
-            const timeLeft = data?.timeLeft ?? 0;
-
-            const w = WORLDS[clamp(world, 0, WORLDS.length-1)];
             this.cameras.main.setBackgroundColor(0x070710);
 
-            addTitle(this, "RUN ENDED", 0.33, 34);
-            this.add.text(W/2, H*0.42, `${w.name} • Level ${level + 1}/${LEVELS_PER_WORLD}`, {
-              fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff"
+            const mode = data?.mode || "campaign";
+            const score = data?.score || 0;
+            const prevBest = data?.prevBest || 0;
+            const pb = !!data?.pb;
+            const total = data?.total;
+            const reason = data?.reason || "";
+
+            const breakdown = data?.breakdown || { survival:0, near:0, clear:0, maxCombo:1 };
+
+            addTitle(this, mode === "endless" ? "ENDLESS RESULT" : "LEVEL RESULT", 0.16, 30);
+
+            const subtitle =
+              mode === "endless"
+                ? `Reason: ${reason}`
+                : `${WORLDS[data.world].name} • Level ${data.level+1} • ${reason==="CLEAR"?"CLEARED":"FAILED"}`;
+
+            addSubtitle(this, subtitle, 0.22);
+
+            this.add.text(W/2, H*0.34, `Score: ${score}`, {
+              fontFamily: uiFont, fontSize:"24px", color:"#ffffff"
+            }).setOrigin(0.5).setAlpha(0.95);
+
+            this.add.text(W/2, H*0.40, `Best: ${Math.max(prevBest, (pb?score:prevBest))}${pb ? "  •  NEW PB!" : ""}`, {
+              fontFamily: uiFont, fontSize:"14px", color: pb ? "#6ef3ff" : "#b7b7ff"
+            }).setOrigin(0.5).setAlpha(0.95);
+
+            // breakdown
+            const lines = [
+              `Survival: ${breakdown.survival}`,
+              `Near-miss: ${breakdown.near}`,
+              `Clear Bonus: ${breakdown.clear}`,
+              `Max Combo: x${breakdown.maxCombo}`
+            ];
+            this.add.text(W/2, H*0.52, lines.join("\n"), {
+              fontFamily: uiFont, fontSize:"14px", color:"rgba(255,255,255,0.85)", align:"center"
             }).setOrigin(0.5);
 
-            this.add.text(W/2, H*0.48, `Score: ${score}`, {
-              fontFamily: uiFont, fontSize: "18px", color: "#ffffff"
-            }).setOrigin(0.5);
+            if (mode === "campaign") {
+              this.add.text(W/2, H*0.66, `Campaign Total: ${total}`, {
+                fontFamily: uiFont, fontSize:"14px", color:"#ffffff"
+              }).setOrigin(0.5).setAlpha(0.85);
 
-            this.add.text(W/2, H*0.54, `Time left: ${timeLeft}s`, {
-              fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff"
-            }).setOrigin(0.5).setAlpha(0.85);
+              makeButton(this, "RETRY", W/2, H*0.76, () => this.scene.start("Play", { mode:"campaign", world:data.world, level:data.level }));
+              makeGhostButton(this, "CAMPAIGN MAP", W/2, H*0.85, () => this.scene.start("WorldMap"));
+            } else {
+              makeButton(this, "RETRY ENDLESS", W/2, H*0.76, () => this.scene.start("Play", { mode:"endless" }));
+              makeGhostButton(this, "LEADERBOARDS", W/2, H*0.85, () => this.scene.start("Leaderboards"));
+            }
 
-            makeButton(this, "RETRY LEVEL", W/2, H*0.66, () => this.scene.start("Play", { world, level }));
-            makeGhostButton(this, "WORLD MAP", W/2, H*0.76, () => this.scene.start("WorldMap"));
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.84, () => this.scene.start("Menu"));
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.93, () => this.scene.start("Menu"));
           }
         }
 
+        // ===== Game config =====
         new Phaser.Game({
           type: Phaser.AUTO,
           width: W,
@@ -1088,13 +1618,13 @@
           physics: { default: "arcade", arcade: { debug: false } },
           scene: [
             MenuScene,
+            SettingsScene,
+            LeaderboardsScene,
             WorldMapScene,
             WorldIntroScene,
+            EndlessIntroScene,
             PlayScene,
-            LevelCompleteScene,
-            WorldCompleteScene,
-            CampaignCompleteScene,
-            GameOverScene
+            ResultsScene
           ],
         });
 

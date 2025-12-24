@@ -18,7 +18,7 @@
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD/Arrows • Mobile: drag thumb (FAST analog) • World Map + Levels • World 3 Laser Boss</div>
+  <div class="hint">PC: WASD/Arrows • Mobile: drag thumb • Toggle: Direct Follow (top-right)</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -39,11 +39,16 @@
         // Movement
         const PLAYER_SPEED = 320;
 
-        // ✅ Mobile analog tuning
-        const ANALOG_MAX_DIST = 105;     // smaller = faster response
-        const ANALOG_DEADZONE = 4;       // smaller = more sensitive
-        const ANALOG_BOOST = 1.55;       // baseline punch
-        const ANALOG_MAX_EXTRA = 0.95;   // extra boost ceiling from time ramp
+        // ✅ Mobile analog tuning (more responsive)
+        const ANALOG_MAX_DIST = 60;      // smaller = faster response
+        const ANALOG_DEADZONE = 3;       // smaller = more sensitive
+        const ANALOG_BOOST = 1.65;       // baseline punch
+        const ANALOG_MAX_EXTRA = 1.05;   // extra boost ceiling from time ramp
+
+        // Direct-follow mode (snap/lerp to finger)
+        const FOLLOW_RADIUS = 10;        // player stops when within this many px of target
+        const FOLLOW_LERP = 0.28;        // higher = more snappy (0.22–0.40 good range)
+        const FOLLOW_MAX_SPEED_MULT = 2.2; // cap follow speed vs PLAYER_SPEED
 
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -73,6 +78,16 @@
           if (world < p.unlockedWorld) return true;
           if (world > p.unlockedWorld) return false;
           return level <= p.unlockedLevel;
+        }
+
+        // Persist input mode (mobile feel preference)
+        const INPUT_KEY = "gridrun_input_mode_v1"; // "analog" | "follow"
+        function loadInputMode() {
+          const v = localStorage.getItem(INPUT_KEY);
+          return (v === "follow" || v === "analog") ? v : "analog";
+        }
+        function saveInputMode(mode) {
+          localStorage.setItem(INPUT_KEY, mode);
         }
 
         // ======== UI HELPERS ========
@@ -116,7 +131,6 @@
         }
 
         // ======== WORLDS + REAL LEVEL DESIGN ========
-        // Each level: tuned spawn and speed, still “random,” but feels authored.
         const WORLDS = [
           {
             id: 0,
@@ -169,20 +183,18 @@
               { seconds: 60, baseScroll: 182, scrollRamp: 34, spawnStart: 680, spawnRamp: 20, spawnMin: 260, shape:"mix",  size:[18,34], colors:[0xff4d7d,0xff6aa2,0xffb0ff] },
             ],
             boss: {
-              // Laser boss: warning phase then active beam, repeats
               enabled: true,
-              cycleSeconds: 6.0,   // every 6 seconds
-              warnSeconds: 1.25,   // warning visible first
-              activeSeconds: 1.1,  // beam active duration
-              thickness: 16,       // beam thickness
-              warnThickness: 6     // warning line thickness
+              cycleSeconds: 6.0,
+              warnSeconds: 1.25,
+              activeSeconds: 1.1,
+              thickness: 16,
+              warnThickness: 6
             }
           }
         ];
 
         // ======== BACKGROUND FX ========
         function buildBackdrop(scene, fxType, colorA, colorB) {
-          // Keeps it light + mobile-friendly: simple graphics arrays.
           const items = [];
 
           if (fxType === "scanlines") {
@@ -267,7 +279,11 @@
             cont.setAlpha(hasProgress ? 1 : 0.45);
 
             makeGhostButton(this, "WORLD MAP / LEVEL SELECT", W/2, H*0.66, () => this.scene.start("WorldMap"));
-            makeGhostButton(this, "RESET SAVE", W/2, H*0.78, () => { resetProgress(); this.scene.restart(); }).setAlpha(0.75);
+
+            makeGhostButton(this, "RESET SAVE", W/2, H*0.78, () => {
+              resetProgress();
+              this.scene.restart();
+            }).setAlpha(0.75);
 
             this.add.text(W/2, H*0.88, "No login needed: progress saves locally on your device.", {
               fontFamily: uiFont, fontSize: "12px", color: "#ffffff", align: "center"
@@ -284,7 +300,6 @@
             addTitle(this, "WORLD MAP", 0.14, 34);
             addSubtitle(this, "Select an unlocked level • Replay anytime", 0.20);
 
-            // Layout
             const marginX = 18;
             const colW = (W - marginX*2);
             let y = H*0.26;
@@ -292,7 +307,7 @@
             WORLDS.forEach((w, wi) => {
               const unlockedWorld = wi <= p.unlockedWorld;
 
-              const header = this.add.text(marginX, y, `${wi+1}. ${w.name}`, {
+              this.add.text(marginX, y, `${wi+1}. ${w.name}`, {
                 fontFamily: uiFont,
                 fontSize: "16px",
                 color: unlockedWorld ? "#ffffff" : "rgba(255,255,255,0.40)"
@@ -300,7 +315,6 @@
 
               y += 26;
 
-              // Level buttons row
               const gap = 10;
               const btnW = (colW - gap*(LEVELS_PER_WORLD-1)) / LEVELS_PER_WORLD;
               for (let li = 0; li < LEVELS_PER_WORLD; li++) {
@@ -308,8 +322,7 @@
                 const bx = marginX + li * (btnW + gap);
                 const by = y;
 
-                const label = `${li+1}`;
-                const b = this.add.text(bx + btnW/2, by + 18, label, {
+                const b = this.add.text(bx + btnW/2, by + 18, `${li+1}`, {
                   fontFamily: uiFont,
                   fontSize: "16px",
                   color: unlocked ? "#0a0a12" : "rgba(255,255,255,0.55)",
@@ -365,10 +378,7 @@
             p.currentLevel = level;
             saveProgress(p);
 
-            makeButton(this, "START", W/2, H*0.60, () => {
-              this.scene.start("Play", { world, level });
-            });
-
+            makeButton(this, "START", W/2, H*0.60, () => this.scene.start("Play", { world, level }));
             makeGhostButton(this, "WORLD MAP", W/2, H*0.70, () => this.scene.start("WorldMap"));
             makeGhostButton(this, "MAIN MENU", W/2, H*0.79, () => this.scene.start("Menu"));
           }
@@ -383,7 +393,6 @@
             this.wcfg = WORLDS[0];
             this.lcfg = WORLDS[0].levels[0];
 
-            // run state
             this.elapsed = 0;
             this.score = 0;
             this.levelTime = 0;
@@ -392,24 +401,24 @@
             this.spawnEvery = 0;
             this.spawnTimer = 0;
 
-            // visuals
             this.gridGraphics = null;
             this.gridOffset = 0;
             this.backdropItems = [];
 
-            // objects
             this.obstacles = null;
             this.player = null;
 
-            // mobile
             this.touchTarget = null;
             this.touchDot = null;
 
-            // boss (world 3)
+            // input mode toggle
+            this.inputMode = "analog"; // "analog" | "follow"
+            this.modeBtn = null;
+
+            // boss
             this.laser = null;
             this.laserWarn = null;
             this.bossT = 0;
-            this.laserActive = false;
           }
 
           init(data) {
@@ -422,31 +431,25 @@
           create() {
             this.cameras.main.setBackgroundColor(this.wcfg.bg);
 
-            // backdrop
             this.backdropItems = buildBackdrop(this, this.wcfg.backFx, this.wcfg.player, this.wcfg.border);
 
-            // grid
             this.gridGraphics = this.add.graphics();
             this.gridOffset = 0;
 
-            // groups
             this.obstacles = this.physics.add.group({ immovable: true, allowGravity: false });
 
-            // player
             const startX = GRID_X + GRID_W / 2;
             const startY = GRID_Y + GRID_H * 0.72;
             this.player = this.add.rectangle(startX, startY, 28, 28, this.wcfg.player);
             this.physics.add.existing(this.player);
             this.player.body.setAllowGravity(false);
 
-            // overlap with obstacles
             this.physics.add.overlap(this.player, this.obstacles, () => this.gameOver());
 
-            // inputs
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D");
 
-            // thumb target dot
+            // Thumb dot + input
             this.touchDot = this.add.circle(0, 0, 6, this.wcfg.player).setAlpha(0);
             this.touchTarget = null;
 
@@ -468,7 +471,25 @@
             this.uiTop = this.add.text(14, 10, "", { fontFamily: uiFont, fontSize: "14px", color: "#ffffff" }).setAlpha(0.95);
             this.uiTime = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95);
 
-            // run state reset
+            // Input mode button (top-right)
+            this.inputMode = loadInputMode();
+            this.modeBtn = this.add.text(W - 14, 12, "", {
+              fontFamily: uiFont,
+              fontSize: "12px",
+              color: "#ffffff",
+              backgroundColor: "rgba(255,255,255,0.10)",
+              padding: { left: 10, right: 10, top: 6, bottom: 6 }
+            }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+
+            this.modeBtn.on("pointerdown", () => {
+              this.inputMode = (this.inputMode === "analog") ? "follow" : "analog";
+              saveInputMode(this.inputMode);
+              this.refreshModeBtn();
+            });
+
+            this.refreshModeBtn();
+
+            // run state
             this.elapsed = 0;
             this.score = 0;
             this.levelTime = 0;
@@ -477,40 +498,35 @@
             this.spawnEvery = this.lcfg.spawnStart;
             this.spawnTimer = 0;
 
-            // boss hazard setup (World 3)
             this.setupBoss();
-
             this.updateHud();
+          }
+
+          refreshModeBtn() {
+            const label = (this.inputMode === "follow") ? "Direct Follow: ON" : "Direct Follow: OFF";
+            this.modeBtn.setText(label);
+            this.modeBtn.setAlpha(this.inputMode === "follow" ? 0.95 : 0.75);
           }
 
           setupBoss() {
             this.bossT = 0;
-            this.laserActive = false;
-
-            // destroy old if restarting
             if (this.laser) this.laser.destroy();
             if (this.laserWarn) this.laserWarn.destroy();
 
             const boss = this.wcfg.boss;
             if (!boss || !boss.enabled) return;
 
-            // warning line
             this.laserWarn = this.add.rectangle(
               GRID_X + GRID_W/2, GRID_Y + GRID_H/2,
               GRID_W, boss.warnThickness,
               0xffffff
-            ).setAlpha(0);
+            ).setAlpha(0).setDepth(5);
 
-            // active beam
             this.laser = this.add.rectangle(
               GRID_X + GRID_W/2, GRID_Y + GRID_H/2,
               GRID_W, boss.thickness,
               0xff4d7d
-            ).setAlpha(0);
-
-            // keep above grid but below HUD
-            this.laserWarn.setDepth(5);
-            this.laser.setDepth(6);
+            ).setAlpha(0).setDepth(6);
           }
 
           update(_, deltaMs) {
@@ -518,25 +534,22 @@
             this.elapsed += dt;
             this.levelTime += dt;
 
-            // Level complete
             if (this.levelTime >= this.lcfg.seconds) {
               this.levelComplete();
               return;
             }
 
-            // tuned speed curve
             this.scrollSpeed = this.lcfg.baseScroll + this.elapsed * this.lcfg.scrollRamp;
-
-            // tuned spawn curve
             const targetSpawn = this.lcfg.spawnStart - this.elapsed * this.lcfg.spawnRamp;
             this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
 
-            // score
             this.score += dt * 10;
             this.updateHud();
 
-            // movement
+            // ===== Movement =====
             let vx = 0, vy = 0;
+
+            // Keyboard still works always
             const left = this.cursors.left.isDown || this.keys.A.isDown;
             const right = this.cursors.right.isDown || this.keys.D.isDown;
             const up = this.cursors.up.isDown || this.keys.W.isDown;
@@ -547,28 +560,75 @@
             if (up) vy -= 1;
             if (down) vy += 1;
 
-            // mobile fairness: boost increases a bit over time
-            const dynamicBoost = ANALOG_BOOST + (this.elapsed * 0.02);
-            const boost = Phaser.Math.Clamp(dynamicBoost, ANALOG_BOOST, ANALOG_BOOST + ANALOG_MAX_EXTRA);
-
+            // Mobile / touch behavior:
+            // - analog: velocity direction + speed scaling
+            // - follow: position lerp toward finger (fast & responsive)
             if (this.touchTarget) {
-              const dx = this.touchTarget.x - this.player.x;
-              const dy = this.touchTarget.y - this.player.y;
+              if (this.inputMode === "follow") {
+                // Direct follow (lerp toward target)
+                const tx = clamp(this.touchTarget.x, GRID_X + 14, GRID_X + GRID_W - 14);
+                const ty = clamp(this.touchTarget.y, GRID_Y + 14, GRID_Y + GRID_H - 14);
 
-              const ax = Math.abs(dx) > ANALOG_DEADZONE ? dx : 0;
-              const ay = Math.abs(dy) > ANALOG_DEADZONE ? dy : 0;
+                const dx = tx - this.player.x;
+                const dy = ty - this.player.y;
+                const dist = Math.hypot(dx, dy);
 
-              vx += Phaser.Math.Clamp((ax / ANALOG_MAX_DIST) * boost, -1, 1);
-              vy += Phaser.Math.Clamp((ay / ANALOG_MAX_DIST) * boost, -1, 1);
+                if (dist > FOLLOW_RADIUS) {
+                  // lerp position
+                  const nx = this.player.x + dx * FOLLOW_LERP;
+                  const ny = this.player.y + dy * FOLLOW_LERP;
+
+                  // cap max instantaneous velocity so it remains fair
+                  const maxStep = PLAYER_SPEED * FOLLOW_MAX_SPEED_MULT * dt;
+                  const stepDist = Math.hypot(nx - this.player.x, ny - this.player.y);
+                  if (stepDist > maxStep) {
+                    const s = maxStep / stepDist;
+                    this.player.x = this.player.x + (nx - this.player.x) * s;
+                    this.player.y = this.player.y + (ny - this.player.y) * s;
+                  } else {
+                    this.player.x = nx;
+                    this.player.y = ny;
+                  }
+
+                  // reset body to avoid physics drift
+                  this.player.body.reset(this.player.x, this.player.y);
+                } else {
+                  this.player.body.setVelocity(0, 0);
+                }
+              } else {
+                // Analog steering + boosted speed based on thumb distance
+                const dx = this.touchTarget.x - this.player.x;
+                const dy = this.touchTarget.y - this.player.y;
+
+                const ax = Math.abs(dx) > ANALOG_DEADZONE ? dx : 0;
+                const ay = Math.abs(dy) > ANALOG_DEADZONE ? dy : 0;
+
+                const dynamicBoost = ANALOG_BOOST + (this.elapsed * 0.02);
+                const boost = Phaser.Math.Clamp(dynamicBoost, ANALOG_BOOST, ANALOG_BOOST + ANALOG_MAX_EXTRA);
+
+                vx += Phaser.Math.Clamp((ax / ANALOG_MAX_DIST) * boost, -1, 1);
+                vy += Phaser.Math.Clamp((ay / ANALOG_MAX_DIST) * boost, -1, 1);
+
+                // normalize
+                const mag = Math.hypot(vx, vy);
+                if (mag > 1) { vx /= mag; vy /= mag; }
+
+                // speed scales with distance (drag far = faster)
+                let speed = PLAYER_SPEED;
+                const dist = Math.hypot(dx, dy);
+                const t = Phaser.Math.Clamp(dist / 120, 0, 1);
+                speed = PLAYER_SPEED * (1 + 1.15 * t); // stronger than before
+
+                this.player.body.setVelocity(vx * speed, vy * speed);
+              }
+            } else {
+              // No touch: keyboard only
+              const mag = Math.hypot(vx, vy);
+              if (mag > 1) { vx /= mag; vy /= mag; }
+              this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
             }
 
-            // normalize (no diagonal boost)
-            const mag = Math.hypot(vx, vy);
-            if (mag > 1) { vx /= mag; vy /= mag; }
-
-            this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
-
-            // clamp to grid
+            // Clamp to grid (always)
             const pad = 14;
             const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
             const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
@@ -577,7 +637,7 @@
               this.player.body.reset(nx, ny);
             }
 
-            // spawn obstacles (random but styled per level)
+            // spawn obstacles
             this.spawnTimer += deltaMs;
             while (this.spawnTimer >= this.spawnEvery) {
               this.spawnTimer -= this.spawnEvery;
@@ -591,10 +651,10 @@
               if (o.y > GRID_Y + GRID_H + 120) o.destroy();
             });
 
-            // boss hazard update (world 3)
+            // boss
             this.updateBoss(dt);
 
-            // draw grid
+            // grid
             this.drawGrid(dt);
           }
 
@@ -624,7 +684,6 @@
             }
           }
 
-          // ======== Obstacle spawner (random, tuned, with variety) ========
           spawnObstacle() {
             const col = Phaser.Math.Between(0, GRID_COLS - 1);
             const x = GRID_X + col * TILE + TILE / 2;
@@ -636,28 +695,21 @@
             let w = Phaser.Math.Between(smin, smax);
             let h = Phaser.Math.Between(smin, smax);
 
-            // Shape variety per level
             const shape = this.lcfg.shape;
             if (shape === "tall") { w = Phaser.Math.Between(smin, smax-2); h = Phaser.Math.Between(smax, smax+18); }
             else if (shape === "wide") { w = Phaser.Math.Between(smax, smax+22); h = Phaser.Math.Between(smin, smax-2); }
             else if (shape === "mix") {
-              // 1/3 tall, 1/3 wide, 1/3 square
               const r = Phaser.Math.Between(0,2);
               if (r === 0) { w = Phaser.Math.Between(smin, smax-2); h = Phaser.Math.Between(smax, smax+18); }
               if (r === 1) { w = Phaser.Math.Between(smax, smax+22); h = Phaser.Math.Between(smin, smax-2); }
             }
 
-            const rect = this.add.rectangle(x, y, w, h, color);
+            const rect = this.add.rectangle(x, y, w, h, color).setAlpha(0.95);
             this.physics.add.existing(rect);
             rect.body.setAllowGravity(false);
             rect.body.setImmovable(true);
-
-            // tiny glow-ish feel by alpha
-            rect.setAlpha(0.95);
-
             this.obstacles.add(rect);
 
-            // Occasional second obstacle (rare early, more late) — still random
             const chance = Phaser.Math.Clamp(0.08 + (this.elapsed * 0.004), 0.08, 0.26);
             if (Math.random() < chance && this.levelTime > 6) {
               let col2 = Phaser.Math.Between(0, GRID_COLS - 1);
@@ -672,7 +724,6 @@
             }
           }
 
-          // ======== Boss (World 3): Laser sweep ========
           updateBoss(dt) {
             const boss = this.wcfg.boss;
             if (!boss || !boss.enabled || !this.laser || !this.laserWarn) return;
@@ -681,26 +732,21 @@
             const cycle = boss.cycleSeconds;
             const t = this.bossT % cycle;
 
-            // Laser position sweeps vertically down the grid and loops
-            const sweep = (this.bossT * 0.22) % 1; // slow drift
+            const sweep = (this.bossT * 0.22) % 1;
             const yPos = GRID_Y + 20 + (GRID_H - 40) * ((t / cycle + sweep) % 1);
 
             this.laserWarn.setPosition(GRID_X + GRID_W/2, yPos);
             this.laser.setPosition(GRID_X + GRID_W/2, yPos);
 
-            // phases
             const warnOn = t < boss.warnSeconds;
             const activeOn = (t >= boss.warnSeconds) && (t < boss.warnSeconds + boss.activeSeconds);
 
             this.laserWarn.setAlpha(warnOn ? 0.35 : 0);
             this.laser.setAlpha(activeOn ? 0.85 : 0);
 
-            // collision when active
             if (activeOn) {
               const pr = this.player.getBounds();
               const lr = this.laser.getBounds();
-
-              // only count collision within grid region
               const inGrid =
                 pr.left >= GRID_X - 2 && pr.right <= GRID_X + GRID_W + 2 &&
                 pr.top >= GRID_Y - 2 && pr.bottom <= GRID_Y + GRID_H + 2;
@@ -711,12 +757,9 @@
             }
           }
 
-          // ======== Progression ========
           levelComplete() {
-            // update save
             const p = loadProgress();
 
-            // compute next
             let nextWorld = this.world;
             let nextLevel = this.level + 1;
             let worldClear = false;
@@ -727,7 +770,6 @@
               nextWorld = this.world + 1;
             }
 
-            // unlock logic
             if (worldClear) {
               p.unlockedWorld = Math.max(p.unlockedWorld, this.world + 1);
               p.unlockedLevel = 0;
@@ -736,7 +778,6 @@
               if (p.unlockedWorld === this.world) p.unlockedLevel = Math.max(p.unlockedLevel, this.level + 1);
             }
 
-            // set current pointer
             if (nextWorld >= WORLDS.length) {
               p.currentWorld = WORLDS.length - 1;
               p.currentLevel = LEVELS_PER_WORLD - 1;
@@ -746,7 +787,6 @@
             }
             saveProgress(p);
 
-            // route
             if (nextWorld >= WORLDS.length) {
               this.scene.start("CampaignComplete", { score: Math.floor(this.score) });
             } else if (worldClear) {
@@ -872,10 +912,7 @@
               fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff"
             }).setOrigin(0.5).setAlpha(0.85);
 
-            makeButton(this, "RETRY LEVEL", W/2, H*0.66, () => {
-              this.scene.start("Play", { world, level });
-            });
-
+            makeButton(this, "RETRY LEVEL", W/2, H*0.66, () => this.scene.start("Play", { world, level }));
             makeGhostButton(this, "WORLD MAP", W/2, H*0.76, () => this.scene.start("WorldMap"));
             makeGhostButton(this, "MAIN MENU", W/2, H*0.84, () => this.scene.start("Menu"));
           }
@@ -904,3 +941,4 @@
   </script>
 </body>
 </html>
+

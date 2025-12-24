@@ -23,7 +23,6 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
   <script>
-    // Start AFTER page load + AFTER Phaser exists (prevents blank-page surprises)
     window.addEventListener("load", () => {
       const wait = setInterval(() => {
         if (typeof window.Phaser === "undefined") return;
@@ -31,6 +30,59 @@
 
         const W = 420, H = 760;
 
+        // ----- Shared UI helpers -----
+        const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+
+        function addTitle(scene, text, yFrac = 0.22) {
+          return scene.add.text(W/2, H*yFrac, text, {
+            fontFamily: uiFont,
+            fontSize: "40px",
+            color: "#ffffff",
+          }).setOrigin(0.5).setAlpha(0.95);
+        }
+
+        function addSubtitle(scene, text, yFrac = 0.28) {
+          return scene.add.text(W/2, H*yFrac, text, {
+            fontFamily: uiFont,
+            fontSize: "14px",
+            color: "#b7b7ff",
+          }).setOrigin(0.5).setAlpha(0.9);
+        }
+
+        function makeButton(scene, label, x, y, onClick) {
+          const btn = scene.add.text(x, y, label, {
+            fontFamily: uiFont,
+            fontSize: "18px",
+            color: "#0a0a12",
+            backgroundColor: "#6ef3ff",
+            padding: { left: 18, right: 18, top: 10, bottom: 10 },
+          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+          btn.on("pointerdown", onClick);
+
+          // tiny hover polish (desktop)
+          btn.on("pointerover", () => btn.setAlpha(0.92));
+          btn.on("pointerout", () => btn.setAlpha(1));
+
+          return btn;
+        }
+
+        function makeGhostButton(scene, label, x, y, onClick) {
+          const btn = scene.add.text(x, y, label, {
+            fontFamily: uiFont,
+            fontSize: "16px",
+            color: "#ffffff",
+            backgroundColor: "rgba(255,255,255,0.10)",
+            padding: { left: 16, right: 16, top: 10, bottom: 10 },
+          }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+          btn.on("pointerdown", onClick);
+          btn.on("pointerover", () => btn.setAlpha(0.85));
+          btn.on("pointerout", () => btn.setAlpha(1));
+          return btn;
+        }
+
+        // ----- GAMEPLAY constants -----
         const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
         const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
         const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
@@ -41,6 +93,73 @@
         const SPAWN_MIN_MS = 320;
 
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+        // ----- Scenes -----
+        class MenuScene extends Phaser.Scene {
+          constructor() { super("Menu"); }
+
+          create() {
+            this.cameras.main.setBackgroundColor(0x0a0a12);
+
+            // Subtle “grid” backdrop
+            const g = this.add.graphics();
+            g.lineStyle(1, 0x20204a, 0.8);
+            for (let i = 0; i < 30; i++) {
+              const y = i * 28;
+              g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.strokePath();
+            }
+            for (let i = 0; i < 20; i++) {
+              const x = i * 28;
+              g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.strokePath();
+            }
+
+            addTitle(this, "GRIDRUN", 0.22);
+            addSubtitle(this, "Fast neon dodging. Skill only. Fun first.", 0.285);
+
+            makeButton(this, "PLAY", W/2, H*0.46, () => this.scene.start("Play"));
+            makeGhostButton(this, "COSMETICS", W/2, H*0.56, () => this.scene.start("Cosmetics"));
+            makeGhostButton(this, "EVENTS", W/2, H*0.66, () => this.scene.start("Events"));
+
+            this.add.text(W/2, H*0.82, "Wallet integration comes later.\nGameplay is fully playable without it.", {
+              fontFamily: uiFont,
+              fontSize: "12px",
+              color: "#ffffff",
+              align: "center",
+            }).setOrigin(0.5).setAlpha(0.55);
+          }
+        }
+
+        class CosmeticsScene extends Phaser.Scene {
+          constructor() { super("Cosmetics"); }
+          create() {
+            this.cameras.main.setBackgroundColor(0x070710);
+            addTitle(this, "COSMETICS", 0.22);
+            addSubtitle(this, "Placeholder screen (no wallet required yet).", 0.29);
+
+            this.add.text(W/2, H*0.43,
+              "Coming soon:\n• Trails\n• Color palettes\n• Avatars\n\nCosmetic only — no gameplay advantage.",
+              { fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff", align: "center" }
+            ).setOrigin(0.5);
+
+            makeGhostButton(this, "BACK", W/2, H*0.72, () => this.scene.start("Menu"));
+          }
+        }
+
+        class EventsScene extends Phaser.Scene {
+          constructor() { super("Events"); }
+          create() {
+            this.cameras.main.setBackgroundColor(0x070710);
+            addTitle(this, "EVENTS", 0.22);
+            addSubtitle(this, "Placeholder screen (no rewards, no earnings).", 0.29);
+
+            this.add.text(W/2, H*0.43,
+              "Coming soon:\n• Weekly challenges\n• Limited-time modes\n• Prestige leaderboards\n\nFun + bragging rights only.",
+              { fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff", align: "center" }
+            ).setOrigin(0.5);
+
+            makeGhostButton(this, "BACK", W/2, H*0.72, () => this.scene.start("Menu"));
+          }
+        }
 
         class PlayScene extends Phaser.Scene {
           constructor() {
@@ -72,7 +191,7 @@
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D");
 
-            // Swipe
+            // Swipe support
             this.touchStart = null;
             this.input.on("pointerdown", (p) => (this.touchStart = { x: p.x, y: p.y }));
             this.input.on("pointerup", (p) => {
@@ -95,17 +214,18 @@
             });
 
             this.uiText = this.add.text(14, 12, "Score: 0", {
-              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+              fontFamily: uiFont,
               fontSize: "16px",
               color: "#ffffff",
             }).setAlpha(0.9);
 
             this.add.text(14, 34, "Survive. Speed ramps up.", {
-              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+              fontFamily: uiFont,
               fontSize: "12px",
               color: "#b7b7ff",
             }).setAlpha(0.9);
 
+            // reset
             this.scrollSpeed = BASE_SCROLL;
             this.spawnEvery = SPAWN_START_MS;
             this.spawnTimer = 0;
@@ -117,7 +237,7 @@
             const dt = deltaMs / 1000;
             this.elapsed += dt;
 
-            // ramp
+            // difficulty ramp
             this.scrollSpeed = BASE_SCROLL + this.elapsed * 22;
             this.spawnEvery = clamp(SPAWN_START_MS - this.elapsed * 18, SPAWN_MIN_MS, SPAWN_START_MS);
 
@@ -136,12 +256,11 @@
             if (right) vx += 1;
             if (up) vy -= 1;
             if (down) vy += 1;
-
             if (vx !== 0 && vy !== 0) { vx *= 0.7071; vy *= 0.7071; }
 
             this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
 
-            // keep inside grid bounds
+            // keep inside grid
             const pad = 14;
             const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
             const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
@@ -150,26 +269,26 @@
               this.player.body.reset(nx, ny);
             }
 
-            // spawn
+            // spawn obstacles
             this.spawnTimer += deltaMs;
             while (this.spawnTimer >= this.spawnEvery) {
               this.spawnTimer -= this.spawnEvery;
               this.spawnObstacle();
             }
 
-            // move obstacles down
+            // move obstacles
             this.obstacles.children.iterate((o) => {
               if (!o) return;
               o.y += this.scrollSpeed * dt;
               if (o.y > GRID_Y + GRID_H + 80) o.destroy();
             });
 
+            // draw grid
             this.drawGrid(dt);
           }
 
           drawGrid(dt) {
             this.gridOffset = (this.gridOffset + this.scrollSpeed * dt) % TILE;
-
             const g = this.gridGraphics;
             g.clear();
 
@@ -182,7 +301,6 @@
               const x = GRID_X + c * TILE;
               g.beginPath(); g.moveTo(x, GRID_Y); g.lineTo(x, GRID_Y + GRID_H); g.strokePath();
             }
-
             for (let r = -1; r <= GRID_ROWS + 1; r++) {
               const y = GRID_Y + r * TILE + this.gridOffset - TILE;
               g.beginPath(); g.moveTo(GRID_X, y); g.lineTo(GRID_X + GRID_W, y); g.strokePath();
@@ -211,30 +329,17 @@
           constructor() { super("GameOver"); }
           create(data) {
             this.cameras.main.setBackgroundColor(0x070710);
-
             const score = data?.score ?? 0;
 
-            this.add.text(W/2, H*0.35, "RUN ENDED", {
-              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
-              fontSize: "34px",
-              color: "#ffffff",
-            }).setOrigin(0.5);
-
+            addTitle(this, "RUN ENDED", 0.35);
             this.add.text(W/2, H*0.43, "Score: " + score, {
-              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+              fontFamily: uiFont,
               fontSize: "18px",
               color: "#b7b7ff",
             }).setOrigin(0.5);
 
-            const btn = this.add.text(W/2, H*0.55, "RETRY", {
-              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
-              fontSize: "20px",
-              color: "#0a0a12",
-              backgroundColor: "#6ef3ff",
-              padding: { left: 18, right: 18, top: 10, bottom: 10 },
-            }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-            btn.on("pointerdown", () => this.scene.start("Play"));
+            makeButton(this, "RETRY", W/2, H*0.55, () => this.scene.start("Play"));
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.65, () => this.scene.start("Menu"));
           }
         }
 
@@ -243,7 +348,7 @@
           width: W,
           height: H,
           physics: { default: "arcade", arcade: { debug: false } },
-          scene: [PlayScene, GameOverScene],
+          scene: [MenuScene, CosmeticsScene, EventsScene, PlayScene, GameOverScene],
         });
       }, 50);
     });

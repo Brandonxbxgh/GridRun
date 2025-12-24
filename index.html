@@ -11,14 +11,14 @@
       position:fixed; left:12px; bottom:10px;
       font:12px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
       color:rgba(255,255,255,.75);
-      background:rgba(0,0,0,.35);
+      background:rgba(0,0,0,0.35);
       padding:8px 10px; border-radius:10px;
       user-select:none; z-index:10;
     }
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD/Arrows • Mobile: drag thumb (FAST analog) • Survive as long as possible</div>
+  <div class="hint">PC: WASD/Arrows • Mobile: drag thumb (FAST analog) • Dot shows thumb target • Survive</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -81,15 +81,15 @@
         const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
 
         const PLAYER_SPEED = 320;
-
         const BASE_SCROLL = 120;
         const SPAWN_START_MS = 850;
         const SPAWN_MIN_MS = 320;
 
-        // ✅ Faster analog thumb-follow tuning
-        const ANALOG_MAX_DIST = 110;  // reach max speed sooner (smaller = faster)
-        const ANALOG_DEADZONE = 4;    // react sooner (smaller = more sensitive)
-        const ANALOG_BOOST = 2.0;    // extra punch (1.25–1.6 range)
+        // ✅ Mobile analog tuning
+        const ANALOG_MAX_DIST = 110;  // smaller = faster response
+        const ANALOG_DEADZONE = 4;    // smaller = more sensitive
+        const ANALOG_BOOST = 1.45;    // baseline punch
+        const ANALOG_MAX_EXTRA = 0.85; // extra boost ceiling from speed ramp
 
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -163,7 +163,9 @@
             this.spawnTimer = 0;
             this.elapsed = 0;
             this.score = 0;
+
             this.touchTarget = null;
+            this.touchDot = null;
           }
 
           create() {
@@ -186,11 +188,24 @@
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D");
 
-            // ✅ Analog thumb-follow: touch/drag sets target point.
+            // ✅ Debug thumb target dot (only visible while touching)
+            this.touchDot = this.add.circle(0, 0, 6, 0x6ef3ff).setAlpha(0);
+
+            // ✅ Analog thumb-follow input (drag to steer)
             this.touchTarget = null;
-            this.input.on("pointerdown", (p) => { this.touchTarget = { x: p.x, y: p.y }; });
-            this.input.on("pointermove", (p) => { if (p.isDown) this.touchTarget = { x: p.x, y: p.y }; });
-            this.input.on("pointerup", () => { this.touchTarget = null; });
+            this.input.on("pointerdown", (p) => {
+              this.touchTarget = { x: p.x, y: p.y };
+              this.touchDot.setPosition(p.x, p.y).setAlpha(0.8);
+            });
+            this.input.on("pointermove", (p) => {
+              if (!p.isDown) return;
+              this.touchTarget = { x: p.x, y: p.y };
+              this.touchDot.setPosition(p.x, p.y).setAlpha(0.8);
+            });
+            this.input.on("pointerup", () => {
+              this.touchTarget = null;
+              this.touchDot.setAlpha(0);
+            });
 
             this.uiText = this.add.text(14, 12, "Score: 0", {
               fontFamily: uiFont, fontSize: "16px", color: "#ffffff",
@@ -232,6 +247,10 @@
             if (up) vy -= 1;
             if (down) vy += 1;
 
+            // ✅ Mobile fairness: boost increases as speed ramps
+            const dynamicBoost = ANALOG_BOOST + (this.elapsed * 0.02); // slow ramp
+            const boost = Phaser.Math.Clamp(dynamicBoost, ANALOG_BOOST, ANALOG_BOOST + ANALOG_MAX_EXTRA);
+
             // ✅ FAST analog thumb-follow steering
             if (this.touchTarget) {
               const dx = this.touchTarget.x - this.player.x;
@@ -240,8 +259,8 @@
               const ax = Math.abs(dx) > ANALOG_DEADZONE ? dx : 0;
               const ay = Math.abs(dy) > ANALOG_DEADZONE ? dy : 0;
 
-              vx += Phaser.Math.Clamp((ax / ANALOG_MAX_DIST) * ANALOG_BOOST, -1, 1);
-              vy += Phaser.Math.Clamp((ay / ANALOG_MAX_DIST) * ANALOG_BOOST, -1, 1);
+              vx += Phaser.Math.Clamp((ax / ANALOG_MAX_DIST) * boost, -1, 1);
+              vy += Phaser.Math.Clamp((ay / ANALOG_MAX_DIST) * boost, -1, 1);
             }
 
             // normalize (prevents diagonal speed boost)

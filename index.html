@@ -18,7 +18,7 @@
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD/Arrows • Mobile: DIRECT FOLLOW only (drag thumb) • World Map + Levels • World 3 Laser Boss</div>
+  <div class="hint">PC: WASD/Arrows • Mobile: DIRECT FOLLOW (drag) • 3 Worlds • 5 Levels • W3 Laser Boss</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -31,7 +31,7 @@
         const W = 420, H = 760;
         const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
 
-        // ======== GRID ========
+        // ===== GRID =====
         const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
         const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
         const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
@@ -39,19 +39,17 @@
         // Movement
         const PLAYER_SPEED = 320;
 
-        // ✅ DIRECT FOLLOW ONLY (mobile)
-        const FOLLOW_RADIUS = 8;           // stops when close to finger
-        const FOLLOW_LERP = 0.34;          // higher = snappier follow
-        const FOLLOW_MAX_SPEED_MULT = 2.6; // cap follow speed vs PLAYER_SPEED
+        // ✅ Mobile DIRECT FOLLOW only
+        const FOLLOW_RADIUS = 7;            // stop when close to finger
+        const FOLLOW_LERP = 0.38;           // snappier follow
+        const FOLLOW_MAX_SPEED_MULT = 2.8;  // cap follow speed vs PLAYER_SPEED
 
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-        // Detect touch-capable device (used to force direct-follow behavior)
         const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
 
-        // ======== SAVE / PROGRESS ========
+        // ===== SAVE / PROGRESS =====
         const LEVELS_PER_WORLD = 5;
-        const SAVE_KEY = "gridrun_progress_v2";
+        const SAVE_KEY = "gridrun_progress_v3";
 
         function loadProgress() {
           try {
@@ -77,7 +75,7 @@
           return level <= p.unlockedLevel;
         }
 
-        // ======== UI HELPERS ========
+        // ===== UI helpers =====
         function addTitle(scene, text, yFrac = 0.22, size = 40) {
           return scene.add.text(W/2, H*yFrac, text, {
             fontFamily: uiFont, fontSize: `${size}px`, color: "#ffffff",
@@ -117,58 +115,99 @@
           return btn;
         }
 
-        // ======== WORLDS + REAL LEVEL DESIGN ========
+        // ===== Difficulty scaling (your requested pacing) =====
+        // Level durations: 20 → 25 → 30 → 38 → 45
+        const DUR = [20, 25, 30, 38, 45];
+
+        // Helper to build level curves that start easy and ramp per level
+        function mkLevels(baseScroll0, baseScrollStep, ramp0, rampStep, spawnStart0, spawnStep, spawnMin0, spawnMinStep) {
+          return DUR.map((seconds, i) => ({
+            seconds,
+            baseScroll: baseScroll0 + baseScrollStep * i,
+            scrollRamp: ramp0 + rampStep * i,
+            spawnStart: spawnStart0 - spawnStep * i, // bigger = less frequent early
+            spawnRamp: 8 + i * 2,
+            spawnMin: Math.max(250, spawnMin0 - spawnMinStep * i),
+            size: [22 - i, 34 - Math.floor(i/2)]
+          }));
+        }
+
+        // ===== Worlds (A+B+C mixed) =====
         const WORLDS = [
           {
             id: 0,
-            name: "Neon Alley",
-            subtitle: "Warmup. Find your flow.",
-            bg: 0x0a0a12,
+            name: "Cyber Circuit",
+            subtitle: "Neon lanes. Clean reads. Warm up.",
+            bg: 0x070812,
             border: 0x2a2a55,
             gridLine: 0x20204a,
             player: 0x6ef3ff,
-            backFx: "scanlines",
-            levels: [
-              { seconds: 35, baseScroll: 105, scrollRamp: 14, spawnStart: 980, spawnRamp: 10, spawnMin: 430, shape:"square", size:[22,34], colors:[0xff4d7d,0xff6aa2] },
-              { seconds: 40, baseScroll: 112, scrollRamp: 16, spawnStart: 930, spawnRamp: 11, spawnMin: 410, shape:"square", size:[22,34], colors:[0xff4d7d,0xff7bd0] },
-              { seconds: 45, baseScroll: 118, scrollRamp: 18, spawnStart: 900, spawnRamp: 12, spawnMin: 390, shape:"tall",   size:[20,32], colors:[0xff4d7d,0xff6aa2] },
-              { seconds: 48, baseScroll: 125, scrollRamp: 20, spawnStart: 870, spawnRamp: 13, spawnMin: 370, shape:"wide",   size:[20,32], colors:[0xff4d7d,0xff7bd0] },
-              { seconds: 50, baseScroll: 132, scrollRamp: 22, spawnStart: 850, spawnRamp: 14, spawnMin: 360, shape:"mix",    size:[20,34], colors:[0xff4d7d,0xff6aa2,0xff7bd0] },
-            ]
+            fx: "scanlines",
+            gridStyle: "circuit",
+            obstacleStyle: {
+              palette: [0xff4d7d, 0xff6aa2, 0xff7bd0],
+              shapes: ["tri", "hex", "frame", "rect"]
+            },
+            levels: mkLevels(
+              78,   // baseScroll0 (easy)
+              14,   // baseScrollStep
+              7,    // ramp0
+              2.2,  // rampStep
+              1050, // spawnStart0 (slow spawns early)
+              65,   // spawnStep
+              520,  // spawnMin0
+              40    // spawnMinStep
+            )
           },
           {
             id: 1,
-            name: "Overclock District",
-            subtitle: "Neon rain. Faster drops.",
-            bg: 0x060814,
+            name: "Industrial Overclock",
+            subtitle: "Heavy plating. Hazard stripes. Faster drops.",
+            bg: 0x050611,
             border: 0x3a4a88,
             gridLine: 0x243056,
             player: 0x7cffd2,
-            backFx: "rain",
-            levels: [
-              { seconds: 40, baseScroll: 130, scrollRamp: 22, spawnStart: 840, spawnRamp: 13, spawnMin: 340, shape:"tall", size:[18,30], colors:[0xff6aa2,0xff4d7d] },
-              { seconds: 45, baseScroll: 140, scrollRamp: 24, spawnStart: 820, spawnRamp: 14, spawnMin: 330, shape:"wide", size:[18,30], colors:[0xff6aa2,0xff7bd0] },
-              { seconds: 50, baseScroll: 148, scrollRamp: 26, spawnStart: 790, spawnRamp: 15, spawnMin: 320, shape:"mix",  size:[18,32], colors:[0xff6aa2,0xff4d7d,0xff7bd0] },
-              { seconds: 52, baseScroll: 155, scrollRamp: 28, spawnStart: 770, spawnRamp: 16, spawnMin: 310, shape:"square",size:[18,32], colors:[0xff6aa2,0xff4d7d] },
-              { seconds: 55, baseScroll: 162, scrollRamp: 30, spawnStart: 750, spawnRamp: 17, spawnMin: 300, shape:"mix",  size:[18,34], colors:[0xff6aa2,0xff4d7d,0xffb0ff] },
-            ]
+            fx: "rain",
+            gridStyle: "industrial",
+            obstacleStyle: {
+              palette: [0xffd166, 0xff4d7d, 0x7cffd2],
+              shapes: ["bar", "plus", "rect", "frame"]
+            },
+            levels: mkLevels(
+              86,
+              16,
+              8,
+              2.6,
+              980,
+              70,
+              500,
+              45
+            )
           },
           {
             id: 2,
-            name: "Blackout Sector",
-            subtitle: "Dark grid. Laser sweeps.",
-            bg: 0x03040b,
+            name: "Blackout Glitch",
+            subtitle: "Broken grid. Flicker. Laser sweeps.",
+            bg: 0x02030a,
             border: 0x4b4bb0,
             gridLine: 0x1e1f3f,
             player: 0x9aa7ff,
-            backFx: "stars",
-            levels: [
-              { seconds: 45, baseScroll: 150, scrollRamp: 26, spawnStart: 760, spawnRamp: 16, spawnMin: 300, shape:"wide", size:[18,30], colors:[0xff4d7d,0xff6aa2] },
-              { seconds: 50, baseScroll: 158, scrollRamp: 28, spawnStart: 740, spawnRamp: 17, spawnMin: 290, shape:"tall", size:[18,30], colors:[0xff4d7d,0xff7bd0] },
-              { seconds: 55, baseScroll: 166, scrollRamp: 30, spawnStart: 720, spawnRamp: 18, spawnMin: 280, shape:"mix",  size:[18,32], colors:[0xff4d7d,0xff6aa2,0xff7bd0] },
-              { seconds: 58, baseScroll: 174, scrollRamp: 32, spawnStart: 700, spawnRamp: 19, spawnMin: 270, shape:"square",size:[18,32], colors:[0xff4d7d,0xffb0ff] },
-              { seconds: 60, baseScroll: 182, scrollRamp: 34, spawnStart: 680, spawnRamp: 20, spawnMin: 260, shape:"mix",  size:[18,34], colors:[0xff4d7d,0xff6aa2,0xffb0ff] },
-            ],
+            fx: "stars",
+            gridStyle: "glitch",
+            obstacleStyle: {
+              palette: [0xff4d7d, 0xffb0ff, 0x9aa7ff],
+              shapes: ["hex", "tri", "bar", "frame"]
+            },
+            levels: mkLevels(
+              92,
+              18,
+              9,
+              3.0,
+              930,
+              75,
+              480,
+              50
+            ),
             boss: {
               enabled: true,
               cycleSeconds: 6.0,
@@ -180,13 +219,13 @@
           }
         ];
 
-        // ======== BACKGROUND FX ========
+        // ===== Background FX =====
         function buildBackdrop(scene, fxType, colorA, colorB) {
           const items = [];
 
           if (fxType === "scanlines") {
             const g = scene.add.graphics();
-            g.setAlpha(0.25);
+            g.setAlpha(0.22);
             g.lineStyle(1, colorB, 1);
             for (let y = 0; y < H; y += 8) {
               g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.strokePath();
@@ -196,15 +235,15 @@
 
           if (fxType === "rain") {
             const drops = [];
-            for (let i = 0; i < 40; i++) {
+            for (let i = 0; i < 42; i++) {
               const r = scene.add.rectangle(
                 Phaser.Math.Between(0, W),
                 Phaser.Math.Between(-H, H),
                 2,
-                Phaser.Math.Between(18, 44),
+                Phaser.Math.Between(18, 48),
                 colorB
-              ).setAlpha(0.18);
-              r._vy = Phaser.Math.FloatBetween(220, 420);
+              ).setAlpha(0.16);
+              r._vy = Phaser.Math.FloatBetween(240, 460);
               drops.push(r);
             }
             scene.events.on("update", (_, dtMs) => {
@@ -219,13 +258,13 @@
 
           if (fxType === "stars") {
             const stars = [];
-            for (let i = 0; i < 60; i++) {
+            for (let i = 0; i < 62; i++) {
               const s = scene.add.rectangle(
                 Phaser.Math.Between(0, W),
                 Phaser.Math.Between(0, H),
                 2, 2, colorA
-              ).setAlpha(Phaser.Math.FloatBetween(0.08, 0.35));
-              s._vy = Phaser.Math.FloatBetween(12, 42);
+              ).setAlpha(Phaser.Math.FloatBetween(0.07, 0.32));
+              s._vy = Phaser.Math.FloatBetween(12, 52);
               stars.push(s);
             }
             scene.events.on("update", (_, dtMs) => {
@@ -241,13 +280,87 @@
           return items;
         }
 
-        // ======== SCENES ========
+        // ===== Obstacle texture factory (silhouette variety) =====
+        function ensureObstacleTextures(scene) {
+          const makeTex = (key, drawFn) => {
+            if (scene.textures.exists(key)) return;
+            const g = scene.make.graphics({ x:0, y:0, add:false });
+            g.clear();
+            drawFn(g);
+            g.generateTexture(key, 64, 64);
+            g.destroy();
+          };
+
+          makeTex("obs_rect", (g) => {
+            g.fillStyle(0xffffff, 1);
+            g.fillRoundedRect(8, 8, 48, 48, 10);
+          });
+
+          makeTex("obs_frame", (g) => {
+            g.lineStyle(6, 0xffffff, 1);
+            g.strokeRoundedRect(10, 10, 44, 44, 10);
+            g.lineStyle(2, 0xffffff, 0.7);
+            g.strokeRoundedRect(16, 16, 32, 32, 8);
+          });
+
+          makeTex("obs_tri", (g) => {
+            g.fillStyle(0xffffff, 1);
+            g.beginPath();
+            g.moveTo(32, 8);
+            g.lineTo(56, 56);
+            g.lineTo(8, 56);
+            g.closePath();
+            g.fillPath();
+            g.lineStyle(2, 0xffffff, 0.35);
+            g.strokePath();
+          });
+
+          makeTex("obs_hex", (g) => {
+            g.fillStyle(0xffffff, 1);
+            const pts = [
+              {x:32,y:6},{x:54,y:18},{x:54,y:46},{x:32,y:58},{x:10,y:46},{x:10,y:18}
+            ];
+            g.beginPath();
+            g.moveTo(pts[0].x, pts[0].y);
+            for (let i=1;i<pts.length;i++) g.lineTo(pts[i].x, pts[i].y);
+            g.closePath(); g.fillPath();
+            g.lineStyle(2, 0xffffff, 0.35);
+            g.strokePath();
+          });
+
+          makeTex("obs_bar", (g) => {
+            g.fillStyle(0xffffff, 1);
+            g.fillRoundedRect(6, 24, 52, 16, 8);
+            g.lineStyle(2, 0xffffff, 0.35);
+            g.strokeRoundedRect(6, 24, 52, 16, 8);
+          });
+
+          makeTex("obs_plus", (g) => {
+            g.fillStyle(0xffffff, 1);
+            g.fillRoundedRect(26, 10, 12, 44, 5);
+            g.fillRoundedRect(10, 26, 44, 12, 5);
+            g.lineStyle(2, 0xffffff, 0.35);
+            g.strokeRoundedRect(26, 10, 12, 44, 5);
+            g.strokeRoundedRect(10, 26, 44, 12, 5);
+          });
+        }
+
+        const shapeToTex = {
+          rect: "obs_rect",
+          frame: "obs_frame",
+          tri: "obs_tri",
+          hex: "obs_hex",
+          bar: "obs_bar",
+          plus: "obs_plus"
+        };
+
+        // ===== Scenes =====
         class MenuScene extends Phaser.Scene {
           constructor() { super("Menu"); }
           create() {
             this.cameras.main.setBackgroundColor(0x0a0a12);
             addTitle(this, "GRIDRUN", 0.22, 46);
-            addSubtitle(this, "Worlds • Levels • Skill-only arcade run", 0.285);
+            addSubtitle(this, "3 Worlds • 5 Levels • Skill-only arcade run", 0.285);
 
             const p = loadProgress();
             const hasProgress = (p.unlockedWorld > 0) || (p.unlockedLevel > 0);
@@ -266,6 +379,7 @@
             cont.setAlpha(hasProgress ? 1 : 0.45);
 
             makeGhostButton(this, "WORLD MAP / LEVEL SELECT", W/2, H*0.66, () => this.scene.start("WorldMap"));
+
             makeGhostButton(this, "RESET SAVE", W/2, H*0.78, () => { resetProgress(); this.scene.restart(); }).setAlpha(0.75);
 
             this.add.text(W/2, H*0.88, "No login needed: progress saves locally on your device.", {
@@ -345,9 +459,9 @@
             const lv = w.levels[level];
 
             this.cameras.main.setBackgroundColor(w.bg);
-            buildBackdrop(this, w.backFx, w.player, w.border);
+            buildBackdrop(this, w.fx, w.player, w.border);
 
-            addTitle(this, w.name, 0.22, 36);
+            addTitle(this, w.name, 0.22, 34);
             addSubtitle(this, w.subtitle, 0.285);
 
             this.add.text(W/2, H*0.40,
@@ -391,9 +505,14 @@
             this.touchTarget = null;
             this.touchDot = null;
 
+            // boss
             this.laser = null;
             this.laserWarn = null;
             this.bossT = 0;
+
+            // world dressing
+            this.decor = [];
+            this.glitchFlash = null;
           }
 
           init(data) {
@@ -404,8 +523,10 @@
           }
 
           create() {
+            ensureObstacleTextures(this);
+
             this.cameras.main.setBackgroundColor(this.wcfg.bg);
-            buildBackdrop(this, this.wcfg.backFx, this.wcfg.player, this.wcfg.border);
+            buildBackdrop(this, this.wcfg.fx, this.wcfg.player, this.wcfg.border);
 
             this.gridGraphics = this.add.graphics();
             this.gridOffset = 0;
@@ -414,17 +535,18 @@
 
             const startX = GRID_X + GRID_W / 2;
             const startY = GRID_Y + GRID_H * 0.72;
+
             this.player = this.add.rectangle(startX, startY, 28, 28, this.wcfg.player);
             this.physics.add.existing(this.player);
             this.player.body.setAllowGravity(false);
 
             this.physics.add.overlap(this.player, this.obstacles, () => this.gameOver());
 
-            // Keyboard for PC
+            // PC keyboard
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D");
 
-            // Touch target + dot
+            // Touch target dot
             this.touchDot = this.add.circle(0, 0, 6, this.wcfg.player).setAlpha(0);
             this.touchTarget = null;
 
@@ -446,6 +568,9 @@
             this.uiTop = this.add.text(14, 10, "", { fontFamily: uiFont, fontSize: "14px", color: "#ffffff" }).setAlpha(0.95);
             this.uiTime = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95);
 
+            // glitch overlay (W3)
+            this.glitchFlash = this.add.rectangle(W/2, H/2, W, H, 0xffffff).setAlpha(0).setDepth(50);
+
             // run state
             this.elapsed = 0;
             this.score = 0;
@@ -456,7 +581,38 @@
             this.spawnTimer = 0;
 
             this.setupBoss();
+            this.setupDecor();
             this.updateHud();
+          }
+
+          setupDecor() {
+            // Clear old
+            for (const d of this.decor) d.destroy();
+            this.decor = [];
+
+            if (this.wcfg.gridStyle === "industrial") {
+              // hazard chevrons near border (non-colliding)
+              for (let i = 0; i < 8; i++) {
+                const r = this.add.rectangle(GRID_X - 18, GRID_Y + 40 + i*70, 10, 26, 0xffd166).setAlpha(0.22);
+                const r2 = this.add.rectangle(GRID_X + GRID_W + 18, GRID_Y + 40 + i*70, 10, 26, 0xffd166).setAlpha(0.22);
+                this.decor.push(r, r2);
+              }
+            }
+
+            if (this.wcfg.gridStyle === "glitch") {
+              // glitch blocks drifting down
+              for (let i=0;i<16;i++){
+                const b = this.add.rectangle(
+                  Phaser.Math.Between(0, W),
+                  Phaser.Math.Between(-H, H),
+                  Phaser.Math.Between(10, 26),
+                  Phaser.Math.Between(4, 12),
+                  0x9aa7ff
+                ).setAlpha(Phaser.Math.FloatBetween(0.06, 0.14));
+                b._vy = Phaser.Math.FloatBetween(40, 110);
+                this.decor.push(b);
+              }
+            }
           }
 
           setupBoss() {
@@ -469,15 +625,13 @@
 
             this.laserWarn = this.add.rectangle(
               GRID_X + GRID_W/2, GRID_Y + GRID_H/2,
-              GRID_W, boss.warnThickness,
-              0xffffff
-            ).setAlpha(0).setDepth(5);
+              GRID_W, boss.warnThickness, 0xffffff
+            ).setAlpha(0).setDepth(20);
 
             this.laser = this.add.rectangle(
               GRID_X + GRID_W/2, GRID_Y + GRID_H/2,
-              GRID_W, boss.thickness,
-              0xff4d7d
-            ).setAlpha(0).setDepth(6);
+              GRID_W, boss.thickness, 0xff4d7d
+            ).setAlpha(0).setDepth(21);
           }
 
           update(_, deltaMs) {
@@ -485,33 +639,35 @@
             this.elapsed += dt;
             this.levelTime += dt;
 
+            // complete
             if (this.levelTime >= this.lcfg.seconds) {
               this.levelComplete();
               return;
             }
 
+            // tuned speed curve (easy → hard)
             this.scrollSpeed = this.lcfg.baseScroll + this.elapsed * this.lcfg.scrollRamp;
+
+            // tuned spawn curve
             const targetSpawn = this.lcfg.spawnStart - this.elapsed * this.lcfg.spawnRamp;
             this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
 
+            // score
             this.score += dt * 10;
             this.updateHud();
 
             // ===== Movement =====
-            // PC movement: keyboard
-            let kvx = 0, kvy = 0;
-            const left = this.cursors.left.isDown || this.keys.A.isDown;
-            const right = this.cursors.right.isDown || this.keys.D.isDown;
-            const up = this.cursors.up.isDown || this.keys.W.isDown;
-            const down = this.cursors.down.isDown || this.keys.S.isDown;
-
-            if (left) kvx -= 1;
-            if (right) kvx += 1;
-            if (up) kvy -= 1;
-            if (down) kvy += 1;
-
             if (!IS_TOUCH) {
-              // Desktop/PC: keyboard velocity
+              // PC: keyboard velocity
+              let kvx = 0, kvy = 0;
+              const left = this.cursors.left.isDown || this.keys.A.isDown;
+              const right = this.cursors.right.isDown || this.keys.D.isDown;
+              const up = this.cursors.up.isDown || this.keys.W.isDown;
+              const down = this.cursors.down.isDown || this.keys.S.isDown;
+              if (left) kvx -= 1;
+              if (right) kvx += 1;
+              if (up) kvy -= 1;
+              if (down) kvy += 1;
               const mag = Math.hypot(kvx, kvy);
               if (mag > 1) { kvx /= mag; kvy /= mag; }
               this.player.body.setVelocity(kvx * PLAYER_SPEED, kvy * PLAYER_SPEED);
@@ -529,7 +685,6 @@
                   const nx = this.player.x + dx * FOLLOW_LERP;
                   const ny = this.player.y + dy * FOLLOW_LERP;
 
-                  // cap max step for fairness
                   const maxStep = PLAYER_SPEED * FOLLOW_MAX_SPEED_MULT * dt;
                   const stepDist = Math.hypot(nx - this.player.x, ny - this.player.y);
 
@@ -547,18 +702,30 @@
                   this.player.body.setVelocity(0, 0);
                 }
               } else {
-                // no touch: stop
                 this.player.body.setVelocity(0, 0);
               }
             }
 
-            // clamp to grid always
+            // Clamp to grid
             const pad = 14;
             const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
             const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
             if (nx !== this.player.x || ny !== this.player.y) {
               this.player.x = nx; this.player.y = ny;
               this.player.body.reset(nx, ny);
+            }
+
+            // Decor movement (W3 glitch blocks drift)
+            if (this.wcfg.gridStyle === "glitch") {
+              for (const b of this.decor) {
+                b.y += b._vy * dt;
+                if (b.y > H + 20) { b.y = -20; b.x = Phaser.Math.Between(0, W); }
+              }
+              // occasional flicker flash
+              if (Math.random() < 0.015) {
+                this.glitchFlash.setAlpha(0.07);
+                this.tweens.add({ targets: this.glitchFlash, alpha: 0, duration: 120, ease: "Linear" });
+              }
             }
 
             // spawn obstacles
@@ -572,13 +739,13 @@
             this.obstacles.children.iterate((o) => {
               if (!o) return;
               o.y += this.scrollSpeed * dt;
-              if (o.y > GRID_Y + GRID_H + 120) o.destroy();
+              if (o.y > GRID_Y + GRID_H + 140) o.destroy();
             });
 
-            // boss
+            // boss update
             this.updateBoss(dt);
 
-            // grid draw
+            // draw grid
             this.drawGrid(dt);
           }
 
@@ -593,58 +760,156 @@
             const g = this.gridGraphics;
             g.clear();
 
+            // border
             g.lineStyle(2, this.wcfg.border, 0.92);
             g.strokeRoundedRect(GRID_X - 6, GRID_Y - 6, GRID_W + 12, GRID_H + 12, 14);
 
-            g.lineStyle(1, this.wcfg.gridLine, 0.9);
-
-            for (let c = 0; c <= GRID_COLS; c++) {
-              const x = GRID_X + c * TILE;
-              g.beginPath(); g.moveTo(x, GRID_Y); g.lineTo(x, GRID_Y + GRID_H); g.strokePath();
+            // styles
+            if (this.wcfg.gridStyle === "circuit") {
+              // thin lines + glowing nodes at intersections
+              g.lineStyle(1, this.wcfg.gridLine, 0.95);
+              for (let c = 0; c <= GRID_COLS; c++) {
+                const x = GRID_X + c * TILE;
+                g.beginPath(); g.moveTo(x, GRID_Y); g.lineTo(x, GRID_Y + GRID_H); g.strokePath();
+              }
+              for (let r = -1; r <= GRID_ROWS + 1; r++) {
+                const y = GRID_Y + r * TILE + this.gridOffset - TILE;
+                g.beginPath(); g.moveTo(GRID_X, y); g.lineTo(GRID_X + GRID_W, y); g.strokePath();
+              }
+              // nodes
+              g.fillStyle(this.wcfg.player, 0.12);
+              for (let c = 0; c <= GRID_COLS; c++) {
+                for (let r = 0; r <= GRID_ROWS; r++) {
+                  if ((c + r) % 3 !== 0) continue;
+                  const x = GRID_X + c*TILE;
+                  const y = GRID_Y + r*TILE;
+                  g.fillCircle(x, y, 2.2);
+                }
+              }
             }
-            for (let r = -1; r <= GRID_ROWS + 1; r++) {
-              const y = GRID_Y + r * TILE + this.gridOffset - TILE;
-              g.beginPath(); g.moveTo(GRID_X, y); g.lineTo(GRID_X + GRID_W, y); g.strokePath();
+
+            if (this.wcfg.gridStyle === "industrial") {
+              // thick plating lines + diagonal hatch accent
+              g.lineStyle(2, this.wcfg.gridLine, 0.9);
+              for (let c = 0; c <= GRID_COLS; c++) {
+                const x = GRID_X + c * TILE;
+                g.beginPath(); g.moveTo(x, GRID_Y); g.lineTo(x, GRID_Y + GRID_H); g.strokePath();
+              }
+              for (let r = -1; r <= GRID_ROWS + 1; r++) {
+                const y = GRID_Y + r * TILE + this.gridOffset - TILE;
+                g.beginPath(); g.moveTo(GRID_X, y); g.lineTo(GRID_X + GRID_W, y); g.strokePath();
+              }
+              // hatch (subtle)
+              g.lineStyle(1, 0xffd166, 0.07);
+              for (let x = GRID_X - GRID_H; x < GRID_X + GRID_W + GRID_H; x += 18) {
+                g.beginPath();
+                g.moveTo(x, GRID_Y);
+                g.lineTo(x + GRID_H, GRID_Y + GRID_H);
+                g.strokePath();
+              }
+            }
+
+            if (this.wcfg.gridStyle === "glitch") {
+              // broken segments + flicker alpha
+              const flick = 0.75 + Math.sin(this.elapsed * 8) * 0.10;
+              g.lineStyle(1, this.wcfg.gridLine, flick);
+
+              // vertical segments (skip randomly)
+              for (let c = 0; c <= GRID_COLS; c++) {
+                const x = GRID_X + c * TILE;
+                let y0 = GRID_Y;
+                while (y0 < GRID_Y + GRID_H) {
+                  const seg = Phaser.Math.Between(18, 64);
+                  const gap = Phaser.Math.Between(10, 40);
+                  if (Math.random() > 0.22) {
+                    g.beginPath();
+                    g.moveTo(x, y0);
+                    g.lineTo(x, Math.min(GRID_Y + GRID_H, y0 + seg));
+                    g.strokePath();
+                  }
+                  y0 += seg + gap;
+                }
+              }
+
+              // horizontal segments (scrolling)
+              for (let r = -1; r <= GRID_ROWS + 1; r++) {
+                const y = GRID_Y + r * TILE + this.gridOffset - TILE;
+                let x0 = GRID_X;
+                while (x0 < GRID_X + GRID_W) {
+                  const seg = Phaser.Math.Between(20, 70);
+                  const gap = Phaser.Math.Between(12, 44);
+                  if (Math.random() > 0.25) {
+                    g.beginPath();
+                    g.moveTo(x0, y);
+                    g.lineTo(Math.min(GRID_X + GRID_W, x0 + seg), y);
+                    g.strokePath();
+                  }
+                  x0 += seg + gap;
+                }
+              }
             }
           }
 
           spawnObstacle() {
+            // random column & spawn slightly above grid
             const col = Phaser.Math.Between(0, GRID_COLS - 1);
             const x = GRID_X + col * TILE + TILE / 2;
-            const y = GRID_Y - 60;
+            const y = GRID_Y - 70;
 
+            // pick shape + color from world style
+            const style = this.wcfg.obstacleStyle;
+            const shape = style.shapes[Phaser.Math.Between(0, style.shapes.length - 1)];
+            const tex = shapeToTex[shape] || "obs_rect";
+            const color = style.palette[Phaser.Math.Between(0, style.palette.length - 1)];
+
+            // size (slightly shrinks as levels rise, but not too much)
             const [smin, smax] = this.lcfg.size;
-            const color = this.lcfg.colors[Phaser.Math.Between(0, this.lcfg.colors.length - 1)];
-
             let w = Phaser.Math.Between(smin, smax);
             let h = Phaser.Math.Between(smin, smax);
 
-            const shape = this.lcfg.shape;
-            if (shape === "tall") { w = Phaser.Math.Between(smin, smax-2); h = Phaser.Math.Between(smax, smax+18); }
-            else if (shape === "wide") { w = Phaser.Math.Between(smax, smax+22); h = Phaser.Math.Between(smin, smax-2); }
-            else if (shape === "mix") {
-              const r = Phaser.Math.Between(0,2);
-              if (r === 0) { w = Phaser.Math.Between(smin, smax-2); h = Phaser.Math.Between(smax, smax+18); }
-              if (r === 1) { w = Phaser.Math.Between(smax, smax+22); h = Phaser.Math.Between(smin, smax-2); }
-            }
+            // shape bias
+            if (shape === "bar") { w = Phaser.Math.Between(smax+8, smax+26); h = Phaser.Math.Between(14, 22); }
+            if (shape === "tri") { w = Phaser.Math.Between(smin, smax+4); h = Phaser.Math.Between(smin, smax+8); }
+            if (shape === "frame") { w = Phaser.Math.Between(smin+2, smax+10); h = Phaser.Math.Between(smin+2, smax+10); }
+            if (shape === "plus") { w = Phaser.Math.Between(smin, smax+10); h = Phaser.Math.Between(smin, smax+10); }
 
-            const rect = this.add.rectangle(x, y, w, h, color).setAlpha(0.95);
-            this.physics.add.existing(rect);
-            rect.body.setAllowGravity(false);
-            rect.body.setImmovable(true);
-            this.obstacles.add(rect);
+            const s = this.add.image(x, y, tex);
+            s.setTint(color);
+            s.setAlpha(0.95);
 
-            const chance = Phaser.Math.Clamp(0.08 + (this.elapsed * 0.004), 0.08, 0.26);
-            if (Math.random() < chance && this.levelTime > 6) {
+            // scale image to desired w/h
+            s.displayWidth = w;
+            s.displayHeight = h;
+
+            this.physics.add.existing(s);
+            s.body.setAllowGravity(false);
+            s.body.setImmovable(true);
+
+            // tighten body to the displayed size
+            s.body.setSize(w * 0.88, h * 0.88, true);
+
+            this.obstacles.add(s);
+
+            // occasional extra piece (later levels only)
+            const later = this.level >= 2 ? 1 : 0;
+            const chance = Phaser.Math.Clamp(0.05 + later*0.06 + (this.elapsed * 0.0025), 0.05, 0.22);
+            if (Math.random() < chance && this.levelTime > 5) {
               let col2 = Phaser.Math.Between(0, GRID_COLS - 1);
               if (col2 === col) col2 = (col + Phaser.Math.Between(1, GRID_COLS-1)) % GRID_COLS;
               const x2 = GRID_X + col2 * TILE + TILE / 2;
-              const color2 = this.lcfg.colors[Phaser.Math.Between(0, this.lcfg.colors.length - 1)];
-              const r2 = this.add.rectangle(x2, y - Phaser.Math.Between(20, 70), w * 0.9, h * 0.9, color2).setAlpha(0.9);
-              this.physics.add.existing(r2);
-              r2.body.setAllowGravity(false);
-              r2.body.setImmovable(true);
-              this.obstacles.add(r2);
+              const shape2 = style.shapes[Phaser.Math.Between(0, style.shapes.length - 1)];
+              const tex2 = shapeToTex[shape2] || "obs_rect";
+              const color2 = style.palette[Phaser.Math.Between(0, style.palette.length - 1)];
+              const s2 = this.add.image(x2, y - Phaser.Math.Between(22, 90), tex2);
+              s2.setTint(color2);
+              s2.setAlpha(0.9);
+              s2.displayWidth = Math.max(14, w * 0.78);
+              s2.displayHeight = Math.max(14, h * 0.78);
+              this.physics.add.existing(s2);
+              s2.body.setAllowGravity(false);
+              s2.body.setImmovable(true);
+              s2.body.setSize(s2.displayWidth * 0.88, s2.displayHeight * 0.88, true);
+              this.obstacles.add(s2);
             }
           }
 
@@ -656,8 +921,8 @@
             const cycle = boss.cycleSeconds;
             const t = this.bossT % cycle;
 
-            const sweep = (this.bossT * 0.22) % 1;
-            const yPos = GRID_Y + 20 + (GRID_H - 40) * ((t / cycle + sweep) % 1);
+            const drift = (this.bossT * 0.22) % 1;
+            const yPos = GRID_Y + 20 + (GRID_H - 40) * ((t / cycle + drift) % 1);
 
             this.laserWarn.setPosition(GRID_X + GRID_W/2, yPos);
             this.laser.setPosition(GRID_X + GRID_W/2, yPos);
@@ -739,7 +1004,7 @@
 
             const w = WORLDS[clamp(world, 0, WORLDS.length-1)];
             this.cameras.main.setBackgroundColor(w.bg);
-            buildBackdrop(this, w.backFx, w.player, w.border);
+            buildBackdrop(this, w.fx, w.player, w.border);
 
             addTitle(this, "LEVEL CLEAR", 0.30, 34);
             this.add.text(W/2, H*0.40, `${w.name} • Level ${level + 1}/${LEVELS_PER_WORLD}`, {
@@ -768,7 +1033,7 @@
 
             const w = WORLDS[clamp(world, 0, WORLDS.length-1)];
             this.cameras.main.setBackgroundColor(w.bg);
-            buildBackdrop(this, w.backFx, w.player, w.border);
+            buildBackdrop(this, w.fx, w.player, w.border);
 
             addTitle(this, "WORLD CLEAR", 0.30, 34);
             this.add.text(W/2, H*0.40, `${w.name} completed`, {

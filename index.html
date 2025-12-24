@@ -1,82 +1,23 @@
 <!doctype html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>TXC GRIDRUN (Prototype)</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #0a0a12;
-      height: 100%;
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
-    }
-    canvas { display: block; margin: 0 auto; }
-    .hint {
-      position: fixed;
-      left: 12px;
-      bottom: 10px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.75);
-      background: rgba(0,0,0,0.35);
-      padding: 8px 10px;
-      border-radius: 10px;
-      user-select: none;
-    }
-  </style>
-</head>
-<body>
+  <head>
+    <meta charset="utf-8" />
+    <title>GRIDRUN TEST</title>
+  </head>
+  <body style="margin:0;background:#111;color:#0ff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;">
+    <h1>GRIDRUN IS LIVE ✅</h1>
 
-<div class="hint">
-  Controls: WASD / Arrow Keys • Mobile: Swipe • Survive as long as possible
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-
-<script>
-const W = 420;
-const H = 760;
-
-const GRID_COLS = 7;
-const GRID_ROWS = 13;
-const TILE = 52;
-const GRID_W = GRID_COLS * TILE;
-const GRID_H = GRID_ROWS * TILE;
-const GRID_X = (W - GRID_W) / 2;
-const GRID_Y = (H - GRID_H) / 2;
-
-const PLAYER_SPEED = 320;
-const BASE_SCROLL = 120;
-const SPAWN_START_MS = 850;
-const SPAWN_MIN_MS = 320;
-
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-class PlayScene extends Phaser.Scene {
-  constructor() {
-    super('Play');
-    this.scrollSpeed = BASE_SCROLL;
-    this.spawnEvery = SPAWN_START_MS;
-    this.spawnTimer = 0;
-    this.elapsed = 0;
-    this.score = 0;
-  }
-
-  create() {
-    this.cameras.main.setBackgroundColor(0x0a0a12);
-    this.gridGraphics = this.add.graphics();
-    this.gridOffset = 0;
-
-    this.obstacles = this.physics.add.group({ immovable: true, allowGravity: false });
-
-    const startX = GRID_X + GRID_W / 2;
-    const startY = GRID_Y + GRID_H * 0.72;
-    this.player = this.add.rectangle(startX, startY, 28, 28, 0x6ef3ff);
-    this.physics.add.existing(this.player);
-
-    this.physics.add.overlap(this.player, this.obstacles, () => this.gameOver());
-
-    this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.
+    <script>
+      console.log("JS is running ✅");
+      const box = document.createElement("div");
+      box.textContent = "If you see this, JavaScript works.";
+      box.style.position = "fixed";
+      box.style.bottom = "20px";
+      box.style.left = "20px";
+      box.style.padding = "10px 12px";
+      box.style.border = "2px solid cyan";
+      box.style.borderRadius = "10px";
+      document.body.appendChild(box);
+    </script>
+  </body>
+</html>

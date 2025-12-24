@@ -1,23 +1,252 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>GRIDRUN TEST</title>
-  </head>
-  <body style="margin:0;background:#111;color:#0ff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;">
-    <h1>GRIDRUN IS LIVE ✅</h1>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>TXC GRIDRUN (Prototype)</title>
+  <style>
+    html, body { margin:0; padding:0; background:#0a0a12; height:100%; overflow:hidden; }
+    canvas { display:block; margin:0 auto; }
+    .hint{
+      position:fixed; left:12px; bottom:10px;
+      font:12px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      color:rgba(255,255,255,.75);
+      background:rgba(0,0,0,.35);
+      padding:8px 10px; border-radius:10px;
+      user-select:none;
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">Controls: WASD / Arrow Keys • Mobile: Swipe • Survive as long as possible</div>
 
-    <script>
-      console.log("JS is running ✅");
-      const box = document.createElement("div");
-      box.textContent = "If you see this, JavaScript works.";
-      box.style.position = "fixed";
-      box.style.bottom = "20px";
-      box.style.left = "20px";
-      box.style.padding = "10px 12px";
-      box.style.border = "2px solid cyan";
-      box.style.borderRadius = "10px";
-      document.body.appendChild(box);
-    </script>
-  </body>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+
+  <script>
+    // Start AFTER page load + AFTER Phaser exists (prevents blank-page surprises)
+    window.addEventListener("load", () => {
+      const wait = setInterval(() => {
+        if (typeof window.Phaser === "undefined") return;
+        clearInterval(wait);
+
+        const W = 420, H = 760;
+
+        const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
+        const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
+        const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
+
+        const PLAYER_SPEED = 320;
+        const BASE_SCROLL = 120;
+        const SPAWN_START_MS = 850;
+        const SPAWN_MIN_MS = 320;
+
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+        class PlayScene extends Phaser.Scene {
+          constructor() {
+            super("Play");
+            this.scrollSpeed = BASE_SCROLL;
+            this.spawnEvery = SPAWN_START_MS;
+            this.spawnTimer = 0;
+            this.elapsed = 0;
+            this.score = 0;
+          }
+
+          create() {
+            this.cameras.main.setBackgroundColor(0x0a0a12);
+
+            this.gridGraphics = this.add.graphics();
+            this.gridOffset = 0;
+
+            this.obstacles = this.physics.add.group({ immovable: true, allowGravity: false });
+
+            const startX = GRID_X + GRID_W / 2;
+            const startY = GRID_Y + GRID_H * 0.72;
+
+            this.player = this.add.rectangle(startX, startY, 28, 28, 0x6ef3ff);
+            this.physics.add.existing(this.player);
+            this.player.body.setAllowGravity(false);
+
+            this.physics.add.overlap(this.player, this.obstacles, () => this.gameOver());
+
+            this.cursors = this.input.keyboard.createCursorKeys();
+            this.keys = this.input.keyboard.addKeys("W,A,S,D");
+
+            // Swipe
+            this.touchStart = null;
+            this.input.on("pointerdown", (p) => (this.touchStart = { x: p.x, y: p.y }));
+            this.input.on("pointerup", (p) => {
+              if (!this.touchStart) return;
+              const dx = p.x - this.touchStart.x;
+              const dy = p.y - this.touchStart.y;
+              this.touchStart = null;
+
+              const dead = 18;
+              if (Math.abs(dx) < dead && Math.abs(dy) < dead) return;
+
+              const step = TILE;
+              let nx = this.player.x, ny = this.player.y;
+              if (Math.abs(dx) > Math.abs(dy)) nx += dx > 0 ? step : -step;
+              else ny += dy > 0 ? step : -step;
+
+              this.player.x = clamp(nx, GRID_X + 14, GRID_X + GRID_W - 14);
+              this.player.y = clamp(ny, GRID_Y + 14, GRID_Y + GRID_H - 14);
+              this.player.body.reset(this.player.x, this.player.y);
+            });
+
+            this.uiText = this.add.text(14, 12, "Score: 0", {
+              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+              fontSize: "16px",
+              color: "#ffffff",
+            }).setAlpha(0.9);
+
+            this.add.text(14, 34, "Survive. Speed ramps up.", {
+              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+              fontSize: "12px",
+              color: "#b7b7ff",
+            }).setAlpha(0.9);
+
+            this.scrollSpeed = BASE_SCROLL;
+            this.spawnEvery = SPAWN_START_MS;
+            this.spawnTimer = 0;
+            this.elapsed = 0;
+            this.score = 0;
+          }
+
+          update(_, deltaMs) {
+            const dt = deltaMs / 1000;
+            this.elapsed += dt;
+
+            // ramp
+            this.scrollSpeed = BASE_SCROLL + this.elapsed * 22;
+            this.spawnEvery = clamp(SPAWN_START_MS - this.elapsed * 18, SPAWN_MIN_MS, SPAWN_START_MS);
+
+            // score
+            this.score += dt * 10;
+            this.uiText.setText("Score: " + Math.floor(this.score));
+
+            // movement
+            let vx = 0, vy = 0;
+            const left = this.cursors.left.isDown || this.keys.A.isDown;
+            const right = this.cursors.right.isDown || this.keys.D.isDown;
+            const up = this.cursors.up.isDown || this.keys.W.isDown;
+            const down = this.cursors.down.isDown || this.keys.S.isDown;
+
+            if (left) vx -= 1;
+            if (right) vx += 1;
+            if (up) vy -= 1;
+            if (down) vy += 1;
+
+            if (vx !== 0 && vy !== 0) { vx *= 0.7071; vy *= 0.7071; }
+
+            this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
+
+            // keep inside grid bounds
+            const pad = 14;
+            const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
+            const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
+            if (nx !== this.player.x || ny !== this.player.y) {
+              this.player.x = nx; this.player.y = ny;
+              this.player.body.reset(nx, ny);
+            }
+
+            // spawn
+            this.spawnTimer += deltaMs;
+            while (this.spawnTimer >= this.spawnEvery) {
+              this.spawnTimer -= this.spawnEvery;
+              this.spawnObstacle();
+            }
+
+            // move obstacles down
+            this.obstacles.children.iterate((o) => {
+              if (!o) return;
+              o.y += this.scrollSpeed * dt;
+              if (o.y > GRID_Y + GRID_H + 80) o.destroy();
+            });
+
+            this.drawGrid(dt);
+          }
+
+          drawGrid(dt) {
+            this.gridOffset = (this.gridOffset + this.scrollSpeed * dt) % TILE;
+
+            const g = this.gridGraphics;
+            g.clear();
+
+            g.lineStyle(2, 0x2a2a55, 0.9);
+            g.strokeRoundedRect(GRID_X - 6, GRID_Y - 6, GRID_W + 12, GRID_H + 12, 14);
+
+            g.lineStyle(1, 0x20204a, 0.9);
+
+            for (let c = 0; c <= GRID_COLS; c++) {
+              const x = GRID_X + c * TILE;
+              g.beginPath(); g.moveTo(x, GRID_Y); g.lineTo(x, GRID_Y + GRID_H); g.strokePath();
+            }
+
+            for (let r = -1; r <= GRID_ROWS + 1; r++) {
+              const y = GRID_Y + r * TILE + this.gridOffset - TILE;
+              g.beginPath(); g.moveTo(GRID_X, y); g.lineTo(GRID_X + GRID_W, y); g.strokePath();
+            }
+          }
+
+          spawnObstacle() {
+            const col = Phaser.Math.Between(0, GRID_COLS - 1);
+            const x = GRID_X + col * TILE + TILE / 2;
+            const y = GRID_Y - 40;
+            const size = Phaser.Math.Between(22, 34);
+
+            const rect = this.add.rectangle(x, y, size, size, 0xff4d7d);
+            this.physics.add.existing(rect);
+            rect.body.setAllowGravity(false);
+            rect.body.setImmovable(true);
+            this.obstacles.add(rect);
+          }
+
+          gameOver() {
+            this.scene.start("GameOver", { score: Math.floor(this.score) });
+          }
+        }
+
+        class GameOverScene extends Phaser.Scene {
+          constructor() { super("GameOver"); }
+          create(data) {
+            this.cameras.main.setBackgroundColor(0x070710);
+
+            const score = data?.score ?? 0;
+
+            this.add.text(W/2, H*0.35, "RUN ENDED", {
+              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+              fontSize: "34px",
+              color: "#ffffff",
+            }).setOrigin(0.5);
+
+            this.add.text(W/2, H*0.43, "Score: " + score, {
+              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+              fontSize: "18px",
+              color: "#b7b7ff",
+            }).setOrigin(0.5);
+
+            const btn = this.add.text(W/2, H*0.55, "RETRY", {
+              fontFamily: "system-ui,-apple-system,Segoe UI,Roboto,sans-serif",
+              fontSize: "20px",
+              color: "#0a0a12",
+              backgroundColor: "#6ef3ff",
+              padding: { left: 18, right: 18, top: 10, bottom: 10 },
+            }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+            btn.on("pointerdown", () => this.scene.start("Play"));
+          }
+        }
+
+        new Phaser.Game({
+          type: Phaser.AUTO,
+          width: W,
+          height: H,
+          physics: { default: "arcade", arcade: { debug: false } },
+          scene: [PlayScene, GameOverScene],
+        });
+      }, 50);
+    });
+  </script>
+</body>
 </html>

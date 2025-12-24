@@ -40,16 +40,16 @@
         const PLAYER_SPEED = 320;
 
         // ✅ Mobile DIRECT FOLLOW only
-        const FOLLOW_RADIUS = 7;            // stop when close to finger
-        const FOLLOW_LERP = 0.38;           // snappier follow
-        const FOLLOW_MAX_SPEED_MULT = 2.8;  // cap follow speed vs PLAYER_SPEED
+        const FOLLOW_RADIUS = 7;
+        const FOLLOW_LERP = 0.38;
+        const FOLLOW_MAX_SPEED_MULT = 2.8;
 
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
         const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
 
         // ===== SAVE / PROGRESS =====
         const LEVELS_PER_WORLD = 5;
-        const SAVE_KEY = "gridrun_progress_v3";
+        const SAVE_KEY = "gridrun_progress_v4";
 
         function loadProgress() {
           try {
@@ -115,24 +115,31 @@
           return btn;
         }
 
-        // ===== Difficulty scaling (your requested pacing) =====
-        // Level durations: 20 → 25 → 30 → 38 → 45
+        // ===== Level times (fixed) =====
         const DUR = [20, 25, 30, 38, 45];
 
-        // Helper to build level curves that start easy and ramp per level
-        function mkLevels(baseScroll0, baseScrollStep, ramp0, rampStep, spawnStart0, spawnStep, spawnMin0, spawnMinStep) {
+        // Difficulty builder:
+        // baseScroll + scrollRamp control obstacle travel speed.
+        // spawnStart/spawnMin/spawnRamp control density (lower = denser).
+        function mkLevels(cfg) {
           return DUR.map((seconds, i) => ({
             seconds,
-            baseScroll: baseScroll0 + baseScrollStep * i,
-            scrollRamp: ramp0 + rampStep * i,
-            spawnStart: spawnStart0 - spawnStep * i, // bigger = less frequent early
-            spawnRamp: 8 + i * 2,
-            spawnMin: Math.max(250, spawnMin0 - spawnMinStep * i),
-            size: [22 - i, 34 - Math.floor(i/2)]
+            baseScroll: cfg.baseScroll0 + cfg.baseScrollStep * i,
+            scrollRamp: cfg.ramp0 + cfg.rampStep * i,
+
+            // density
+            spawnStart: cfg.spawnStart0 - cfg.spawnStep * i,
+            spawnRamp: cfg.spawnRamp0 + cfg.spawnRampStep * i,
+            spawnMin: Math.max(cfg.spawnMinFloor, cfg.spawnMin0 - cfg.spawnMinStep * i),
+
+            // obstacle footprint
+            size: [cfg.sizeMin0 - cfg.sizeMinStep*i, cfg.sizeMax0 - cfg.sizeMaxStep*i]
           }));
         }
 
-        // ===== Worlds (A+B+C mixed) =====
+        // ===== Worlds (A+B+C mixed) with your new difficulty intent =====
+        // Rule: World2 > World1, World3 > World2 across matching levels.
+        // Also: W1/W2 L2-L5 bumped; W3 L1-L4 bumped slightly.
         const WORLDS = [
           {
             id: 0,
@@ -144,20 +151,21 @@
             player: 0x6ef3ff,
             fx: "scanlines",
             gridStyle: "circuit",
-            obstacleStyle: {
-              palette: [0xff4d7d, 0xff6aa2, 0xff7bd0],
-              shapes: ["tri", "hex", "frame", "rect"]
-            },
-            levels: mkLevels(
-              78,   // baseScroll0 (easy)
-              14,   // baseScrollStep
-              7,    // ramp0
-              2.2,  // rampStep
-              1050, // spawnStart0 (slow spawns early)
-              65,   // spawnStep
-              520,  // spawnMin0
-              40    // spawnMinStep
-            )
+            obstacleStyle: { palette: [0xff4d7d, 0xff6aa2, 0xff7bd0], shapes: ["tri","hex","frame","rect"] },
+
+            // ✅ World 1: easy L1, stronger L2-L5
+            levels: mkLevels({
+              baseScroll0: 80, baseScrollStep: 18,     // speed ramps harder by level
+              ramp0: 8.0, rampStep: 3.0,
+
+              spawnStart0: 1020, spawnStep: 105,       // L2-5 noticeably denser
+              spawnRamp0: 10, spawnRampStep: 3,
+              spawnMin0: 520, spawnMinStep: 55,
+              spawnMinFloor: 300,
+
+              sizeMin0: 22, sizeMinStep: 1,
+              sizeMax0: 34, sizeMaxStep: 1
+            })
           },
           {
             id: 1,
@@ -169,20 +177,21 @@
             player: 0x7cffd2,
             fx: "rain",
             gridStyle: "industrial",
-            obstacleStyle: {
-              palette: [0xffd166, 0xff4d7d, 0x7cffd2],
-              shapes: ["bar", "plus", "rect", "frame"]
-            },
-            levels: mkLevels(
-              86,
-              16,
-              8,
-              2.6,
-              980,
-              70,
-              500,
-              45
-            )
+            obstacleStyle: { palette: [0xffd166, 0xff4d7d, 0x7cffd2], shapes: ["bar","plus","rect","frame"] },
+
+            // ✅ World 2: Level 1 is harder than World 1 Level 1 (and so on)
+            levels: mkLevels({
+              baseScroll0: 92, baseScrollStep: 20,
+              ramp0: 9.0, rampStep: 3.3,
+
+              spawnStart0: 980, spawnStep: 115,
+              spawnRamp0: 11, spawnRampStep: 3.4,
+              spawnMin0: 500, spawnMinStep: 60,
+              spawnMinFloor: 285,
+
+              sizeMin0: 21, sizeMinStep: 1,
+              sizeMax0: 33, sizeMaxStep: 1
+            })
           },
           {
             id: 2,
@@ -194,25 +203,26 @@
             player: 0x9aa7ff,
             fx: "stars",
             gridStyle: "glitch",
-            obstacleStyle: {
-              palette: [0xff4d7d, 0xffb0ff, 0x9aa7ff],
-              shapes: ["hex", "tri", "bar", "frame"]
-            },
-            levels: mkLevels(
-              92,
-              18,
-              9,
-              3.0,
-              930,
-              75,
-              480,
-              50
-            ),
+            obstacleStyle: { palette: [0xff4d7d, 0xffb0ff, 0x9aa7ff], shapes: ["hex","tri","bar","frame"] },
+
+            // ✅ World 3: slightly harder across L1-L4 (and still hardest overall)
+            levels: mkLevels({
+              baseScroll0: 98, baseScrollStep: 22,
+              ramp0: 9.6, rampStep: 3.6,
+
+              spawnStart0: 940, spawnStep: 120,
+              spawnRamp0: 12, spawnRampStep: 3.6,
+              spawnMin0: 480, spawnMinStep: 62,
+              spawnMinFloor: 270,
+
+              sizeMin0: 21, sizeMinStep: 1,
+              sizeMax0: 33, sizeMaxStep: 1
+            }),
             boss: {
               enabled: true,
-              cycleSeconds: 6.0,
-              warnSeconds: 1.25,
-              activeSeconds: 1.1,
+              cycleSeconds: 5.7,
+              warnSeconds: 1.20,
+              activeSeconds: 1.12,
               thickness: 16,
               warnThickness: 6
             }
@@ -280,7 +290,7 @@
           return items;
         }
 
-        // ===== Obstacle texture factory (silhouette variety) =====
+        // ===== Obstacle texture factory =====
         function ensureObstacleTextures(scene) {
           const makeTex = (key, drawFn) => {
             if (scene.textures.exists(key)) return;
@@ -379,7 +389,6 @@
             cont.setAlpha(hasProgress ? 1 : 0.45);
 
             makeGhostButton(this, "WORLD MAP / LEVEL SELECT", W/2, H*0.66, () => this.scene.start("WorldMap"));
-
             makeGhostButton(this, "RESET SAVE", W/2, H*0.78, () => { resetProgress(); this.scene.restart(); }).setAlpha(0.75);
 
             this.add.text(W/2, H*0.88, "No login needed: progress saves locally on your device.", {
@@ -405,8 +414,7 @@
               const unlockedWorld = wi <= p.unlockedWorld;
 
               this.add.text(marginX, y, `${wi+1}. ${w.name}`, {
-                fontFamily: uiFont,
-                fontSize: "16px",
+                fontFamily: uiFont, fontSize: "16px",
                 color: unlockedWorld ? "#ffffff" : "rgba(255,255,255,0.40)"
               }).setAlpha(0.95);
 
@@ -420,8 +428,7 @@
                 const by = y;
 
                 const b = this.add.text(bx + btnW/2, by + 18, `${li+1}`, {
-                  fontFamily: uiFont,
-                  fontSize: "16px",
+                  fontFamily: uiFont, fontSize: "16px",
                   color: unlocked ? "#0a0a12" : "rgba(255,255,255,0.55)",
                   backgroundColor: unlocked ? "#6ef3ff" : "rgba(255,255,255,0.08)",
                   padding: { left: 0, right: 0, top: 8, bottom: 8 }
@@ -441,7 +448,6 @@
                   b.setAlpha(0.6);
                 }
               }
-
               y += 58;
             });
 
@@ -586,12 +592,10 @@
           }
 
           setupDecor() {
-            // Clear old
             for (const d of this.decor) d.destroy();
             this.decor = [];
 
             if (this.wcfg.gridStyle === "industrial") {
-              // hazard chevrons near border (non-colliding)
               for (let i = 0; i < 8; i++) {
                 const r = this.add.rectangle(GRID_X - 18, GRID_Y + 40 + i*70, 10, 26, 0xffd166).setAlpha(0.22);
                 const r2 = this.add.rectangle(GRID_X + GRID_W + 18, GRID_Y + 40 + i*70, 10, 26, 0xffd166).setAlpha(0.22);
@@ -600,7 +604,6 @@
             }
 
             if (this.wcfg.gridStyle === "glitch") {
-              // glitch blocks drifting down
               for (let i=0;i<16;i++){
                 const b = this.add.rectangle(
                   Phaser.Math.Between(0, W),
@@ -639,16 +642,15 @@
             this.elapsed += dt;
             this.levelTime += dt;
 
-            // complete
             if (this.levelTime >= this.lcfg.seconds) {
               this.levelComplete();
               return;
             }
 
-            // tuned speed curve (easy → hard)
+            // speed curve
             this.scrollSpeed = this.lcfg.baseScroll + this.elapsed * this.lcfg.scrollRamp;
 
-            // tuned spawn curve
+            // spawn curve
             const targetSpawn = this.lcfg.spawnStart - this.elapsed * this.lcfg.spawnRamp;
             this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
 
@@ -658,7 +660,6 @@
 
             // ===== Movement =====
             if (!IS_TOUCH) {
-              // PC: keyboard velocity
               let kvx = 0, kvy = 0;
               const left = this.cursors.left.isDown || this.keys.A.isDown;
               const right = this.cursors.right.isDown || this.keys.D.isDown;
@@ -672,7 +673,7 @@
               if (mag > 1) { kvx /= mag; kvy /= mag; }
               this.player.body.setVelocity(kvx * PLAYER_SPEED, kvy * PLAYER_SPEED);
             } else {
-              // ✅ Mobile: DIRECT FOLLOW ONLY
+              // ✅ Mobile direct follow only
               if (this.touchTarget) {
                 const tx = clamp(this.touchTarget.x, GRID_X + 14, GRID_X + GRID_W - 14);
                 const ty = clamp(this.touchTarget.y, GRID_Y + 14, GRID_Y + GRID_H - 14);
@@ -706,7 +707,7 @@
               }
             }
 
-            // Clamp to grid
+            // clamp to grid
             const pad = 14;
             const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
             const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
@@ -715,20 +716,19 @@
               this.player.body.reset(nx, ny);
             }
 
-            // Decor movement (W3 glitch blocks drift)
+            // decor
             if (this.wcfg.gridStyle === "glitch") {
               for (const b of this.decor) {
                 b.y += b._vy * dt;
                 if (b.y > H + 20) { b.y = -20; b.x = Phaser.Math.Between(0, W); }
               }
-              // occasional flicker flash
               if (Math.random() < 0.015) {
                 this.glitchFlash.setAlpha(0.07);
                 this.tweens.add({ targets: this.glitchFlash, alpha: 0, duration: 120, ease: "Linear" });
               }
             }
 
-            // spawn obstacles
+            // spawn
             this.spawnTimer += deltaMs;
             while (this.spawnTimer >= this.spawnEvery) {
               this.spawnTimer -= this.spawnEvery;
@@ -742,10 +742,10 @@
               if (o.y > GRID_Y + GRID_H + 140) o.destroy();
             });
 
-            // boss update
+            // boss
             this.updateBoss(dt);
 
-            // draw grid
+            // grid
             this.drawGrid(dt);
           }
 
@@ -760,13 +760,10 @@
             const g = this.gridGraphics;
             g.clear();
 
-            // border
             g.lineStyle(2, this.wcfg.border, 0.92);
             g.strokeRoundedRect(GRID_X - 6, GRID_Y - 6, GRID_W + 12, GRID_H + 12, 14);
 
-            // styles
             if (this.wcfg.gridStyle === "circuit") {
-              // thin lines + glowing nodes at intersections
               g.lineStyle(1, this.wcfg.gridLine, 0.95);
               for (let c = 0; c <= GRID_COLS; c++) {
                 const x = GRID_X + c * TILE;
@@ -776,20 +773,16 @@
                 const y = GRID_Y + r * TILE + this.gridOffset - TILE;
                 g.beginPath(); g.moveTo(GRID_X, y); g.lineTo(GRID_X + GRID_W, y); g.strokePath();
               }
-              // nodes
               g.fillStyle(this.wcfg.player, 0.12);
               for (let c = 0; c <= GRID_COLS; c++) {
                 for (let r = 0; r <= GRID_ROWS; r++) {
                   if ((c + r) % 3 !== 0) continue;
-                  const x = GRID_X + c*TILE;
-                  const y = GRID_Y + r*TILE;
-                  g.fillCircle(x, y, 2.2);
+                  g.fillCircle(GRID_X + c*TILE, GRID_Y + r*TILE, 2.2);
                 }
               }
             }
 
             if (this.wcfg.gridStyle === "industrial") {
-              // thick plating lines + diagonal hatch accent
               g.lineStyle(2, this.wcfg.gridLine, 0.9);
               for (let c = 0; c <= GRID_COLS; c++) {
                 const x = GRID_X + c * TILE;
@@ -799,7 +792,6 @@
                 const y = GRID_Y + r * TILE + this.gridOffset - TILE;
                 g.beginPath(); g.moveTo(GRID_X, y); g.lineTo(GRID_X + GRID_W, y); g.strokePath();
               }
-              // hatch (subtle)
               g.lineStyle(1, 0xffd166, 0.07);
               for (let x = GRID_X - GRID_H; x < GRID_X + GRID_W + GRID_H; x += 18) {
                 g.beginPath();
@@ -810,11 +802,9 @@
             }
 
             if (this.wcfg.gridStyle === "glitch") {
-              // broken segments + flicker alpha
               const flick = 0.75 + Math.sin(this.elapsed * 8) * 0.10;
               g.lineStyle(1, this.wcfg.gridLine, flick);
 
-              // vertical segments (skip randomly)
               for (let c = 0; c <= GRID_COLS; c++) {
                 const x = GRID_X + c * TILE;
                 let y0 = GRID_Y;
@@ -831,7 +821,6 @@
                 }
               }
 
-              // horizontal segments (scrolling)
               for (let r = -1; r <= GRID_ROWS + 1; r++) {
                 const y = GRID_Y + r * TILE + this.gridOffset - TILE;
                 let x0 = GRID_X;
@@ -851,23 +840,19 @@
           }
 
           spawnObstacle() {
-            // random column & spawn slightly above grid
             const col = Phaser.Math.Between(0, GRID_COLS - 1);
             const x = GRID_X + col * TILE + TILE / 2;
             const y = GRID_Y - 70;
 
-            // pick shape + color from world style
             const style = this.wcfg.obstacleStyle;
             const shape = style.shapes[Phaser.Math.Between(0, style.shapes.length - 1)];
             const tex = shapeToTex[shape] || "obs_rect";
             const color = style.palette[Phaser.Math.Between(0, style.palette.length - 1)];
 
-            // size (slightly shrinks as levels rise, but not too much)
             const [smin, smax] = this.lcfg.size;
             let w = Phaser.Math.Between(smin, smax);
             let h = Phaser.Math.Between(smin, smax);
 
-            // shape bias
             if (shape === "bar") { w = Phaser.Math.Between(smax+8, smax+26); h = Phaser.Math.Between(14, 22); }
             if (shape === "tri") { w = Phaser.Math.Between(smin, smax+4); h = Phaser.Math.Between(smin, smax+8); }
             if (shape === "frame") { w = Phaser.Math.Between(smin+2, smax+10); h = Phaser.Math.Between(smin+2, smax+10); }
@@ -876,35 +861,34 @@
             const s = this.add.image(x, y, tex);
             s.setTint(color);
             s.setAlpha(0.95);
-
-            // scale image to desired w/h
             s.displayWidth = w;
             s.displayHeight = h;
 
             this.physics.add.existing(s);
             s.body.setAllowGravity(false);
             s.body.setImmovable(true);
-
-            // tighten body to the displayed size
             s.body.setSize(w * 0.88, h * 0.88, true);
-
             this.obstacles.add(s);
 
-            // occasional extra piece (later levels only)
+            // extra piece (mild, increases later + in harder worlds)
+            const worldBonus = this.world * 0.02; // W2/W3 get a touch more
             const later = this.level >= 2 ? 1 : 0;
-            const chance = Phaser.Math.Clamp(0.05 + later*0.06 + (this.elapsed * 0.0025), 0.05, 0.22);
+            const chance = Phaser.Math.Clamp(0.05 + later*0.06 + worldBonus + (this.elapsed * 0.0025), 0.05, 0.24);
             if (Math.random() < chance && this.levelTime > 5) {
               let col2 = Phaser.Math.Between(0, GRID_COLS - 1);
               if (col2 === col) col2 = (col + Phaser.Math.Between(1, GRID_COLS-1)) % GRID_COLS;
               const x2 = GRID_X + col2 * TILE + TILE / 2;
+
               const shape2 = style.shapes[Phaser.Math.Between(0, style.shapes.length - 1)];
               const tex2 = shapeToTex[shape2] || "obs_rect";
               const color2 = style.palette[Phaser.Math.Between(0, style.palette.length - 1)];
+
               const s2 = this.add.image(x2, y - Phaser.Math.Between(22, 90), tex2);
               s2.setTint(color2);
               s2.setAlpha(0.9);
               s2.displayWidth = Math.max(14, w * 0.78);
               s2.displayHeight = Math.max(14, h * 0.78);
+
               this.physics.add.existing(s2);
               s2.body.setAllowGravity(false);
               s2.body.setImmovable(true);
@@ -936,13 +920,7 @@
             if (activeOn) {
               const pr = this.player.getBounds();
               const lr = this.laser.getBounds();
-              const inGrid =
-                pr.left >= GRID_X - 2 && pr.right <= GRID_X + GRID_W + 2 &&
-                pr.top >= GRID_Y - 2 && pr.bottom <= GRID_Y + GRID_H + 2;
-
-              if (inGrid && Phaser.Geom.Intersects.RectangleToRectangle(pr, lr)) {
-                this.gameOver();
-              }
+              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, lr)) this.gameOver();
             }
           }
 
@@ -976,13 +954,9 @@
             }
             saveProgress(p);
 
-            if (nextWorld >= WORLDS.length) {
-              this.scene.start("CampaignComplete", { score: Math.floor(this.score) });
-            } else if (worldClear) {
-              this.scene.start("WorldComplete", { world: this.world, score: Math.floor(this.score) });
-            } else {
-              this.scene.start("LevelComplete", { world: this.world, level: this.level, score: Math.floor(this.score) });
-            }
+            if (nextWorld >= WORLDS.length) this.scene.start("CampaignComplete", { score: Math.floor(this.score) });
+            else if (worldClear) this.scene.start("WorldComplete", { world: this.world, score: Math.floor(this.score) });
+            else this.scene.start("LevelComplete", { world: this.world, level: this.level, score: Math.floor(this.score) });
           }
 
           gameOver() {

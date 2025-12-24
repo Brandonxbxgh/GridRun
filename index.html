@@ -14,11 +14,12 @@
       background:rgba(0,0,0,.35);
       padding:8px 10px; border-radius:10px;
       user-select:none;
+      z-index: 10;
     }
   </style>
 </head>
 <body>
-  <div class="hint">Controls: WASD / Arrow Keys • Mobile: Swipe • Survive as long as possible</div>
+  <div class="hint">PC: WASD / Arrow Keys • Mobile: drag thumb to steer (analog) • Survive as long as possible</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -59,11 +60,8 @@
           }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
           btn.on("pointerdown", onClick);
-
-          // tiny hover polish (desktop)
           btn.on("pointerover", () => btn.setAlpha(0.92));
           btn.on("pointerout", () => btn.setAlpha(1));
-
           return btn;
         }
 
@@ -92,16 +90,19 @@
         const SPAWN_START_MS = 850;
         const SPAWN_MIN_MS = 320;
 
+        // How “analog” the thumb-follow feels:
+        // Larger = slower response; smaller = snappier.
+        const ANALOG_MAX_DIST = 180;
+        const ANALOG_DEADZONE = 10;
+
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
         // ----- Scenes -----
         class MenuScene extends Phaser.Scene {
           constructor() { super("Menu"); }
-
           create() {
             this.cameras.main.setBackgroundColor(0x0a0a12);
 
-            // Subtle “grid” backdrop
             const g = this.add.graphics();
             g.lineStyle(1, 0x20204a, 0.8);
             for (let i = 0; i < 30; i++) {
@@ -169,6 +170,7 @@
             this.spawnTimer = 0;
             this.elapsed = 0;
             this.score = 0;
+            this.touchTarget = null; // analog thumb-follow target
           }
 
           create() {
@@ -191,26 +193,18 @@
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D");
 
-            // Swipe support
-            this.touchStart = null;
-            this.input.on("pointerdown", (p) => (this.touchStart = { x: p.x, y: p.y }));
-            this.input.on("pointerup", (p) => {
-              if (!this.touchStart) return;
-              const dx = p.x - this.touchStart.x;
-              const dy = p.y - this.touchStart.y;
-              this.touchStart = null;
-
-              const dead = 18;
-              if (Math.abs(dx) < dead && Math.abs(dy) < dead) return;
-
-              const step = TILE;
-              let nx = this.player.x, ny = this.player.y;
-              if (Math.abs(dx) > Math.abs(dy)) nx += dx > 0 ? step : -step;
-              else ny += dy > 0 ? step : -step;
-
-              this.player.x = clamp(nx, GRID_X + 14, GRID_X + GRID_W - 14);
-              this.player.y = clamp(ny, GRID_Y + 14, GRID_Y + GRID_H - 14);
-              this.player.body.reset(this.player.x, this.player.y);
+            // Analog thumb-follow: touch/drag sets a target point.
+            // Player steers toward finger position while pressed.
+            this.touchTarget = null;
+            this.input.on("pointerdown", (p) => {
+              this.touchTarget = { x: p.x, y: p.y };
+            });
+            this.input.on("pointermove", (p) => {
+              if (!p.isDown) return;
+              this.touchTarget = { x: p.x, y: p.y };
+            });
+            this.input.on("pointerup", () => {
+              this.touchTarget = null;
             });
 
             this.uiText = this.add.text(14, 12, "Score: 0", {
@@ -245,7 +239,7 @@
             this.score += dt * 10;
             this.uiText.setText("Score: " + Math.floor(this.score));
 
-            // movement
+            // keyboard movement (smooth)
             let vx = 0, vy = 0;
             const left = this.cursors.left.isDown || this.keys.A.isDown;
             const right = this.cursors.right.isDown || this.keys.D.isDown;
@@ -256,7 +250,24 @@
             if (right) vx += 1;
             if (up) vy -= 1;
             if (down) vy += 1;
-            if (vx !== 0 && vy !== 0) { vx *= 0.7071; vy *= 0.7071; }
+
+            // Analog thumb-follow (mobile): adds steering toward finger.
+            if (this.touchTarget) {
+              const dx = this.touchTarget.x - this.player.x;
+              const dy = this.touchTarget.y - this.player.y;
+
+              // deadzone to avoid jitter
+              const ax = Math.abs(dx) > ANALOG_DEADZONE ? dx : 0;
+              const ay = Math.abs(dy) > ANALOG_DEADZONE ? dy : 0;
+
+              // scale by distance (clamped), so farther finger = stronger steering
+              vx += Phaser.Math.Clamp(ax / ANALOG_MAX_DIST, -1, 1);
+              vy += Phaser.Math.Clamp(ay / ANALOG_MAX_DIST, -1, 1);
+            }
+
+            // Normalize if both axes have movement (prevents diagonal speed boost)
+            const mag = Math.hypot(vx, vy);
+            if (mag > 1) { vx /= mag; vy /= mag; }
 
             this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
 

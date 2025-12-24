@@ -18,7 +18,7 @@
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD/Arrows • Mobile: drag thumb • Toggle: Direct Follow (top-right)</div>
+  <div class="hint">PC: WASD/Arrows • Mobile: DIRECT FOLLOW only (drag thumb) • World Map + Levels • World 3 Laser Boss</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -39,18 +39,15 @@
         // Movement
         const PLAYER_SPEED = 320;
 
-        // ✅ Mobile analog tuning (more responsive)
-        const ANALOG_MAX_DIST = 60;      // smaller = faster response
-        const ANALOG_DEADZONE = 3;       // smaller = more sensitive
-        const ANALOG_BOOST = 1.65;       // baseline punch
-        const ANALOG_MAX_EXTRA = 1.05;   // extra boost ceiling from time ramp
-
-        // Direct-follow mode (snap/lerp to finger)
-        const FOLLOW_RADIUS = 10;        // player stops when within this many px of target
-        const FOLLOW_LERP = 0.28;        // higher = more snappy (0.22–0.40 good range)
-        const FOLLOW_MAX_SPEED_MULT = 2.2; // cap follow speed vs PLAYER_SPEED
+        // ✅ DIRECT FOLLOW ONLY (mobile)
+        const FOLLOW_RADIUS = 8;           // stops when close to finger
+        const FOLLOW_LERP = 0.34;          // higher = snappier follow
+        const FOLLOW_MAX_SPEED_MULT = 2.6; // cap follow speed vs PLAYER_SPEED
 
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+        // Detect touch-capable device (used to force direct-follow behavior)
+        const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
 
         // ======== SAVE / PROGRESS ========
         const LEVELS_PER_WORLD = 5;
@@ -78,16 +75,6 @@
           if (world < p.unlockedWorld) return true;
           if (world > p.unlockedWorld) return false;
           return level <= p.unlockedLevel;
-        }
-
-        // Persist input mode (mobile feel preference)
-        const INPUT_KEY = "gridrun_input_mode_v1"; // "analog" | "follow"
-        function loadInputMode() {
-          const v = localStorage.getItem(INPUT_KEY);
-          return (v === "follow" || v === "analog") ? v : "analog";
-        }
-        function saveInputMode(mode) {
-          localStorage.setItem(INPUT_KEY, mode);
         }
 
         // ======== UI HELPERS ========
@@ -279,11 +266,7 @@
             cont.setAlpha(hasProgress ? 1 : 0.45);
 
             makeGhostButton(this, "WORLD MAP / LEVEL SELECT", W/2, H*0.66, () => this.scene.start("WorldMap"));
-
-            makeGhostButton(this, "RESET SAVE", W/2, H*0.78, () => {
-              resetProgress();
-              this.scene.restart();
-            }).setAlpha(0.75);
+            makeGhostButton(this, "RESET SAVE", W/2, H*0.78, () => { resetProgress(); this.scene.restart(); }).setAlpha(0.75);
 
             this.add.text(W/2, H*0.88, "No login needed: progress saves locally on your device.", {
               fontFamily: uiFont, fontSize: "12px", color: "#ffffff", align: "center"
@@ -372,7 +355,6 @@
               { fontFamily: uiFont, fontSize: "16px", color: "#ffffff", align: "center" }
             ).setOrigin(0.5).setAlpha(0.92);
 
-            // Save current position
             const p = loadProgress();
             p.currentWorld = world;
             p.currentLevel = level;
@@ -387,7 +369,6 @@
         class PlayScene extends Phaser.Scene {
           constructor() {
             super("Play");
-
             this.world = 0;
             this.level = 0;
             this.wcfg = WORLDS[0];
@@ -403,7 +384,6 @@
 
             this.gridGraphics = null;
             this.gridOffset = 0;
-            this.backdropItems = [];
 
             this.obstacles = null;
             this.player = null;
@@ -411,11 +391,6 @@
             this.touchTarget = null;
             this.touchDot = null;
 
-            // input mode toggle
-            this.inputMode = "analog"; // "analog" | "follow"
-            this.modeBtn = null;
-
-            // boss
             this.laser = null;
             this.laserWarn = null;
             this.bossT = 0;
@@ -430,8 +405,7 @@
 
           create() {
             this.cameras.main.setBackgroundColor(this.wcfg.bg);
-
-            this.backdropItems = buildBackdrop(this, this.wcfg.backFx, this.wcfg.player, this.wcfg.border);
+            buildBackdrop(this, this.wcfg.backFx, this.wcfg.player, this.wcfg.border);
 
             this.gridGraphics = this.add.graphics();
             this.gridOffset = 0;
@@ -446,10 +420,11 @@
 
             this.physics.add.overlap(this.player, this.obstacles, () => this.gameOver());
 
+            // Keyboard for PC
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D");
 
-            // Thumb dot + input
+            // Touch target + dot
             this.touchDot = this.add.circle(0, 0, 6, this.wcfg.player).setAlpha(0);
             this.touchTarget = null;
 
@@ -471,24 +446,6 @@
             this.uiTop = this.add.text(14, 10, "", { fontFamily: uiFont, fontSize: "14px", color: "#ffffff" }).setAlpha(0.95);
             this.uiTime = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95);
 
-            // Input mode button (top-right)
-            this.inputMode = loadInputMode();
-            this.modeBtn = this.add.text(W - 14, 12, "", {
-              fontFamily: uiFont,
-              fontSize: "12px",
-              color: "#ffffff",
-              backgroundColor: "rgba(255,255,255,0.10)",
-              padding: { left: 10, right: 10, top: 6, bottom: 6 }
-            }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
-
-            this.modeBtn.on("pointerdown", () => {
-              this.inputMode = (this.inputMode === "analog") ? "follow" : "analog";
-              saveInputMode(this.inputMode);
-              this.refreshModeBtn();
-            });
-
-            this.refreshModeBtn();
-
             // run state
             this.elapsed = 0;
             this.score = 0;
@@ -500,12 +457,6 @@
 
             this.setupBoss();
             this.updateHud();
-          }
-
-          refreshModeBtn() {
-            const label = (this.inputMode === "follow") ? "Direct Follow: ON" : "Direct Follow: OFF";
-            this.modeBtn.setText(label);
-            this.modeBtn.setAlpha(this.inputMode === "follow" ? 0.95 : 0.75);
           }
 
           setupBoss() {
@@ -547,25 +498,26 @@
             this.updateHud();
 
             // ===== Movement =====
-            let vx = 0, vy = 0;
-
-            // Keyboard still works always
+            // PC movement: keyboard
+            let kvx = 0, kvy = 0;
             const left = this.cursors.left.isDown || this.keys.A.isDown;
             const right = this.cursors.right.isDown || this.keys.D.isDown;
             const up = this.cursors.up.isDown || this.keys.W.isDown;
             const down = this.cursors.down.isDown || this.keys.S.isDown;
 
-            if (left) vx -= 1;
-            if (right) vx += 1;
-            if (up) vy -= 1;
-            if (down) vy += 1;
+            if (left) kvx -= 1;
+            if (right) kvx += 1;
+            if (up) kvy -= 1;
+            if (down) kvy += 1;
 
-            // Mobile / touch behavior:
-            // - analog: velocity direction + speed scaling
-            // - follow: position lerp toward finger (fast & responsive)
-            if (this.touchTarget) {
-              if (this.inputMode === "follow") {
-                // Direct follow (lerp toward target)
+            if (!IS_TOUCH) {
+              // Desktop/PC: keyboard velocity
+              const mag = Math.hypot(kvx, kvy);
+              if (mag > 1) { kvx /= mag; kvy /= mag; }
+              this.player.body.setVelocity(kvx * PLAYER_SPEED, kvy * PLAYER_SPEED);
+            } else {
+              // ✅ Mobile: DIRECT FOLLOW ONLY
+              if (this.touchTarget) {
                 const tx = clamp(this.touchTarget.x, GRID_X + 14, GRID_X + GRID_W - 14);
                 const ty = clamp(this.touchTarget.y, GRID_Y + 14, GRID_Y + GRID_H - 14);
 
@@ -574,13 +526,13 @@
                 const dist = Math.hypot(dx, dy);
 
                 if (dist > FOLLOW_RADIUS) {
-                  // lerp position
                   const nx = this.player.x + dx * FOLLOW_LERP;
                   const ny = this.player.y + dy * FOLLOW_LERP;
 
-                  // cap max instantaneous velocity so it remains fair
+                  // cap max step for fairness
                   const maxStep = PLAYER_SPEED * FOLLOW_MAX_SPEED_MULT * dt;
                   const stepDist = Math.hypot(nx - this.player.x, ny - this.player.y);
+
                   if (stepDist > maxStep) {
                     const s = maxStep / stepDist;
                     this.player.x = this.player.x + (nx - this.player.x) * s;
@@ -590,45 +542,17 @@
                     this.player.y = ny;
                   }
 
-                  // reset body to avoid physics drift
                   this.player.body.reset(this.player.x, this.player.y);
                 } else {
                   this.player.body.setVelocity(0, 0);
                 }
               } else {
-                // Analog steering + boosted speed based on thumb distance
-                const dx = this.touchTarget.x - this.player.x;
-                const dy = this.touchTarget.y - this.player.y;
-
-                const ax = Math.abs(dx) > ANALOG_DEADZONE ? dx : 0;
-                const ay = Math.abs(dy) > ANALOG_DEADZONE ? dy : 0;
-
-                const dynamicBoost = ANALOG_BOOST + (this.elapsed * 0.02);
-                const boost = Phaser.Math.Clamp(dynamicBoost, ANALOG_BOOST, ANALOG_BOOST + ANALOG_MAX_EXTRA);
-
-                vx += Phaser.Math.Clamp((ax / ANALOG_MAX_DIST) * boost, -1, 1);
-                vy += Phaser.Math.Clamp((ay / ANALOG_MAX_DIST) * boost, -1, 1);
-
-                // normalize
-                const mag = Math.hypot(vx, vy);
-                if (mag > 1) { vx /= mag; vy /= mag; }
-
-                // speed scales with distance (drag far = faster)
-                let speed = PLAYER_SPEED;
-                const dist = Math.hypot(dx, dy);
-                const t = Phaser.Math.Clamp(dist / 120, 0, 1);
-                speed = PLAYER_SPEED * (1 + 1.15 * t); // stronger than before
-
-                this.player.body.setVelocity(vx * speed, vy * speed);
+                // no touch: stop
+                this.player.body.setVelocity(0, 0);
               }
-            } else {
-              // No touch: keyboard only
-              const mag = Math.hypot(vx, vy);
-              if (mag > 1) { vx /= mag; vy /= mag; }
-              this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
             }
 
-            // Clamp to grid (always)
+            // clamp to grid always
             const pad = 14;
             const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
             const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
@@ -654,7 +578,7 @@
             // boss
             this.updateBoss(dt);
 
-            // grid
+            // grid draw
             this.drawGrid(dt);
           }
 
@@ -918,7 +842,6 @@
           }
         }
 
-        // ======== GAME INIT ========
         new Phaser.Game({
           type: Phaser.AUTO,
           width: W,
@@ -941,4 +864,3 @@
   </script>
 </body>
 </html>
-

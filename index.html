@@ -18,7 +18,7 @@
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD/Arrows • Mobile: drag thumb (FAST analog) • Dot shows thumb target • Timed Worlds (3×5)</div>
+  <div class="hint">PC: WASD/Arrows • Mobile: drag thumb (FAST analog) • World Map + Levels • World 3 Laser Boss</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -31,62 +31,25 @@
         const W = 420, H = 760;
         const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
 
-        // ======== PROGRESSION DATA ========
+        // ======== GRID ========
+        const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
+        const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
+        const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
+
+        // Movement
+        const PLAYER_SPEED = 320;
+
+        // ✅ Mobile analog tuning
+        const ANALOG_MAX_DIST = 105;     // smaller = faster response
+        const ANALOG_DEADZONE = 4;       // smaller = more sensitive
+        const ANALOG_BOOST = 1.55;       // baseline punch
+        const ANALOG_MAX_EXTRA = 0.95;   // extra boost ceiling from time ramp
+
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+        // ======== SAVE / PROGRESS ========
         const LEVELS_PER_WORLD = 5;
-
-        const WORLDS = [
-          {
-            id: 0,
-            name: "Neon Alley",
-            subtitle: "Learn the lanes. Find your rhythm.",
-            bg: 0x0a0a12,
-            gridLine: 0x20204a,
-            border: 0x2a2a55,
-            playerColor: 0x6ef3ff,
-            obstacleColor: 0xff4d7d,
-            baseScroll: 110,
-            scrollRamp: 18,          // speed increase per second
-            spawnStartMs: 900,
-            spawnRampMsPerSec: 12,   // spawn interval shrinks over time
-            spawnMinMs: 360,
-            levelSeconds: 45
-          },
-          {
-            id: 1,
-            name: "Overclock District",
-            subtitle: "Faster drops. Tighter reactions.",
-            bg: 0x070814,
-            gridLine: 0x243056,
-            border: 0x3a4a88,
-            playerColor: 0x7cffd2,
-            obstacleColor: 0xff6aa2,
-            baseScroll: 135,
-            scrollRamp: 24,
-            spawnStartMs: 820,
-            spawnRampMsPerSec: 14,
-            spawnMinMs: 320,
-            levelSeconds: 50
-          },
-          {
-            id: 2,
-            name: "Blackout Sector",
-            subtitle: "No mercy. Stay alive.",
-            bg: 0x04050b,
-            gridLine: 0x1e1f3f,
-            border: 0x4b4bb0,
-            playerColor: 0x9aa7ff,
-            obstacleColor: 0xff4d7d,
-            baseScroll: 155,
-            scrollRamp: 30,
-            spawnStartMs: 760,
-            spawnRampMsPerSec: 16,
-            spawnMinMs: 290,
-            levelSeconds: 55
-          }
-        ];
-
-        // ======== STORAGE (Save/Continue) ========
-        const SAVE_KEY = "gridrun_progress_v1";
+        const SAVE_KEY = "gridrun_progress_v2";
 
         function loadProgress() {
           try {
@@ -103,28 +66,26 @@
             return { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
           }
         }
+        function saveProgress(p) { localStorage.setItem(SAVE_KEY, JSON.stringify(p)); }
+        function resetProgress() { localStorage.removeItem(SAVE_KEY); }
 
-        function saveProgress(p) {
-          localStorage.setItem(SAVE_KEY, JSON.stringify(p));
-        }
-
-        function resetProgress() {
-          localStorage.removeItem(SAVE_KEY);
+        function isLevelUnlocked(p, world, level) {
+          if (world < p.unlockedWorld) return true;
+          if (world > p.unlockedWorld) return false;
+          return level <= p.unlockedLevel;
         }
 
         // ======== UI HELPERS ========
         function addTitle(scene, text, yFrac = 0.22, size = 40) {
           return scene.add.text(W/2, H*yFrac, text, {
             fontFamily: uiFont, fontSize: `${size}px`, color: "#ffffff",
-          }).setOrigin(0.5).setAlpha(0.95);
+          }).setOrigin(0.5).setAlpha(0.96);
         }
-
         function addSubtitle(scene, text, yFrac = 0.28) {
           return scene.add.text(W/2, H*yFrac, text, {
             fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff",
           }).setOrigin(0.5).setAlpha(0.9);
         }
-
         function makeButton(scene, label, x, y, onClick) {
           const btn = scene.add.text(x, y, label, {
             fontFamily: uiFont,
@@ -139,7 +100,6 @@
           btn.on("pointerout", () => btn.setAlpha(1));
           return btn;
         }
-
         function makeGhostButton(scene, label, x, y, onClick) {
           const btn = scene.add.text(x, y, label, {
             fontFamily: uiFont,
@@ -155,37 +115,140 @@
           return btn;
         }
 
-        // ======== GRID CONSTANTS ========
-        const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
-        const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
-        const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
+        // ======== WORLDS + REAL LEVEL DESIGN ========
+        // Each level: tuned spawn and speed, still “random,” but feels authored.
+        const WORLDS = [
+          {
+            id: 0,
+            name: "Neon Alley",
+            subtitle: "Warmup. Find your flow.",
+            bg: 0x0a0a12,
+            border: 0x2a2a55,
+            gridLine: 0x20204a,
+            player: 0x6ef3ff,
+            backFx: "scanlines",
+            levels: [
+              { seconds: 35, baseScroll: 105, scrollRamp: 14, spawnStart: 980, spawnRamp: 10, spawnMin: 430, shape:"square", size:[22,34], colors:[0xff4d7d,0xff6aa2] },
+              { seconds: 40, baseScroll: 112, scrollRamp: 16, spawnStart: 930, spawnRamp: 11, spawnMin: 410, shape:"square", size:[22,34], colors:[0xff4d7d,0xff7bd0] },
+              { seconds: 45, baseScroll: 118, scrollRamp: 18, spawnStart: 900, spawnRamp: 12, spawnMin: 390, shape:"tall",   size:[20,32], colors:[0xff4d7d,0xff6aa2] },
+              { seconds: 48, baseScroll: 125, scrollRamp: 20, spawnStart: 870, spawnRamp: 13, spawnMin: 370, shape:"wide",   size:[20,32], colors:[0xff4d7d,0xff7bd0] },
+              { seconds: 50, baseScroll: 132, scrollRamp: 22, spawnStart: 850, spawnRamp: 14, spawnMin: 360, shape:"mix",    size:[20,34], colors:[0xff4d7d,0xff6aa2,0xff7bd0] },
+            ]
+          },
+          {
+            id: 1,
+            name: "Overclock District",
+            subtitle: "Neon rain. Faster drops.",
+            bg: 0x060814,
+            border: 0x3a4a88,
+            gridLine: 0x243056,
+            player: 0x7cffd2,
+            backFx: "rain",
+            levels: [
+              { seconds: 40, baseScroll: 130, scrollRamp: 22, spawnStart: 840, spawnRamp: 13, spawnMin: 340, shape:"tall", size:[18,30], colors:[0xff6aa2,0xff4d7d] },
+              { seconds: 45, baseScroll: 140, scrollRamp: 24, spawnStart: 820, spawnRamp: 14, spawnMin: 330, shape:"wide", size:[18,30], colors:[0xff6aa2,0xff7bd0] },
+              { seconds: 50, baseScroll: 148, scrollRamp: 26, spawnStart: 790, spawnRamp: 15, spawnMin: 320, shape:"mix",  size:[18,32], colors:[0xff6aa2,0xff4d7d,0xff7bd0] },
+              { seconds: 52, baseScroll: 155, scrollRamp: 28, spawnStart: 770, spawnRamp: 16, spawnMin: 310, shape:"square",size:[18,32], colors:[0xff6aa2,0xff4d7d] },
+              { seconds: 55, baseScroll: 162, scrollRamp: 30, spawnStart: 750, spawnRamp: 17, spawnMin: 300, shape:"mix",  size:[18,34], colors:[0xff6aa2,0xff4d7d,0xffb0ff] },
+            ]
+          },
+          {
+            id: 2,
+            name: "Blackout Sector",
+            subtitle: "Dark grid. Laser sweeps.",
+            bg: 0x03040b,
+            border: 0x4b4bb0,
+            gridLine: 0x1e1f3f,
+            player: 0x9aa7ff,
+            backFx: "stars",
+            levels: [
+              { seconds: 45, baseScroll: 150, scrollRamp: 26, spawnStart: 760, spawnRamp: 16, spawnMin: 300, shape:"wide", size:[18,30], colors:[0xff4d7d,0xff6aa2] },
+              { seconds: 50, baseScroll: 158, scrollRamp: 28, spawnStart: 740, spawnRamp: 17, spawnMin: 290, shape:"tall", size:[18,30], colors:[0xff4d7d,0xff7bd0] },
+              { seconds: 55, baseScroll: 166, scrollRamp: 30, spawnStart: 720, spawnRamp: 18, spawnMin: 280, shape:"mix",  size:[18,32], colors:[0xff4d7d,0xff6aa2,0xff7bd0] },
+              { seconds: 58, baseScroll: 174, scrollRamp: 32, spawnStart: 700, spawnRamp: 19, spawnMin: 270, shape:"square",size:[18,32], colors:[0xff4d7d,0xffb0ff] },
+              { seconds: 60, baseScroll: 182, scrollRamp: 34, spawnStart: 680, spawnRamp: 20, spawnMin: 260, shape:"mix",  size:[18,34], colors:[0xff4d7d,0xff6aa2,0xffb0ff] },
+            ],
+            boss: {
+              // Laser boss: warning phase then active beam, repeats
+              enabled: true,
+              cycleSeconds: 6.0,   // every 6 seconds
+              warnSeconds: 1.25,   // warning visible first
+              activeSeconds: 1.1,  // beam active duration
+              thickness: 16,       // beam thickness
+              warnThickness: 6     // warning line thickness
+            }
+          }
+        ];
 
-        // Movement
-        const PLAYER_SPEED = 320;
+        // ======== BACKGROUND FX ========
+        function buildBackdrop(scene, fxType, colorA, colorB) {
+          // Keeps it light + mobile-friendly: simple graphics arrays.
+          const items = [];
 
-        // ✅ Mobile analog tuning
-        const ANALOG_MAX_DIST = 110;   // smaller = faster response
-        const ANALOG_DEADZONE = 4;     // smaller = more sensitive
-        const ANALOG_BOOST = 1.45;     // baseline punch
-        const ANALOG_MAX_EXTRA = 0.85; // extra boost ceiling from speed ramp
+          if (fxType === "scanlines") {
+            const g = scene.add.graphics();
+            g.setAlpha(0.25);
+            g.lineStyle(1, colorB, 1);
+            for (let y = 0; y < H; y += 8) {
+              g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.strokePath();
+            }
+            items.push(g);
+          }
 
-        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+          if (fxType === "rain") {
+            const drops = [];
+            for (let i = 0; i < 40; i++) {
+              const r = scene.add.rectangle(
+                Phaser.Math.Between(0, W),
+                Phaser.Math.Between(-H, H),
+                2,
+                Phaser.Math.Between(18, 44),
+                colorB
+              ).setAlpha(0.18);
+              r._vy = Phaser.Math.FloatBetween(220, 420);
+              drops.push(r);
+            }
+            scene.events.on("update", (_, dtMs) => {
+              const dt = dtMs / 1000;
+              for (const d of drops) {
+                d.y += d._vy * dt;
+                if (d.y > H + 60) { d.y = Phaser.Math.Between(-120, -20); d.x = Phaser.Math.Between(0, W); }
+              }
+            });
+            items.push(...drops);
+          }
+
+          if (fxType === "stars") {
+            const stars = [];
+            for (let i = 0; i < 60; i++) {
+              const s = scene.add.rectangle(
+                Phaser.Math.Between(0, W),
+                Phaser.Math.Between(0, H),
+                2, 2, colorA
+              ).setAlpha(Phaser.Math.FloatBetween(0.08, 0.35));
+              s._vy = Phaser.Math.FloatBetween(12, 42);
+              stars.push(s);
+            }
+            scene.events.on("update", (_, dtMs) => {
+              const dt = dtMs / 1000;
+              for (const s of stars) {
+                s.y += s._vy * dt;
+                if (s.y > H + 10) { s.y = -10; s.x = Phaser.Math.Between(0, W); }
+              }
+            });
+            items.push(...stars);
+          }
+
+          return items;
+        }
 
         // ======== SCENES ========
         class MenuScene extends Phaser.Scene {
           constructor() { super("Menu"); }
-
           create() {
             this.cameras.main.setBackgroundColor(0x0a0a12);
-
-            // Backdrop grid
-            const g = this.add.graphics();
-            g.lineStyle(1, 0x20204a, 0.8);
-            for (let i = 0; i < 30; i++) { const y = i * 28; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.strokePath(); }
-            for (let i = 0; i < 20; i++) { const x = i * 28; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.strokePath(); }
-
-            addTitle(this, "GRIDRUN", 0.22, 44);
-            addSubtitle(this, "Timed Worlds • 3 Worlds × 5 Levels", 0.285);
+            addTitle(this, "GRIDRUN", 0.22, 46);
+            addSubtitle(this, "Worlds • Levels • Skill-only arcade run", 0.285);
 
             const p = loadProgress();
             const hasProgress = (p.unlockedWorld > 0) || (p.unlockedLevel > 0);
@@ -193,154 +256,208 @@
             makeButton(this, "PLAY (NEW RUN)", W/2, H*0.46, () => {
               const fresh = { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
               saveProgress(fresh);
-              this.scene.start("WorldIntro", { world: 0, level: 0, fromContinue: false });
+              this.scene.start("WorldMap");
             });
 
-            const contBtn = makeGhostButton(this, hasProgress ? "CONTINUE" : "CONTINUE (LOCKED)", W/2, H*0.56, () => {
+            const cont = makeGhostButton(this, hasProgress ? "CONTINUE" : "CONTINUE (LOCKED)", W/2, H*0.56, () => {
               if (!hasProgress) return;
               const p2 = loadProgress();
-              this.scene.start("WorldIntro", { world: p2.currentWorld, level: p2.currentLevel, fromContinue: true });
+              this.scene.start("WorldIntro", { world: p2.currentWorld, level: p2.currentLevel });
             });
-            contBtn.setAlpha(hasProgress ? 1 : 0.45);
+            cont.setAlpha(hasProgress ? 1 : 0.45);
 
-            makeGhostButton(this, "COSMETICS (PLACEHOLDER)", W/2, H*0.66, () => this.scene.start("Cosmetics"));
-            makeGhostButton(this, "EVENTS (PLACEHOLDER)", W/2, H*0.74, () => this.scene.start("Events"));
+            makeGhostButton(this, "WORLD MAP / LEVEL SELECT", W/2, H*0.66, () => this.scene.start("WorldMap"));
+            makeGhostButton(this, "RESET SAVE", W/2, H*0.78, () => { resetProgress(); this.scene.restart(); }).setAlpha(0.75);
 
-            makeGhostButton(this, "RESET SAVE", W/2, H*0.86, () => {
-              resetProgress();
-              this.scene.restart();
-            }).setAlpha(0.7);
+            this.add.text(W/2, H*0.88, "No login needed: progress saves locally on your device.", {
+              fontFamily: uiFont, fontSize: "12px", color: "#ffffff", align: "center"
+            }).setOrigin(0.5).setAlpha(0.55);
           }
         }
 
-        class CosmeticsScene extends Phaser.Scene {
-          constructor() { super("Cosmetics"); }
+        class WorldMapScene extends Phaser.Scene {
+          constructor() { super("WorldMap"); }
           create() {
+            const p = loadProgress();
             this.cameras.main.setBackgroundColor(0x070710);
-            addTitle(this, "COSMETICS", 0.22);
-            addSubtitle(this, "Placeholder screen (cosmetic-only later).", 0.29);
 
-            this.add.text(W/2, H*0.43,
-              "Later:\n• Trails\n• Color palettes\n• Avatars\n\nCosmetic only — no gameplay advantage.",
-              { fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff", align: "center" }
-            ).setOrigin(0.5);
+            addTitle(this, "WORLD MAP", 0.14, 34);
+            addSubtitle(this, "Select an unlocked level • Replay anytime", 0.20);
 
-            makeGhostButton(this, "BACK", W/2, H*0.72, () => this.scene.start("Menu"));
-          }
-        }
+            // Layout
+            const marginX = 18;
+            const colW = (W - marginX*2);
+            let y = H*0.26;
 
-        class EventsScene extends Phaser.Scene {
-          constructor() { super("Events"); }
-          create() {
-            this.cameras.main.setBackgroundColor(0x070710);
-            addTitle(this, "EVENTS", 0.22);
-            addSubtitle(this, "Placeholder screen (access later).", 0.29);
+            WORLDS.forEach((w, wi) => {
+              const unlockedWorld = wi <= p.unlockedWorld;
 
-            this.add.text(W/2, H*0.43,
-              "Later:\n• Weekly challenges\n• Limited-time modes\n• Prestige leaderboards\n\nFun + bragging rights only.",
-              { fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff", align: "center" }
-            ).setOrigin(0.5);
+              const header = this.add.text(marginX, y, `${wi+1}. ${w.name}`, {
+                fontFamily: uiFont,
+                fontSize: "16px",
+                color: unlockedWorld ? "#ffffff" : "rgba(255,255,255,0.40)"
+              }).setAlpha(0.95);
 
-            makeGhostButton(this, "BACK", W/2, H*0.72, () => this.scene.start("Menu"));
+              y += 26;
+
+              // Level buttons row
+              const gap = 10;
+              const btnW = (colW - gap*(LEVELS_PER_WORLD-1)) / LEVELS_PER_WORLD;
+              for (let li = 0; li < LEVELS_PER_WORLD; li++) {
+                const unlocked = isLevelUnlocked(p, wi, li);
+                const bx = marginX + li * (btnW + gap);
+                const by = y;
+
+                const label = `${li+1}`;
+                const b = this.add.text(bx + btnW/2, by + 18, label, {
+                  fontFamily: uiFont,
+                  fontSize: "16px",
+                  color: unlocked ? "#0a0a12" : "rgba(255,255,255,0.55)",
+                  backgroundColor: unlocked ? "#6ef3ff" : "rgba(255,255,255,0.08)",
+                  padding: { left: 0, right: 0, top: 8, bottom: 8 }
+                }).setOrigin(0.5);
+
+                b.setFixedSize(btnW, 36);
+                if (unlocked) {
+                  b.setInteractive({ useHandCursor: true });
+                  b.on("pointerdown", () => {
+                    const p2 = loadProgress();
+                    p2.currentWorld = wi;
+                    p2.currentLevel = li;
+                    saveProgress(p2);
+                    this.scene.start("WorldIntro", { world: wi, level: li });
+                  });
+                } else {
+                  b.setAlpha(0.6);
+                }
+              }
+
+              y += 58;
+            });
+
+            makeGhostButton(this, "BACK", W/2, H*0.92, () => this.scene.start("Menu"));
           }
         }
 
         class WorldIntroScene extends Phaser.Scene {
           constructor() { super("WorldIntro"); }
-
           create(data) {
             const world = clamp(data?.world ?? 0, 0, WORLDS.length - 1);
             const level = clamp(data?.level ?? 0, 0, LEVELS_PER_WORLD - 1);
-            const cfg = WORLDS[world];
 
-            this.cameras.main.setBackgroundColor(cfg.bg);
+            const w = WORLDS[world];
+            const lv = w.levels[level];
 
-            addTitle(this, cfg.name, 0.24, 36);
-            addSubtitle(this, cfg.subtitle, 0.30);
+            this.cameras.main.setBackgroundColor(w.bg);
+            buildBackdrop(this, w.backFx, w.player, w.border);
 
-            this.add.text(W/2, H*0.43,
-              `Level ${level + 1} / ${LEVELS_PER_WORLD}\nTime: ${cfg.levelSeconds}s`,
+            addTitle(this, w.name, 0.22, 36);
+            addSubtitle(this, w.subtitle, 0.285);
+
+            this.add.text(W/2, H*0.40,
+              `Level ${level + 1}/${LEVELS_PER_WORLD}\nTime: ${lv.seconds}s`,
               { fontFamily: uiFont, fontSize: "16px", color: "#ffffff", align: "center" }
-            ).setOrigin(0.5).setAlpha(0.9);
+            ).setOrigin(0.5).setAlpha(0.92);
+
+            // Save current position
+            const p = loadProgress();
+            p.currentWorld = world;
+            p.currentLevel = level;
+            saveProgress(p);
 
             makeButton(this, "START", W/2, H*0.60, () => {
-              // update current position in save
-              const p = loadProgress();
-              p.currentWorld = world;
-              p.currentLevel = level;
-              // ensure unlock baseline
-              p.unlockedWorld = Math.max(p.unlockedWorld, world);
-              if (world === p.unlockedWorld) p.unlockedLevel = Math.max(p.unlockedLevel, level);
-              saveProgress(p);
-
               this.scene.start("Play", { world, level });
             });
 
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.70, () => this.scene.start("Menu"));
+            makeGhostButton(this, "WORLD MAP", W/2, H*0.70, () => this.scene.start("WorldMap"));
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.79, () => this.scene.start("Menu"));
           }
         }
 
         class PlayScene extends Phaser.Scene {
           constructor() {
             super("Play");
+
             this.world = 0;
             this.level = 0;
-            this.cfg = WORLDS[0];
+            this.wcfg = WORLDS[0];
+            this.lcfg = WORLDS[0].levels[0];
+
+            // run state
+            this.elapsed = 0;
+            this.score = 0;
+            this.levelTime = 0;
 
             this.scrollSpeed = 0;
             this.spawnEvery = 0;
             this.spawnTimer = 0;
 
-            this.elapsed = 0;
-            this.score = 0;
+            // visuals
+            this.gridGraphics = null;
+            this.gridOffset = 0;
+            this.backdropItems = [];
 
-            this.levelTime = 0;
-            this.levelDuration = 45;
+            // objects
+            this.obstacles = null;
+            this.player = null;
 
+            // mobile
             this.touchTarget = null;
             this.touchDot = null;
+
+            // boss (world 3)
+            this.laser = null;
+            this.laserWarn = null;
+            this.bossT = 0;
+            this.laserActive = false;
           }
 
           init(data) {
             this.world = clamp(data?.world ?? 0, 0, WORLDS.length - 1);
             this.level = clamp(data?.level ?? 0, 0, LEVELS_PER_WORLD - 1);
-            this.cfg = WORLDS[this.world];
-            this.levelDuration = this.cfg.levelSeconds;
+            this.wcfg = WORLDS[this.world];
+            this.lcfg = this.wcfg.levels[this.level];
           }
 
           create() {
-            this.cameras.main.setBackgroundColor(this.cfg.bg);
+            this.cameras.main.setBackgroundColor(this.wcfg.bg);
 
+            // backdrop
+            this.backdropItems = buildBackdrop(this, this.wcfg.backFx, this.wcfg.player, this.wcfg.border);
+
+            // grid
             this.gridGraphics = this.add.graphics();
             this.gridOffset = 0;
 
+            // groups
             this.obstacles = this.physics.add.group({ immovable: true, allowGravity: false });
 
+            // player
             const startX = GRID_X + GRID_W / 2;
             const startY = GRID_Y + GRID_H * 0.72;
-
-            this.player = this.add.rectangle(startX, startY, 28, 28, this.cfg.playerColor);
+            this.player = this.add.rectangle(startX, startY, 28, 28, this.wcfg.player);
             this.physics.add.existing(this.player);
             this.player.body.setAllowGravity(false);
 
+            // overlap with obstacles
             this.physics.add.overlap(this.player, this.obstacles, () => this.gameOver());
 
+            // inputs
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D");
 
-            // Thumb target dot (only while touching)
-            this.touchDot = this.add.circle(0, 0, 6, this.cfg.playerColor).setAlpha(0);
-
-            // Analog thumb-follow input
+            // thumb target dot
+            this.touchDot = this.add.circle(0, 0, 6, this.wcfg.player).setAlpha(0);
             this.touchTarget = null;
+
             this.input.on("pointerdown", (p) => {
               this.touchTarget = { x: p.x, y: p.y };
-              this.touchDot.setPosition(p.x, p.y).setAlpha(0.8);
+              this.touchDot.setPosition(p.x, p.y).setAlpha(0.85);
             });
             this.input.on("pointermove", (p) => {
               if (!p.isDown) return;
               this.touchTarget = { x: p.x, y: p.y };
-              this.touchDot.setPosition(p.x, p.y).setAlpha(0.8);
+              this.touchDot.setPosition(p.x, p.y).setAlpha(0.85);
             });
             this.input.on("pointerup", () => {
               this.touchTarget = null;
@@ -351,16 +468,49 @@
             this.uiTop = this.add.text(14, 10, "", { fontFamily: uiFont, fontSize: "14px", color: "#ffffff" }).setAlpha(0.95);
             this.uiTime = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95);
 
-            // Reset run state
+            // run state reset
             this.elapsed = 0;
             this.score = 0;
             this.levelTime = 0;
 
-            this.scrollSpeed = this.cfg.baseScroll;
-            this.spawnEvery = this.cfg.spawnStartMs;
+            this.scrollSpeed = this.lcfg.baseScroll;
+            this.spawnEvery = this.lcfg.spawnStart;
             this.spawnTimer = 0;
 
+            // boss hazard setup (World 3)
+            this.setupBoss();
+
             this.updateHud();
+          }
+
+          setupBoss() {
+            this.bossT = 0;
+            this.laserActive = false;
+
+            // destroy old if restarting
+            if (this.laser) this.laser.destroy();
+            if (this.laserWarn) this.laserWarn.destroy();
+
+            const boss = this.wcfg.boss;
+            if (!boss || !boss.enabled) return;
+
+            // warning line
+            this.laserWarn = this.add.rectangle(
+              GRID_X + GRID_W/2, GRID_Y + GRID_H/2,
+              GRID_W, boss.warnThickness,
+              0xffffff
+            ).setAlpha(0);
+
+            // active beam
+            this.laser = this.add.rectangle(
+              GRID_X + GRID_W/2, GRID_Y + GRID_H/2,
+              GRID_W, boss.thickness,
+              0xff4d7d
+            ).setAlpha(0);
+
+            // keep above grid but below HUD
+            this.laserWarn.setDepth(5);
+            this.laser.setDepth(6);
           }
 
           update(_, deltaMs) {
@@ -369,24 +519,23 @@
             this.levelTime += dt;
 
             // Level complete
-            if (this.levelTime >= this.levelDuration) {
+            if (this.levelTime >= this.lcfg.seconds) {
               this.levelComplete();
               return;
             }
 
-            // Difficulty ramps for this world
-            this.scrollSpeed = this.cfg.baseScroll + this.elapsed * this.cfg.scrollRamp;
+            // tuned speed curve
+            this.scrollSpeed = this.lcfg.baseScroll + this.elapsed * this.lcfg.scrollRamp;
 
-            const targetSpawn = this.cfg.spawnStartMs - this.elapsed * this.cfg.spawnRampMsPerSec;
-            this.spawnEvery = clamp(targetSpawn, this.cfg.spawnMinMs, this.cfg.spawnStartMs);
+            // tuned spawn curve
+            const targetSpawn = this.lcfg.spawnStart - this.elapsed * this.lcfg.spawnRamp;
+            this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
 
-            // Score (still “endless” feeling inside a level)
+            // score
             this.score += dt * 10;
-
-            // HUD
             this.updateHud();
 
-            // Movement input
+            // movement
             let vx = 0, vy = 0;
             const left = this.cursors.left.isDown || this.keys.A.isDown;
             const right = this.cursors.right.isDown || this.keys.D.isDown;
@@ -398,7 +547,7 @@
             if (up) vy -= 1;
             if (down) vy += 1;
 
-            // Mobile fairness: boost increases over time
+            // mobile fairness: boost increases a bit over time
             const dynamicBoost = ANALOG_BOOST + (this.elapsed * 0.02);
             const boost = Phaser.Math.Clamp(dynamicBoost, ANALOG_BOOST, ANALOG_BOOST + ANALOG_MAX_EXTRA);
 
@@ -413,13 +562,13 @@
               vy += Phaser.Math.Clamp((ay / ANALOG_MAX_DIST) * boost, -1, 1);
             }
 
-            // Normalize (no diagonal speed boost)
+            // normalize (no diagonal boost)
             const mag = Math.hypot(vx, vy);
             if (mag > 1) { vx /= mag; vy /= mag; }
 
             this.player.body.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
 
-            // Clamp to grid
+            // clamp to grid
             const pad = 14;
             const nx = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
             const ny = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
@@ -428,28 +577,30 @@
               this.player.body.reset(nx, ny);
             }
 
-            // Spawn obstacles (simple random, since you preferred it)
+            // spawn obstacles (random but styled per level)
             this.spawnTimer += deltaMs;
             while (this.spawnTimer >= this.spawnEvery) {
               this.spawnTimer -= this.spawnEvery;
               this.spawnObstacle();
             }
 
-            // Move obstacles
+            // move obstacles
             this.obstacles.children.iterate((o) => {
               if (!o) return;
               o.y += this.scrollSpeed * dt;
-              if (o.y > GRID_Y + GRID_H + 80) o.destroy();
+              if (o.y > GRID_Y + GRID_H + 120) o.destroy();
             });
 
-            // Draw grid
+            // boss hazard update (world 3)
+            this.updateBoss(dt);
+
+            // draw grid
             this.drawGrid(dt);
           }
 
           updateHud() {
-            const cfg = this.cfg;
-            const timeLeft = Math.max(0, Math.ceil(this.levelDuration - this.levelTime));
-            this.uiTop.setText(`${cfg.name} • Level ${this.level + 1}/${LEVELS_PER_WORLD} • Score: ${Math.floor(this.score)}`);
+            const timeLeft = Math.max(0, Math.ceil(this.lcfg.seconds - this.levelTime));
+            this.uiTop.setText(`${this.wcfg.name} • Level ${this.level+1}/${LEVELS_PER_WORLD} • Score: ${Math.floor(this.score)}`);
             this.uiTime.setText(`Time Left: ${timeLeft}s`);
           }
 
@@ -458,10 +609,10 @@
             const g = this.gridGraphics;
             g.clear();
 
-            g.lineStyle(2, this.cfg.border, 0.92);
+            g.lineStyle(2, this.wcfg.border, 0.92);
             g.strokeRoundedRect(GRID_X - 6, GRID_Y - 6, GRID_W + 12, GRID_H + 12, 14);
 
-            g.lineStyle(1, this.cfg.gridLine, 0.9);
+            g.lineStyle(1, this.wcfg.gridLine, 0.9);
 
             for (let c = 0; c <= GRID_COLS; c++) {
               const x = GRID_X + c * TILE;
@@ -473,68 +624,135 @@
             }
           }
 
+          // ======== Obstacle spawner (random, tuned, with variety) ========
           spawnObstacle() {
             const col = Phaser.Math.Between(0, GRID_COLS - 1);
             const x = GRID_X + col * TILE + TILE / 2;
-            const y = GRID_Y - 40;
+            const y = GRID_Y - 60;
 
-            // Slight variety per world (still “random” feeling, not pattern-y)
-            const sizeMin = 22;
-            const sizeMax = 34;
-            const size = Phaser.Math.Between(sizeMin, sizeMax);
+            const [smin, smax] = this.lcfg.size;
+            const color = this.lcfg.colors[Phaser.Math.Between(0, this.lcfg.colors.length - 1)];
 
-            const rect = this.add.rectangle(x, y, size, size, this.cfg.obstacleColor);
+            let w = Phaser.Math.Between(smin, smax);
+            let h = Phaser.Math.Between(smin, smax);
+
+            // Shape variety per level
+            const shape = this.lcfg.shape;
+            if (shape === "tall") { w = Phaser.Math.Between(smin, smax-2); h = Phaser.Math.Between(smax, smax+18); }
+            else if (shape === "wide") { w = Phaser.Math.Between(smax, smax+22); h = Phaser.Math.Between(smin, smax-2); }
+            else if (shape === "mix") {
+              // 1/3 tall, 1/3 wide, 1/3 square
+              const r = Phaser.Math.Between(0,2);
+              if (r === 0) { w = Phaser.Math.Between(smin, smax-2); h = Phaser.Math.Between(smax, smax+18); }
+              if (r === 1) { w = Phaser.Math.Between(smax, smax+22); h = Phaser.Math.Between(smin, smax-2); }
+            }
+
+            const rect = this.add.rectangle(x, y, w, h, color);
             this.physics.add.existing(rect);
             rect.body.setAllowGravity(false);
             rect.body.setImmovable(true);
+
+            // tiny glow-ish feel by alpha
+            rect.setAlpha(0.95);
+
             this.obstacles.add(rect);
+
+            // Occasional second obstacle (rare early, more late) — still random
+            const chance = Phaser.Math.Clamp(0.08 + (this.elapsed * 0.004), 0.08, 0.26);
+            if (Math.random() < chance && this.levelTime > 6) {
+              let col2 = Phaser.Math.Between(0, GRID_COLS - 1);
+              if (col2 === col) col2 = (col + Phaser.Math.Between(1, GRID_COLS-1)) % GRID_COLS;
+              const x2 = GRID_X + col2 * TILE + TILE / 2;
+              const color2 = this.lcfg.colors[Phaser.Math.Between(0, this.lcfg.colors.length - 1)];
+              const r2 = this.add.rectangle(x2, y - Phaser.Math.Between(20, 70), w * 0.9, h * 0.9, color2).setAlpha(0.9);
+              this.physics.add.existing(r2);
+              r2.body.setAllowGravity(false);
+              r2.body.setImmovable(true);
+              this.obstacles.add(r2);
+            }
           }
 
+          // ======== Boss (World 3): Laser sweep ========
+          updateBoss(dt) {
+            const boss = this.wcfg.boss;
+            if (!boss || !boss.enabled || !this.laser || !this.laserWarn) return;
+
+            this.bossT += dt;
+            const cycle = boss.cycleSeconds;
+            const t = this.bossT % cycle;
+
+            // Laser position sweeps vertically down the grid and loops
+            const sweep = (this.bossT * 0.22) % 1; // slow drift
+            const yPos = GRID_Y + 20 + (GRID_H - 40) * ((t / cycle + sweep) % 1);
+
+            this.laserWarn.setPosition(GRID_X + GRID_W/2, yPos);
+            this.laser.setPosition(GRID_X + GRID_W/2, yPos);
+
+            // phases
+            const warnOn = t < boss.warnSeconds;
+            const activeOn = (t >= boss.warnSeconds) && (t < boss.warnSeconds + boss.activeSeconds);
+
+            this.laserWarn.setAlpha(warnOn ? 0.35 : 0);
+            this.laser.setAlpha(activeOn ? 0.85 : 0);
+
+            // collision when active
+            if (activeOn) {
+              const pr = this.player.getBounds();
+              const lr = this.laser.getBounds();
+
+              // only count collision within grid region
+              const inGrid =
+                pr.left >= GRID_X - 2 && pr.right <= GRID_X + GRID_W + 2 &&
+                pr.top >= GRID_Y - 2 && pr.bottom <= GRID_Y + GRID_H + 2;
+
+              if (inGrid && Phaser.Geom.Intersects.RectangleToRectangle(pr, lr)) {
+                this.gameOver();
+              }
+            }
+          }
+
+          // ======== Progression ========
           levelComplete() {
-            // Save unlock/progress
+            // update save
             const p = loadProgress();
 
-            // Determine next level/world
+            // compute next
             let nextWorld = this.world;
             let nextLevel = this.level + 1;
-            let worldComplete = false;
+            let worldClear = false;
 
             if (nextLevel >= LEVELS_PER_WORLD) {
-              worldComplete = true;
+              worldClear = true;
               nextLevel = 0;
               nextWorld = this.world + 1;
             }
 
-            // Update unlocks
-            if (worldComplete) {
-              // Completed last level of this world
+            // unlock logic
+            if (worldClear) {
               p.unlockedWorld = Math.max(p.unlockedWorld, this.world + 1);
               p.unlockedLevel = 0;
             } else {
-              // Completed a level within this world
               if (p.unlockedWorld < this.world) p.unlockedWorld = this.world;
               if (p.unlockedWorld === this.world) p.unlockedLevel = Math.max(p.unlockedLevel, this.level + 1);
             }
 
-            // Set current to next playable (or clamp if finished all worlds)
+            // set current pointer
             if (nextWorld >= WORLDS.length) {
-              // finished all content — keep them at last world/level
               p.currentWorld = WORLDS.length - 1;
               p.currentLevel = LEVELS_PER_WORLD - 1;
             } else {
               p.currentWorld = nextWorld;
               p.currentLevel = nextLevel;
             }
-
             saveProgress(p);
 
-            // Go to completion scene
+            // route
             if (nextWorld >= WORLDS.length) {
               this.scene.start("CampaignComplete", { score: Math.floor(this.score) });
-            } else if (worldComplete) {
-              this.scene.start("WorldComplete", { world: this.world, nextWorld, score: Math.floor(this.score) });
+            } else if (worldClear) {
+              this.scene.start("WorldComplete", { world: this.world, score: Math.floor(this.score) });
             } else {
-              this.scene.start("LevelComplete", { world: this.world, level: this.level, nextWorld, nextLevel, score: Math.floor(this.score) });
+              this.scene.start("LevelComplete", { world: this.world, level: this.level, score: Math.floor(this.score) });
             }
           }
 
@@ -543,7 +761,7 @@
               world: this.world,
               level: this.level,
               score: Math.floor(this.score),
-              timeLeft: Math.max(0, Math.ceil(this.levelDuration - this.levelTime))
+              timeLeft: Math.max(0, Math.ceil(this.lcfg.seconds - this.levelTime))
             });
           }
         }
@@ -554,26 +772,27 @@
             const world = data?.world ?? 0;
             const level = data?.level ?? 0;
             const score = data?.score ?? 0;
-            const nextWorld = data?.nextWorld ?? world;
-            const nextLevel = data?.nextLevel ?? (level + 1);
 
-            const cfg = WORLDS[clamp(world, 0, WORLDS.length - 1)];
-            this.cameras.main.setBackgroundColor(cfg.bg);
+            const w = WORLDS[clamp(world, 0, WORLDS.length-1)];
+            this.cameras.main.setBackgroundColor(w.bg);
+            buildBackdrop(this, w.backFx, w.player, w.border);
 
             addTitle(this, "LEVEL CLEAR", 0.30, 34);
-            this.add.text(W/2, H*0.40, `${cfg.name} • Level ${level + 1}/${LEVELS_PER_WORLD}`, {
+            this.add.text(W/2, H*0.40, `${w.name} • Level ${level + 1}/${LEVELS_PER_WORLD}`, {
               fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff"
             }).setOrigin(0.5);
 
-            this.add.text(W/2, H*0.47, `Score: ${score}`, {
+            this.add.text(W/2, H*0.48, `Score: ${score}`, {
               fontFamily: uiFont, fontSize: "18px", color: "#ffffff"
             }).setOrigin(0.5);
 
-            makeButton(this, "NEXT LEVEL", W/2, H*0.60, () => {
-              this.scene.start("WorldIntro", { world: nextWorld, level: nextLevel, fromContinue: false });
+            makeButton(this, "NEXT", W/2, H*0.60, () => {
+              const p = loadProgress();
+              this.scene.start("WorldIntro", { world: p.currentWorld, level: p.currentLevel });
             });
 
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.70, () => this.scene.start("Menu"));
+            makeGhostButton(this, "WORLD MAP", W/2, H*0.70, () => this.scene.start("WorldMap"));
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.79, () => this.scene.start("Menu"));
           }
         }
 
@@ -581,14 +800,14 @@
           constructor() { super("WorldComplete"); }
           create(data) {
             const world = data?.world ?? 0;
-            const nextWorld = data?.nextWorld ?? (world + 1);
             const score = data?.score ?? 0;
 
-            const cfg = WORLDS[clamp(world, 0, WORLDS.length - 1)];
-            this.cameras.main.setBackgroundColor(cfg.bg);
+            const w = WORLDS[clamp(world, 0, WORLDS.length-1)];
+            this.cameras.main.setBackgroundColor(w.bg);
+            buildBackdrop(this, w.backFx, w.player, w.border);
 
             addTitle(this, "WORLD CLEAR", 0.30, 34);
-            this.add.text(W/2, H*0.40, `${cfg.name} completed`, {
+            this.add.text(W/2, H*0.40, `${w.name} completed`, {
               fontFamily: uiFont, fontSize: "16px", color: "#ffffff"
             }).setOrigin(0.5);
 
@@ -597,10 +816,11 @@
             }).setOrigin(0.5);
 
             makeButton(this, "NEXT WORLD", W/2, H*0.62, () => {
-              this.scene.start("WorldIntro", { world: nextWorld, level: 0, fromContinue: false });
+              const p = loadProgress();
+              this.scene.start("WorldIntro", { world: p.currentWorld, level: p.currentLevel });
             });
 
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.72, () => this.scene.start("Menu"));
+            makeGhostButton(this, "WORLD MAP", W/2, H*0.72, () => this.scene.start("WorldMap"));
           }
         }
 
@@ -610,7 +830,7 @@
             this.cameras.main.setBackgroundColor(0x020208);
 
             addTitle(this, "CAMPAIGN CLEAR", 0.30, 32);
-            this.add.text(W/2, H*0.42, `You cleared all worlds.`, {
+            this.add.text(W/2, H*0.42, "You cleared all worlds.", {
               fontFamily: uiFont, fontSize: "16px", color: "#ffffff"
             }).setOrigin(0.5);
 
@@ -621,7 +841,7 @@
             makeButton(this, "PLAY AGAIN", W/2, H*0.64, () => {
               const fresh = { unlockedWorld: 0, unlockedLevel: 0, currentWorld: 0, currentLevel: 0 };
               saveProgress(fresh);
-              this.scene.start("WorldIntro", { world: 0, level: 0, fromContinue: false });
+              this.scene.start("WorldMap");
             });
 
             makeGhostButton(this, "MAIN MENU", W/2, H*0.74, () => this.scene.start("Menu"));
@@ -636,11 +856,11 @@
             const score = data?.score ?? 0;
             const timeLeft = data?.timeLeft ?? 0;
 
-            const cfg = WORLDS[clamp(world, 0, WORLDS.length - 1)];
+            const w = WORLDS[clamp(world, 0, WORLDS.length-1)];
             this.cameras.main.setBackgroundColor(0x070710);
 
             addTitle(this, "RUN ENDED", 0.33, 34);
-            this.add.text(W/2, H*0.42, `${cfg.name} • Level ${level + 1}/${LEVELS_PER_WORLD}`, {
+            this.add.text(W/2, H*0.42, `${w.name} • Level ${level + 1}/${LEVELS_PER_WORLD}`, {
               fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff"
             }).setOrigin(0.5);
 
@@ -656,7 +876,8 @@
               this.scene.start("Play", { world, level });
             });
 
-            makeGhostButton(this, "MAIN MENU", W/2, H*0.76, () => this.scene.start("Menu"));
+            makeGhostButton(this, "WORLD MAP", W/2, H*0.76, () => this.scene.start("WorldMap"));
+            makeGhostButton(this, "MAIN MENU", W/2, H*0.84, () => this.scene.start("Menu"));
           }
         }
 
@@ -668,8 +889,7 @@
           physics: { default: "arcade", arcade: { debug: false } },
           scene: [
             MenuScene,
-            CosmeticsScene,
-            EventsScene,
+            WorldMapScene,
             WorldIntroScene,
             PlayScene,
             LevelCompleteScene,

@@ -101,6 +101,15 @@
       { name: "Hypernova Zone", description: "Master your skills in this high-intensity zone." },
     ];
 
+    // Level Data (Dynamic Times and Score Requirements)
+    const levels = [
+      { time: 30, scores: { bronze: 100, silver: 200, gold: 300 } },
+      { time: 45, scores: { bronze: 150, silver: 300, gold: 450 } },
+      { time: 60, scores: { bronze: 200, silver: 400, gold: 600 } },
+      { time: 75, scores: { bronze: 250, silver: 500, gold: 750 } },
+      { time: 90, scores: { bronze: 300, silver: 600, gold: 900 } },
+    ];
+
     // Main Menu -> Mode Select Screen
     function loadModeSelect() {
       const container = document.getElementById("game-container");
@@ -155,12 +164,19 @@
 
     // Level Selection -> Level Intro Screen
     function loadLevelIntro(worldNumber, levelNumber) {
+      const levelData = levels[levelNumber - 1]; // Get data for the selected level
       const container = document.getElementById("game-container");
+
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Level ${levelNumber} - ${worlds[worldNumber - 1].name}</h1>
-          <p>Requirement: Survive 60 seconds</p>
-          <p>Performance Tiers: <strong>Bronze</strong> / <strong>Silver</strong> / <strong>Gold</strong></p>
+          <p>Requirement: Survive <strong>${levelData.time} seconds</strong></p>
+          <p>Performance Tiers:</p>
+          <ul style="list-style: none; padding: 0; text-align: left;">
+            <li>Bronze: ${levelData.scores.bronze} points</li>
+            <li>Silver: ${levelData.scores.silver} points</li>
+            <li>Gold: ${levelData.scores.gold} points</li>
+          </ul>
           <button onclick="playLevel(${worldNumber}, ${levelNumber})">Start</button>
           <button onclick="loadWorld(${worldNumber})">Back</button>
         </div>

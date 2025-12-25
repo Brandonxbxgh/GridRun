@@ -14,6 +14,9 @@
       animation: backgroundMove 10s infinite alternate;
       height: 100vh;
       overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       color: white;
     }
 
@@ -23,171 +26,99 @@
       100% { background-position: 100% 50%; }
     }
 
-    #game-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100%;
-      text-align: center;
-    }
-
     canvas {
       background: #000;
       border: 3px solid #fff;
       display: block;
     }
-
-    h1 {
-      font-size: 3rem;
-      font-weight: bold;
-      color: #fff;
-      text-shadow: 0 0 20px #ff5733, 0 0 30px #ff5733;
-      margin: 10px;
-    }
-
-    p {
-      font-size: 18px;
-      margin: 10px 0;
-    }
-
-    button {
-      margin: 8px;
-      padding: 15px 30px;
-      font-size: 1rem;
-      font-weight: bold;
-      color: white;
-      background: linear-gradient(45deg, #ff5733, #ff8b3d);
-      border: none;
-      border-radius: 50px;
-      cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), 0 0 15px rgba(255, 87, 51, 0.7);
-      transition: transform 0.2s, box-shadow 0.3s;
-    }
-
-    button:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 25px rgba(255, 110, 60, 1);
-    }
-
-    button:active {
-      transform: translateY(2px);
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3), 0 0 10px rgba(255, 79, 40, 0.9);
-    }
-
-    .menu-screen {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      padding: 20px;
-    }
   </style>
 </head>
 <body>
   <div id="game-container">
-    <!-- Main Menu -->
-    <div class="menu-screen" id="main-menu">
-      <h1>GRIDRUN</h1>
-      <button onclick="loadModeSelect()">PLAY</button>
-      <button onclick="alert('Login Placeholder')">LOGIN</button>
-      <button onclick="alert('Coming Soon!')">SETTINGS</button>
-    </div>
+    <!-- Canvas will be dynamically added here -->
   </div>
 
   <script>
-    // Simulated Local Storage for Campaign Progress
-    const progress = {
-      worldsUnlocked: 1, // Number of worlds unlocked
-      levelsUnlocked: [1, 0, 0], // Tracks unlocked levels for each world (World 1, 2, 3)
-    };
-
-    // Grid gameplay variables
+    // Gameplay variables
     let canvas, ctx;
     let player, obstacles, gameState, gridSize, gridCellSize;
+    let touchPosition = null; // Tracks the current touch position
+    
+    // Start Grid Gameplay
+    function startGridGameplay() {
+      initializeCanvas();
+      initializeGameObjects();
 
-    // Main Menu -> Mode Select Screen
-    function loadModeSelect() {
-      const container = document.getElementById("game-container");
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Select Mode</h1>
-          <button onclick="loadCampaignMode()">Campaign</button>
-          <button onclick="alert('Endless Mode Placeholder')">Endless</button>
-          <button onclick="loadMainMenu()">Back</button>
-        </div>
-      `;
-    }
+      // Add touch listeners for movement
+      canvas.addEventListener("touchstart", updateTouchPosition);
+      canvas.addEventListener("touchmove", updateTouchPosition);
+      canvas.addEventListener("touchend", clearTouchPosition);
 
-    // Campaign -> World Selection Screen
-    function loadCampaignMode() {
-      const container = document.getElementById("game-container");
-      const worlds = [
-        { name: "Neon Plains", unlocked: true },
-        { name: "Quantum Abyss", unlocked: progress.worldsUnlocked >= 2 },
-        { name: "Hypernova Zone", unlocked: progress.worldsUnlocked >= 3 },
-      ];
-
-      const worldButtons = worlds.map((world, index) => `
-        <button onclick="startGridGameplay(${index + 1}, 1)" ${world.unlocked ? '' : 'disabled'}>
-          ${world.unlocked ? world.name : 'Locked'}
-        </button>
-      `).join('');
-
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Campaign</h1>
-          ${worldButtons}
-          <button onclick="loadModeSelect()">Back</button>
-        </div>
-      `;
-    }
-
-    // Start Gameplay Action for a World
-    function startGridGameplay(world, level) {
-      // Initialize canvas and variables
-      canvas = document.createElement('canvas');
-      ctx = canvas.getContext('2d');
-      canvas.width = 500;
-      canvas.height = 500;
-      document.getElementById('game-container').innerHTML = '';
-      document.getElementById('game-container').appendChild(canvas);
-
-      gridSize = 10; // 10x10 grid
-      gridCellSize = canvas.width / gridSize;
-
-      player = { x: 5, y: 5, size: gridCellSize, color: '#0f0' }; // Player starting in the middle
-      obstacles = [];
-      gameState = { score: 0, running: true };
-
-      document.addEventListener('keydown', handlePlayerMovement);
-
-      spawnObstacles();
       gameLoop();
     }
 
-    // Player Movement
-    function handlePlayerMovement(event) {
-      const key = event.key.toLowerCase();
-      if (!gameState.running) return;
+    // Initialize the canvas (responsive to device size)
+    function initializeCanvas() {
+      canvas = document.createElement("canvas");
+      ctx = canvas.getContext("2d");
 
-      switch (key) {
-        case 'arrowup':
-        case 'w':
-          if (player.y > 0) player.y--;
-          break;
-        case 'arrowdown':
-        case 's':
-          if (player.y < gridSize - 1) player.y++;
-          break;
-        case 'arrowleft':
-        case 'a':
-          if (player.x > 0) player.x--;
-          break;
-        case 'arrowright':
-        case 'd':
-          if (player.x < gridSize - 1) player.x++;
-          break;
-      }
+      // Portrait layout (taller than wide)
+      gridSize = { cols: 7, rows: 12 }; // 7x12 grid for mobile
+      const aspectRatio = gridSize.cols / gridSize.rows;
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      // Dynamically set canvas dimensions
+      canvas.width = Math.min(screenWidth, screenHeight * aspectRatio); // Width adapts to fit the height
+      canvas.height = canvas.width / aspectRatio;
+
+      document.body.appendChild(canvas);
+      gridCellSize = canvas.width / gridSize.cols; // Size of each grid cell
+    }
+
+    // Initialize player and obstacle data
+    function initializeGameObjects() {
+      const startX = Math.floor(gridSize.cols / 2);
+      const startY = gridSize.rows - 2; // Start near the bottom-center of the grid
+      player = {
+        x: startX,
+        y: startY,
+        size: gridCellSize * 0.9, // Slightly smaller than a grid cell
+        color: "#0f0",
+        speed: 4, // Player movement speed
+      };
+      obstacles = []; // Spawned obstacles
+      spawnObstacles();
+      gameState = { running: true, score: 0 };
+    }
+
+    // Touch control: update player target position
+    function updateTouchPosition(event) {
+      const rect = canvas.getBoundingClientRect();
+      const touch = event.touches[0]; // Get the first touch point
+      touchPosition = {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+      };
+      event.preventDefault(); // Prevent unwanted scroll/zoom
+    }
+
+    function clearTouchPosition() {
+      touchPosition = null; // Stop following movement
+    }
+
+    // Move the player toward the touch position
+    function movePlayer() {
+      if (!touchPosition) return; // No touch events are active, do nothing
+
+      const targetX = Math.floor(touchPosition.x / gridCellSize);
+      const targetY = Math.floor(touchPosition.y / gridCellSize);
+
+      const deltaX = targetX - player.x;
+      const deltaY = targetY - player.y;
+
+      // Smooth movement towards the target
+      player.x += Math.sign(deltaX) * Math.min(Math.abs(deltaX), player.speed / gridCellSize);
+      player.y += Math.sign(deltaY) * Math.min(Math.abs(deltaY), player.speed / gridCellSize);
     }
 
     // Game Loop
@@ -197,75 +128,82 @@
       updateGame();
       renderGame();
 
-      if (gameState.running) {
-        requestAnimationFrame(gameLoop);
-      }
+      requestAnimationFrame(gameLoop);
     }
 
     // Update Game State
     function updateGame() {
-      // Check collisions
-      for (const obstacle of obstacles) {
-        if (obstacle.x === player.x && obstacle.y === player.y) {
-          gameState.running = false;
-          endGame();
-        }
-      }
+      movePlayer();
+      checkCollisions();
     }
 
     // Render Game
     function renderGame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw grid
-      ctx.strokeStyle = '#444';
-      for (let i = 0; i < gridSize; i++) {
-        for (let j = 0; j < gridSize; j++) {
+      // Draw the grid
+      ctx.strokeStyle = "#444";
+      for (let i = 0; i < gridSize.cols; i++) {
+        for (let j = 0; j < gridSize.rows; j++) {
           ctx.strokeRect(i * gridCellSize, j * gridCellSize, gridCellSize, gridCellSize);
         }
       }
 
-      // Draw player
+      // Draw the player
       ctx.fillStyle = player.color;
-      ctx.fillRect(player.x * gridCellSize, player.y * gridCellSize, player.size, player.size);
+      ctx.beginPath();
+      ctx.arc(
+        (player.x + 0.5) * gridCellSize,
+        (player.y + 0.5) * gridCellSize,
+        player.size / 2,
+        0,
+        2 * Math.PI
+      );
+      ctx.fill();
 
       // Draw obstacles
-      ctx.fillStyle = '#f00';
-      for (const obstacle of obstacles) {
-        ctx.fillRect(obstacle.x * gridCellSize, obstacle.y * gridCellSize, gridCellSize, gridCellSize);
+      ctx.fillStyle = "red";
+      for (const obs of obstacles) {
+        ctx.fillRect(
+          obs.x * gridCellSize,
+          obs.y * gridCellSize,
+          gridCellSize,
+          gridCellSize
+        );
       }
     }
 
     // Spawn obstacles randomly
     function spawnObstacles() {
       for (let i = 0; i < 3; i++) {
-        const randomX = Math.floor(Math.random() * gridSize);
-        const randomY = Math.floor(Math.random() * gridSize);
+        const randomX = Math.floor(Math.random() * gridSize.cols);
+        const randomY = Math.floor(Math.random() * (gridSize.rows / 2)); // Spawn in top half of the grid
 
-        if (randomX !== player.x || randomY !== player.y) {
-          obstacles.push({ x: randomX, y: randomY });
+        obstacles.push({ x: randomX, y: randomY });
+      }
+    }
+
+    // Check for collisions
+    function checkCollisions() {
+      for (const obs of obstacles) {
+        if (Math.abs(obs.x - player.x) < 1 && Math.abs(obs.y - player.y) < 1) {
+          endGame();
         }
       }
     }
 
-    // End Game
+    // End game logic
     function endGame() {
-      alert(`Game Over! Your score: ${gameState.score}`);
-      loadMainMenu(); // Return to main menu after game is over
+      gameState.running = false;
+
+      // Display game over screen
+      alert(`Game Over! Final Score: ${gameState.score}`);
+      document.body.innerHTML = ""; // Clear the screen
+      location.reload(); // Reload the game
     }
 
-    // Reload Main Menu
-    function loadMainMenu() {
-      const container = document.getElementById("game-container");
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>GRIDRUN</h1>
-          <button onclick="loadModeSelect()">PLAY</button>
-          <button onclick="alert('Login Placeholder')">LOGIN</button>
-          <button onclick="alert('Coming Soon!')">SETTINGS</button>
-        </div>
-      `;
-    }
+    // Start the game
+    startGridGameplay();
   </script>
 </body>
 </html>

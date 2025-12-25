@@ -15,9 +15,6 @@
       height: 100vh;
       overflow: hidden;
       color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
 
     /* Background Animation */
@@ -26,210 +23,99 @@
       100% { background-position: 100% 50%; }
     }
 
+    button {
+      padding: 15px 30px;
+      font-size: 1rem;
+      margin: 10px;
+      background: linear-gradient(45deg, #ff5733, #ff8b3d);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    button:hover {
+      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
+    }
+
     canvas {
       background: #000;
       border: 3px solid #fff;
       display: block;
-    }
-
-    button {
-      margin: 8px;
-      padding: 15px 30px;
-      font-size: 1rem;
-      font-weight: bold;
-      color: white;
-      background: linear-gradient(45deg, #ff5733, #ff8b3d);
-      border: none;
-      border-radius: 50px;
-      cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), 0 0 15px rgba(255, 87, 51, 0.7);
-      transition: transform 0.2s, box-shadow 0.3s;
-    }
-
-    button:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 25px rgba(255, 110, 60, 1);
-    }
-
-    button:active {
-      transform: translateY(2px);
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3), 0 0 10px rgba(255, 79, 40, 0.9);
-    }
-
-    .menu-screen {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      padding: 20px;
-    }
-
-    h1 {
-      font-size: 3rem;
-      font-weight: bold;
-      color: white;
-      text-shadow: 0 0 20px #ff5733, 0 0 30px #ff5733;
-    }
-
-    p {
-      font-size: 1.2rem;
+      margin: auto;
     }
   </style>
 </head>
 <body>
   <div id="game-container">
-    <!-- Main Menu -->
-    <div class="menu-screen" id="main-menu">
-      <h1>GRIDRUN</h1>
-      <button onclick="loadModeSelect()">PLAY</button>
-      <button onclick="alert('Login Placeholder')">LOGIN</button>
-      <button onclick="alert('Coming Soon!')">SETTINGS</button>
-    </div>
+    <h1>GRIDRUN</h1>
+    <button onclick="startGame()">START</button>
   </div>
 
   <script>
-    // Simulated Local Storage for Campaign Progress
-    const progress = {
-      worldsUnlocked: 1, // Number of worlds unlocked
-      levelsUnlocked: [1, 0, 0], // Tracks unlocked levels for each world (World 1, 2, 3)
-    };
-
-    // Grid gameplay variables
+    // Variables
     let canvas, ctx;
-    let player, obstacles, gameState, gridSize, gridCellSize;
-    let touchPosition = null; // Tracks the current touch position
-    
-    // Load Mode Select Screen
-    function loadModeSelect() {
-      const container = document.getElementById('game-container');
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Select Mode</h1>
-          <button onclick="loadCampaignMode()">Campaign</button>
-          <button onclick="alert('Endless Mode Placeholder')">Endless</button>
-          <button onclick="loadMainMenu()">Back</button>
-        </div>
-      `;
-    }
+    let player, obstacles, gameState, gridCellSize, gridSize;
 
-    // Load Campaign Worlds
-    function loadCampaignMode() {
-      const container = document.getElementById('game-container');
-      const worldButtons = ['Neon Plains', 'Quantum Abyss', 'Hypernova Zone'].map((world, index) =>
-        `<button onclick="loadWorld(${index + 1})" ${progress.worldsUnlocked > index ? '' : 'disabled'}>${progress.worldsUnlocked > index ? world : 'Locked'}</button>`
-      ).join('');
-
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Campaign</h1>
-          <p>Select a World</p>
-          ${worldButtons}
-          <button onclick="loadModeSelect()">Back</button>
-        </div>
-      `;
-    }
-
-    // Load Levels for a Selected World
-    function loadWorld(worldNumber) {
-      const container = document.getElementById('game-container');
-      const levels = Array.from({ length: 5 }, (_, i) => `
-        <button onclick="loadLevelIntro(${worldNumber}, ${i + 1})" ${i < progress.levelsUnlocked[worldNumber - 1] ? '' : 'disabled'}>
-          ${i < progress.levelsUnlocked[worldNumber - 1] ? `Level ${i + 1}` : 'Locked'}
-        </button>
-      `).join('');
-
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>World ${worldNumber}</h1>
-          <p>Select a Level</p>
-          ${levels}
-          <button onclick="loadCampaignMode()">Back</button>
-        </div>
-      `;
-    }
-
-    // Load Level Intro Screen
-    function loadLevelIntro(worldNumber, levelNumber) {
-      const timePerLevel = [30, 45, 60, 75, 90];
-      const scores = { bronze: 100 * levelNumber, silver: 200 * levelNumber, gold: 300 * levelNumber };
-      const container = document.getElementById('game-container');
-
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Level ${levelNumber} - World ${worldNumber}</h1>
-          <p>Survive for ${timePerLevel[levelNumber - 1]} seconds</p>
-          <p>Tier Scores:</p>
-          <ul>
-            <li>Bronze: ${scores.bronze}</li>
-            <li>Silver: ${scores.silver}</li>
-            <li>Gold: ${scores.gold}</li>
-          </ul>
-          <button onclick="startGridGameplay()">Start</button>
-          <button onclick="loadWorld(${worldNumber})">Back</button>
-        </div>
-      `;
-    }
-
-    // Start Grid Gameplay
-    function startGridGameplay() {
+    // Start the game
+    function startGame() {
       initializeCanvas();
       initializeGameObjects();
-
-      // Add touch listeners for movement
-      canvas.addEventListener("touchmove", updateTouchPosition);
-      canvas.addEventListener("touchend", clearTouchPosition);
-
-      gameLoop();
+      renderGame();
     }
 
-    // Initialize the canvas and game setup
+    // Initialize Canvas
     function initializeCanvas() {
       canvas = document.createElement("canvas");
       ctx = canvas.getContext("2d");
+      document.body.appendChild(canvas);
 
-      gridSize = { cols: 7, rows: 12 }; // Portrait grid dimensions
-      canvas.width = Math.min(innerWidth, innerHeight * (gridSize.cols / gridSize.rows));
+      // Portrait grid dimensions
+      gridSize = { cols: 7, rows: 12 };
+      canvas.width = Math.min(window.innerWidth, window.innerHeight * (gridSize.cols / gridSize.rows));
       canvas.height = canvas.width * (gridSize.rows / gridSize.cols);
-
-      document.getElementById('game-container').innerHTML = '';
-      document.getElementById('game-container').appendChild(canvas);
-
-      gridCellSize = canvas.width / gridSize.cols;
+      
+      gridCellSize = canvas.width / gridSize.cols; // Dynamically determine cell size
     }
 
+    // Initialize game objects
     function initializeGameObjects() {
-      player = { x: Math.floor(gridSize.cols / 2), y: gridSize.rows - 3, size: gridCellSize, color: '#0f0', speed: 5 };
-      obstacles = [{ x: 3, y: 0 }, { x: 5, y: 2 }]; // Example obstacles
-      gameState = { running: true, score: 0 };
+      player = { x: 3, y: 8, size: gridCellSize * 0.8, color: "#0f0", speed: 5 };
+      obstacles = [];
+      gameState = { running: true };
     }
 
-    function updateTouchPosition(e) {
-      const rect = canvas.getBoundingClientRect();
-      const touch = e.touches[0];
-      touchPosition = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    // Render game
+    function renderGame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+      drawPlayer();
     }
 
-    function clearTouchPosition() {
-      touchPosition = null;
+    // Draw grid
+    function drawGrid() {
+      for (let i = 0; i < gridSize.cols; i++) {
+        for (let j = 0; j < gridSize.rows; j++) {
+          ctx.strokeStyle = "#444";
+          ctx.strokeRect(i * gridCellSize, j * gridCellSize, gridCellSize, gridCellSize);
+        }
+      }
     }
 
-    function movePlayer(deltaTime) {
-      if (!touchPosition) return;
-      const targetX = Math.min(gridSize.cols - 1, Math.max(0, Math.floor(touchPosition.x / gridCellSize)));
-      const targetY = Math.min(gridSize.rows - 1, Math.max(0, Math.floor(touchPosition.y / gridCellSize)));
-      const deltaX = targetX - player.x;
-      const deltaY = targetY - player.y;
-      player.x += Math.sign(deltaX) * Math.min(Math.abs(deltaX), player.speed * deltaTime);
-      player.y += Math.sign(deltaY) * Math.min(Math.abs(deltaY), player.speed * deltaTime);
+    // Draw player
+    function drawPlayer() {
+      ctx.fillStyle = player.color;
+      ctx.beginPath();
+      ctx.arc(
+        (player.x + 0.5) * gridCellSize,
+        (player.y + 0.5) * gridCellSize,
+        player.size / 2,
+        0,
+        2 * Math.PI
+      );
+      ctx.fill();
     }
-
-    function gameLoop() {
-      if (!gameState.running) return;
-      movePlayer(0.02); // 20ms frame timing
-      requestAnimationFrame(gameLoop);
-    }
-
-    loadMainMenu(); // Start with the main menu
   </script>
 </body>
 </html>

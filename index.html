@@ -5,319 +5,100 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GRIDRUN</title>
   <style>
-    /* Style sheet for GRIDRUN */
-
+    /* Reset and General Styling */
     body {
       margin: 0;
       padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      font-family: 'Verdana', sans-serif;
+      background: linear-gradient(135deg, #1a1c30, #292942, #1a1c30);
+      animation: backgroundMove 10s infinite alternate;
       height: 100vh;
-      background: #111;
-      color: #fff;
-      font-family: sans-serif;
+      overflow: hidden;
+      color: white;
+    }
+
+    /* Background Animation */
+    @keyframes backgroundMove {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 100% 50%; }
     }
 
     #game-container {
-      width: 100%;
-      height: 100%;
       display: flex;
       justify-content: center;
       align-items: center;
-      position: relative;
-      overflow: hidden;
+      height: 100%;
+      text-align: center;
     }
 
-    canvas {
-      background: #222;
-      border: 5px solid #fff;
-      display: block;
+    h1 {
+      font-size: 4rem;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 0 0 20px #ff5733, 0 0 30px #ff5733;
     }
 
     button {
-      padding: 10px 20px;
-      margin: 10px;
-      font-size: 18px;
-      color: #fff;
-      background: #444;
+      margin: 15px;
+      padding: 15px 40px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: white;
+      background: linear-gradient(45deg, #ff5733, #ff8b3d);
       border: none;
+      border-radius: 50px;
       cursor: pointer;
-      border-radius: 5px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), 0 0 15px rgba(255, 87, 51, 0.7);
+      transition: transform 0.2s, box-shadow 0.3s;
     }
 
     button:hover {
-      background: #666;
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 25px rgba(255, 110, 60, 1);
+    }
+
+    button:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3), 0 0 10px rgba(255, 79, 40, 0.9);
     }
 
     .menu-screen {
-      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .menu-footer {
+      position: absolute;
+      bottom: 15px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: #bbb;
+      text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
     }
   </style>
 </head>
 <body>
   <div id="game-container">
-    <!-- Dynamic screens will be inserted here -->
+    <!-- Main menu content -->
+    <div class="menu-screen">
+      <h1>GRIDRUN</h1>
+      <button onclick="loadModeSelect()">PLAY</button>
+      <button>SETTINGS</button>
+      <button>CREDITS</button>
+    </div>
   </div>
 
+  <div class="menu-footer">© 2025 GRIDRUN Studios</div>
+
   <script>
-    // GRIDRUN core game logic
-
-    // --------------------------------
-    // GLOBAL VARIABLES
-    // --------------------------------
-    const container = document.getElementById("game-container");
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    let player;
-    let obstacles = [];
-    let gameState;
-    let animationFrame;
-
-    canvas.width = 800;
-    canvas.height = 600;
-
-    // --------------------------------
-    // SCREEN LOGIC
-    // --------------------------------
-    function loadMainMenu() {
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>GRIDRUN</h1>
-          <button onclick="loadModeSelect()">Play</button>
-        </div>
-      `;
-    }
-
+    // Replace this part with functional handlers or navigation
     function loadModeSelect() {
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h2>Select Mode</h2>
-          <button onclick="loadCampaignMode()">Campaign</button>
-          <button onclick="loadEndlessMode()">Endless</button>
-        </div>
-      `;
+      alert("Mode Select Screen Placeholder");
     }
 
-    function loadCampaignMode() {
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h2>Campaign: Select World</h2>
-          <button onclick="loadWorld(1)">World 1</button>
-          <button onclick="loadWorld(2)">World 2</button>
-          <button onclick="loadWorld(3)">World 3</button>
-        </div>
-      `;
-    }
-
-    function loadWorld(worldNumber) {
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h2>World ${worldNumber}: Select Level</h2>
-          <button onclick="startLevel(1, ${worldNumber}, 60)">Level 1</button>
-          <button onclick="startLevel(2, ${worldNumber}, 70)">Level 2</button>
-          <button onclick="startLevel(3, ${worldNumber}, 80)">Level 3</button>
-        </div>
-      `;
-    }
-
-    function loadEndlessMode() {
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h2>Endless Mode</h2>
-          <button onclick="startEndlessMode()">Start Endless</button>
-        </div>
-      `;
-    }
-
-    function startLevel(level, world, time) {
-      const levelConfig = { level, world, time };
-      startGame(levelConfig);
-    }
-
-    function startEndlessMode() {
-      const levelConfig = { endless: true };
-      startGame(levelConfig);
-    }
-
-    // --------------------------------
-    // GAME LOGIC
-    // --------------------------------
-    function startGame(levelConfig) {
-      container.innerHTML = "";
-      container.appendChild(canvas);
-
-      // Initialize player and game state
-      player = { x: 400, y: 500, width: 20, height: 20, speed: 5, vx: 0, vy: 0 };
-      gameState = {
-        score: 0,
-        time: levelConfig.endless ? 0 : levelConfig.time,
-        isGameOver: false,
-        endless: levelConfig.endless,
-      };
-
-      // Reset obstacles
-      obstacles = [];
-      spawnObstacles();
-
-      // Start game loop
-      animationFrame = requestAnimationFrame(gameLoop);
-    }
-
-    function gameLoop() {
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Draw player
-      drawPlayer();
-
-      // Handle player movement
-      movePlayer();
-
-      // Handle obstacles
-      updateObstacles();
-      drawObstacles();
-
-      // Collision check
-      checkCollisions();
-
-      // Update score
-      gameState.score += gameState.endless ? 1 : 0;
-
-      // Manage countdown timer
-      if (!gameState.endless) {
-        gameState.time -= 1 / 60;
-        if (gameState.time <= 0) {
-          gameState.isGameOver = true;
-        }
-      }
-
-      // Handle game over
-      if (gameState.isGameOver) {
-        cancelAnimationFrame(animationFrame);
-        displayResults();
-        return;
-      }
-
-      // Continue game loop
-      animationFrame = requestAnimationFrame(gameLoop);
-    }
-
-    function drawPlayer() {
-      ctx.fillStyle = "#0f0";
-      ctx.fillRect(player.x, player.y, player.width, player.height);
-    }
-
-    function movePlayer() {
-      player.x += player.vx;
-      player.y += player.vy;
-
-      // Keep player within bounds
-      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-      player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
-    }
-
-    function updateObstacles() {
-      for (let i = obstacles.length - 1; i >= 0; i--) {
-        const obs = obstacles[i];
-        obs.y += obs.speed;
-        if (obs.y > canvas.height) obstacles.splice(i, 1);
-      }
-
-      // Spawn new obstacles continuously in endless mode
-      if (gameState.endless && Math.random() < 0.02) {
-        spawnObstacle();
-      }
-    }
-
-    function drawObstacles() {
-      ctx.fillStyle = "#f00";
-      for (const obs of obstacles) {
-        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-      }
-    }
-
-    function spawnObstacle() {
-      const size = 20 + Math.random() * 30;
-      const x = Math.random() * (canvas.width - size);
-      const y = -size;
-      obstacles.push({ x, y, width: size, height: size, speed: 2 + Math.random() * 3 });
-    }
-
-    function spawnObstacles() {
-      for (let i = 0; i < 5; i++) spawnObstacle();
-    }
-
-    function checkCollisions() {
-      for (const obs of obstacles) {
-        if (
-          player.x < obs.x + obs.width &&
-          player.x + player.width > obs.x &&
-          player.y < obs.y + obs.height &&
-          player.y + player.height > obs.y
-        ) {
-          gameState.isGameOver = true;
-        }
-      }
-    }
-
-    function displayResults() {
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h2>Game Over</h2>
-          <p>Score: ${Math.floor(gameState.score)}</p>
-          <button onclick="loadMainMenu()">Main Menu</button>
-        </div>
-      `;
-    }
-
-    // --------------------------------
-    // INPUT HANDLING
-    // --------------------------------
-    document.addEventListener("keydown", (e) => {
-      switch (e.code) {
-        case "ArrowUp":
-        case "KeyW":
-          player.vy = -player.speed;
-          break;
-        case "ArrowDown":
-        case "KeyS":
-          player.vy = player.speed;
-          break;
-        case "ArrowLeft":
-        case "KeyA":
-          player.vx = -player.speed;
-          break;
-        case "ArrowRight":
-        case "KeyD":
-          player.vx = player.speed;
-          break;
-      }
-    });
-
-    document.addEventListener("keyup", (e) => {
-      switch (e.code) {
-        case "ArrowUp":
-        case "KeyW":
-          if (player.vy < 0) player.vy = 0;
-          break;
-        case "ArrowDown":
-        case "KeyS":
-          if (player.vy > 0) player.vy = 0;
-          break;
-        case "ArrowLeft":
-        case "KeyA":
-          if (player.vx < 0) player.vx = 0;
-          break;
-        case "ArrowRight":
-        case "KeyD":
-          if (player.vx > 0) player.vx = 0;
-          break;
-      }
-    });
-
-    // Initialize
-    loadMainMenu();
+    // Extra button handlers can be added for Settings, Credits, etc.
   </script>
 </body>
 </html>

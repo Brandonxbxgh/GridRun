@@ -7,18 +7,9 @@
   <style>
     html, body { margin:0; padding:0; background:#070710; height:100%; overflow:hidden; }
     canvas { display:block; margin:0 auto; }
-    .hint{
-      position:fixed; left:12px; bottom:10px;
-      font:12px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-      color:rgba(255,255,255,.70);
-      background:rgba(0,0,0,0.30);
-      padding:8px 10px; border-radius:10px;
-      user-select:none; z-index:10;
-    }
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD/Arrows • Mobile: DIRECT FOLLOW (drag) • Pause works on mobile • Endless blends earlier + adds vertical lasers</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -400,7 +391,7 @@
           return m > 0 ? `${m}:${String(s).padStart(2,"0")}` : `${s}s`;
         }
 
-        // ===== Endless blending (moved earlier per request) =====
+        // ===== Endless blending (start effects at 30s) =====
         // Starts at World 1 Level 1 difficulty (not easier).
         const ENDLESS = {
           baseScroll0: WORLDS[0].levels[0].baseScroll,
@@ -415,19 +406,19 @@
           spawnTighten: 0.26,
           spawnRampGrowth: 0.012,
 
-          // earlier stages
-          t_industrial: 45,
-          t_glitch: 90,
-          t_blackout: 105,     // blackout pulses begin
-          t_laserWarnOnly: 120,
-          t_laserActive: 160,
-          t_verticalLaser: 210 // vertical lasers begin
+          // effects ramp (earlier)
+          t_industrial: 30,
+          t_glitch: 55,
+          t_blackout: 65,
+          t_laserWarnOnly: 80,
+          t_laserActive: 110,
+          t_verticalLaser: 140
         };
 
         function getEndlessBlend(t) {
           const w1 = 1;
-          const w2 = clamp((t - ENDLESS.t_industrial) / 70, 0, 1);
-          const w3 = clamp((t - ENDLESS.t_glitch) / 80, 0, 1);
+          const w2 = clamp((t - ENDLESS.t_industrial) / 55, 0, 1);
+          const w3 = clamp((t - ENDLESS.t_glitch) / 65, 0, 1);
           const total = w1 + w2 + w3;
 
           return {
@@ -450,9 +441,9 @@
 
         // ===== Surge speed window modifier =====
         const SURGE = {
-          period: 9.0,     // seconds
-          active: 1.2,     // seconds
-          mult: 1.22       // scroll speed multiplier during surge
+          period: 9.0,
+          active: 1.2,
+          mult: 1.22
         };
 
         // ===== Blackout pulse modifier =====
@@ -514,18 +505,20 @@
               color: "#ffffff"
             }).setOrigin(0.5).setAlpha(0.98);
 
-            const sub = this.add.text(W/2, H*0.25, "Campaign + Endless • Skill-only • TXC L2 optional later", {
-              fontFamily: uiFont,
-              fontSize: "13px",
-              color: "#b7b7ff"
-            }).setOrigin(0.5).setAlpha(0.92);
+            // (removed the line you asked to remove)
 
             // Buttons
             const accent = "#6ef3ff";
             makeButton(this, "CAMPAIGN", W/2, H*0.44, () => this.scene.start("WorldMap"), accent);
             makeButton(this, "ENDLESS", W/2, H*0.54, () => this.scene.start("EndlessIntro"), "#7cffd2");
-            makeGhostButton(this, "LEADERBOARDS", W/2, H*0.64, () => this.scene.start("Leaderboards"));
-            makeGhostButton(this, "RESET SAVES", W/2, H*0.76, () => { resetAllSaves(); this.scene.restart(); }).setAlpha(0.70);
+
+            // Add color to Leaderboards + Reset Saves (keep ghost style but with color)
+            const lbBtn = makeGhostButton(this, "LEADERBOARDS", W/2, H*0.64, () => this.scene.start("Leaderboards"));
+            lbBtn.setStyle({ backgroundColor: "rgba(255,176,255,0.22)" });
+
+            const rsBtn = makeGhostButton(this, "RESET SAVES", W/2, H*0.76, () => { resetAllSaves(); this.scene.restart(); });
+            rsBtn.setStyle({ backgroundColor: "rgba(255,209,102,0.22)" });
+            rsBtn.setAlpha(0.85);
 
             const p = loadProgress();
             this.totalText = this.add.text(W/2, H*0.86, `Campaign Total: ${campaignTotalScore(p)}`, {
@@ -758,15 +751,14 @@
             this.wcfg = WORLDS[0];
             this.lcfg = WORLDS[0].levels[0];
 
-            this.t = 0;             // active time (after countdown)
-            this.rawTime = 0;        // includes countdown
+            this.t = 0;
+            this.rawTime = 0;
             this.score = 0;
             this.paused = false;
 
             this.countdown = 0;
             this.canMove = false;
 
-            // scoring breakdown
             this.survivalPts = 0;
             this.nearPts = 0;
             this.clearBonusPts = 0;
@@ -774,51 +766,40 @@
             this.comboTimer = 0;
             this.maxCombo = 1;
 
-            // pacing
             this.scrollSpeed = 0;
             this.baseScroll = 0;
             this.spawnEvery = 0;
             this.spawnTimer = 0;
 
-            // surge
             this.surgeMult = 1;
 
-            // blackout
             this.blackoutOn = false;
 
-            // graphics
             this.gridGraphics = null;
             this.gridOffset = 0;
 
-            // groups
             this.obstacles = null;
             this.player = null;
 
-            // touch
             this.touchTarget = null;
             this.touchDot = null;
 
-            // UI
             this.pauseBtn = null;
             this.pauseOverlay = null;
 
-            // lasers
             this.hLaser = null;
             this.hLaserWarn = null;
             this.vLaser = null;
             this.vLaserWarn = null;
 
             this.bossT = 0;
-            this.hLaserMode = "off"; // off | warn | active
+            this.hLaserMode = "off";
             this.vLaserMode = "off";
 
-            // overlays
             this.flash = null;
             this.blackout = null;
 
-            // decor
             this.decor = [];
-            this.glitchFlash = null;
           }
 
           init(data) {
@@ -856,41 +837,37 @@
 
             this.physics.add.overlap(this.player, this.obstacles, () => this.endRun({ reason: "OBSTACLE" }));
 
-            // keyboard
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D,ESC");
 
-            // overlays
             this.flash = this.add.rectangle(W/2, H/2, W, H, 0xffffff).setAlpha(0).setDepth(200);
             this.blackout = this.add.rectangle(W/2, H/2, W, H, 0x000000).setAlpha(0).setDepth(180);
 
-            // touch dot
             this.touchDot = this.add.circle(0, 0, 6, this.wcfg.player).setAlpha(0).setDepth(50);
             this.touchTarget = null;
 
-            // HUD
             this.uiTop = this.add.text(14, 10, "", { fontFamily: uiFont, fontSize: "14px", color: "#ffffff" }).setAlpha(0.95).setDepth(60);
             this.uiSub = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95).setDepth(60);
             this.uiCombo = this.add.text(W-14, 10, "", { fontFamily: uiFont, fontSize: "12px", color: "#ffffff" })
               .setOrigin(1,0).setAlpha(0.85).setDepth(60);
 
-            // PAUSE button (mobile + desktop) — FIXED: always wins taps
+            // PAUSE button: fixed (topOnly + large hit rect + pointerdown priority)
             this.pauseBtn = this.add.text(W-14, 30, "PAUSE", {
               fontFamily: uiFont, fontSize: "12px",
               color: "#ffffff", backgroundColor: "rgba(255,255,255,0.16)",
               padding: { left: 10, right: 10, top: 6, bottom: 6 }
-            }).setOrigin(1,0).setDepth(120).setInteractive({ useHandCursor:true });
+            }).setOrigin(1,0).setDepth(9999).setInteractive({ useHandCursor:true });
 
-            // Make the hit area generous for thumbs
+            this.input.topOnly = true;
+
             const pb = this.pauseBtn.getBounds();
-            this.pauseBtn.input.hitArea.setTo(pb.x-18, pb.y-10, pb.width+28, pb.height+18);
+            this.pauseBtn.input.hitArea.setTo(pb.x-24, pb.y-16, pb.width+38, pb.height+28);
 
             this.pauseBtn.on("pointerdown", (p) => {
               p.event?.stopPropagation?.();
               this.togglePause(!this.paused);
             });
 
-            // Countdown text
             this.countText = this.add.text(W/2, H*0.42, "", {
               fontFamily: uiFont, fontSize:"54px", color:"#ffffff"
             }).setOrigin(0.5).setDepth(160).setAlpha(0);
@@ -899,12 +876,12 @@
               fontFamily: uiFont, fontSize:"14px", color:"#b7b7ff"
             }).setOrigin(0.5).setDepth(160).setAlpha(0);
 
-            // Input: global pointer handlers, but ignore the pause area (FIX)
-            this.uiNoTouchZone = { x: W-160, y: 0, w: 160, h: 82 };
+            // Global pointer handlers: pause area gets ignored (never steals pause taps)
+            this.uiNoTouchZone = { x: W-200, y: 0, w: 200, h: 100 };
 
             this.input.on("pointerdown", (p) => {
               if (this.paused) { this.togglePause(false); return; }
-              if (this.isInNoTouchZone(p.x, p.y)) return; // don't steal pause taps
+              if (this.isInNoTouchZone(p.x, p.y)) return;
               this.touchTarget = { x: p.x, y: p.y };
               this.touchDot.setPosition(p.x, p.y).setAlpha(0.85);
             });
@@ -919,17 +896,11 @@
               this.touchDot.setAlpha(0);
             });
 
-            // ESC pause
             this.input.keyboard.on("keydown-ESC", () => this.togglePause(!this.paused));
 
-            // Reset run state
             this.resetRunState();
-
-            // Setup decor + lasers
             this.setupDecor();
             this.setupLasers();
-
-            // Start countdown
             this.startCountdown(3);
           }
 
@@ -967,7 +938,6 @@
             this.surgeMult = 1;
             this.blackoutOn = false;
 
-            // clear existing obstacles
             if (this.obstacles) {
               this.obstacles.children.iterate((o)=>{ if(o) o.destroy(); });
             }
@@ -989,7 +959,7 @@
 
             this.time.addEvent({
               delay: 1000,
-              repeat: n, // counts down to GO
+              repeat: n,
               callback: () => {
                 this.countdown--;
                 if (this.countdown > 0) {
@@ -1006,8 +976,6 @@
                       this.canMove = true;
                     }
                   });
-                } else {
-                  // nothing
                 }
               }
             });
@@ -1022,7 +990,6 @@
                 .setOrigin(0.5).setDepth(141);
               this.pauseSub = this.add.text(W/2, H*0.52, "Tap anywhere to resume", { fontFamily: uiFont, fontSize:"14px", color:"#b7b7ff" })
                 .setOrigin(0.5).setDepth(141).setAlpha(0.9);
-              // tapping anywhere resumes (reliable mobile)
               this.pauseOverlay.setInteractive();
               this.pauseOverlay.on("pointerdown", () => this.togglePause(false));
             } else {
@@ -1034,7 +1001,6 @@
           }
 
           setupDecor() {
-            // Clear prior decor
             for (const d of this.decor) d.destroy();
             this.decor = [];
 
@@ -1064,13 +1030,11 @@
           setupLasers() {
             const boss = WORLDS[2].boss;
 
-            // horizontal laser
             this.hLaserWarn = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.warnThickness, 0xffffff)
               .setAlpha(0).setDepth(90);
             this.hLaser = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.thickness, 0xff4d7d)
               .setAlpha(0).setDepth(91);
 
-            // vertical laser (NEW)
             this.vLaserWarn = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, boss.warnThickness, GRID_H, 0xffffff)
               .setAlpha(0).setDepth(90);
             this.vLaser = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, boss.thickness, GRID_H, 0xff4d7d)
@@ -1079,18 +1043,15 @@
             this.bossT = 0;
 
             if (this.mode === "campaign") {
-              // campaign: only world 3 has horizontal laser. Vertical stays off.
               this.hLaserMode = (this.world === 2) ? "active" : "off";
               this.vLaserMode = "off";
             } else {
-              // endless: time-based modes
               this.hLaserMode = "off";
               this.vLaserMode = "off";
             }
           }
 
           applyEndlessBlend(blend){
-            // blend visuals towards W2/W3
             const w1 = WORLDS[0], w2 = WORLDS[1], w3 = WORLDS[2];
 
             const bg12 = mixColor(w1.bg, w2.bg, blend.a2);
@@ -1125,21 +1086,17 @@
               }
             };
 
-            // update tints
             this.player.fillColor = player;
             this.touchDot.fillColor = player;
 
-            // if gridStyle changed, refresh decor
             if (!this._lastGridStyle) this._lastGridStyle = this.wcfg.gridStyle;
             if (this._lastGridStyle !== this.wcfg.gridStyle) {
               this._lastGridStyle = this.wcfg.gridStyle;
               this.setupDecor();
             }
 
-            // blackout enabled?
             this.blackoutEnabled = !!blend.blackout;
 
-            // lasers
             this.hLaserMode = blend.laserWarn ? (blend.laserActive ? "active" : "warn") : "off";
             this.vLaserMode = blend.verticalLaser ? (blend.laserActive ? "active" : "warn") : "off";
           }
@@ -1150,7 +1107,6 @@
             const dt = deltaMs/1000;
             this.rawTime += dt;
 
-            // During countdown phase, don't advance game time / spawn
             if (!this.canMove) {
               this.drawGrid(0.0001);
               this.updateHud();
@@ -1159,16 +1115,13 @@
 
             this.t += dt;
 
-            // combo decay
             this.comboTimer += dt;
             if (this.comboTimer > COMBO_DECAY_SEC) this.combo = 1;
 
-            // surge window (both modes)
             const phase = (this.t % SURGE.period);
             const inSurge = phase < SURGE.active;
             this.surgeMult = inSurge ? SURGE.mult : 1.0;
 
-            // blackout pulse (endless only, once enabled)
             if (this.mode === "endless" && this.blackoutEnabled) {
               const bp = (this.t % BLACKOUT.period);
               this.blackoutOn = bp < BLACKOUT.active;
@@ -1177,7 +1130,6 @@
               this.blackout.setAlpha(0);
             }
 
-            // pacing
             let timeLeft = 0;
 
             if (this.mode === "campaign") {
@@ -1190,11 +1142,9 @@
                 return;
               }
 
-              // base scroll speed
               this.baseScroll = this.lcfg.baseScroll + this.t * this.lcfg.scrollRamp;
               this.scrollSpeed = this.baseScroll * this.surgeMult;
 
-              // spawn
               const targetSpawn = this.lcfg.spawnStart - this.t * this.lcfg.spawnRamp;
               this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
 
@@ -1213,12 +1163,10 @@
               this.spawnEvery = clamp(targetSpawn, ENDLESS.spawnMinFloor, ENDLESS.spawnStart0);
             }
 
-            // survival score
             const add = SCORE_PPS * dt;
             this.survivalPts += add;
             this.score += add;
 
-            // movement
             if (!IS_TOUCH) {
               let kvx = 0, kvy = 0;
               const left = this.cursors.left.isDown || this.keys.A.isDown;
@@ -1266,7 +1214,6 @@
               }
             }
 
-            // clamp to grid
             const pad = 14;
             const px = clamp(this.player.x, GRID_X + pad, GRID_X + GRID_W - pad);
             const py = clamp(this.player.y, GRID_Y + pad, GRID_Y + GRID_H - pad);
@@ -1275,7 +1222,6 @@
               this.player.body.reset(px, py);
             }
 
-            // decor (glitch)
             if (this.wcfg.gridStyle === "glitch") {
               for (const b of this.decor) {
                 b.y += b._vy * dt;
@@ -1287,14 +1233,12 @@
               }
             }
 
-            // spawn
             this.spawnTimer += deltaMs;
             while (this.spawnTimer >= this.spawnEvery) {
               this.spawnTimer -= this.spawnEvery;
               this.spawnObstacle();
             }
 
-            // move obstacles + near misses
             this.obstacles.children.iterate((o) => {
               if (!o) return;
               o.y += this.scrollSpeed * dt;
@@ -1302,10 +1246,8 @@
               this.checkNearMiss(o);
             });
 
-            // lasers
             this.updateLasers(dt);
 
-            // draw grid + HUD
             this.drawGrid(dt);
             this.updateHud(timeLeft);
           }
@@ -1425,7 +1367,6 @@
             const palette = style.palette;
             const color = palette[Phaser.Math.Between(0, palette.length - 1)];
 
-            // size
             let smin = 20, smax = 32;
             if (this.mode === "campaign") {
               const [a,b] = this.lcfg.size;
@@ -1456,7 +1397,6 @@
             s._nearAwarded = false;
             this.obstacles.add(s);
 
-            // extra piece chance
             let chance = 0.06;
             if (this.mode === "campaign") {
               const worldBonus = this.world * 0.02;
@@ -1514,32 +1454,25 @@
             const boss = WORLDS[2].boss;
             this.bossT += dt;
 
-            // Horizontal sweep uses boss cycle timing
             const cycle = boss.cycleSeconds;
             const t = this.bossT % cycle;
 
-            // Warning/active windows
             const warnOn = t < boss.warnSeconds;
             const activeOn = (t >= boss.warnSeconds) && (t < boss.warnSeconds + boss.activeSeconds);
 
-            // ---- Horizontal laser position (sweeps Y) ----
             const driftY = (this.bossT * 0.22) % 1;
             const yPos = GRID_Y + 20 + (GRID_H - 40) * ((t / cycle + driftY) % 1);
             this.hLaserWarn.setPosition(GRID_X + GRID_W/2, yPos);
             this.hLaser.setPosition(GRID_X + GRID_W/2, yPos);
 
-            // ---- Vertical laser position (sweeps X) ----
-            // Use a different phase so it doesn’t always align with horizontal
             const driftX = (this.bossT * 0.19 + 0.37) % 1;
             const xPos = GRID_X + 20 + (GRID_W - 40) * ((t / cycle + driftX) % 1);
             this.vLaserWarn.setPosition(xPos, GRID_Y + GRID_H/2);
             this.vLaser.setPosition(xPos, GRID_Y + GRID_H/2);
 
-            // Apply modes
             const applyBeam = (mode, warnRect, activeRect) => {
               if (mode === "off") { warnRect.setAlpha(0); activeRect.setAlpha(0); return; }
               if (mode === "warn") { warnRect.setAlpha(warnOn ? 0.30 : 0); activeRect.setAlpha(0); return; }
-              // active
               warnRect.setAlpha(warnOn ? 0.30 : 0);
               activeRect.setAlpha(activeOn ? 0.85 : 0);
             };
@@ -1547,7 +1480,6 @@
             applyBeam(this.hLaserMode, this.hLaserWarn, this.hLaser);
             applyBeam(this.vLaserMode, this.vLaserWarn, this.vLaser);
 
-            // Collision checks only during ACTIVE windows
             if (activeOn) {
               const pr = this.player.getBounds();
 
@@ -1571,7 +1503,6 @@
             let pbLevel = false;
             if (thisScore > prevBest) { p.levelBest[id] = thisScore; pbLevel = true; }
 
-            // unlock next
             let nextWorld = this.world;
             let nextLevel = this.level + 1;
 
@@ -1594,7 +1525,6 @@
 
             saveProgress(p);
 
-            // update campaign leaderboard with TOTAL
             const total = campaignTotalScore(p);
             const lb = loadLeaderboards();
             lb.campaignTop = maybeInsertTop(lb.campaignTop, { score: total, meta: "Total" });
@@ -1648,7 +1578,6 @@
               return;
             }
 
-            // campaign fail: best only updates on clear
             const p = loadProgress();
             const id = levelId(this.world, this.level);
             const prevBest = p.levelBest[id] || 0;
@@ -1725,7 +1654,6 @@
           }
         }
 
-        // ===== Game config =====
         new Phaser.Game({
           type: Phaser.AUTO,
           width: W,

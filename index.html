@@ -31,7 +31,7 @@
     }
 
     #phaser-container {
-      display: none; /* To switch screens between Phaser gameplay and menus */
+      display: none; /* Displays only during gameplay */
       width: 100%;
       height: 100%;
       justify-content: center;
@@ -80,6 +80,7 @@
 </head>
 <body>
   <div id="game-container">
+    <!-- Main Menu -->
     <div class="menu-screen" id="main-menu">
       <h1>GRIDRUN</h1>
       <button onclick="loadModeSelect()">PLAY</button>
@@ -93,7 +94,7 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script>
     /***********************
-     * SAVING PROGRESS
+     * SAVING GAME PROGRESS
      ***********************/
     const SAVE_KEY = "gridrun_progress";
     const defaultProgress = () => ({
@@ -112,16 +113,15 @@
         return defaultProgress();
       }
     };
-
     let progress = loadProgress();
 
     /***********************
-     * WORLD / LEVEL CONFIGURATION
+     * WORLD & LEVEL CONFIGURATION
      ***********************/
     const WORLDS = [
-      { name: "Neon Bliss", description: "Bright, friendly neon world.", colors: [0xff22ff, 0x2222ff, 0x88ffdd] },
-      { name: "Techno Abyss", description: "Cold, metallic geometric world.", colors: [0x55aaff, 0x33ddff, 0x0055ff] },
-      { name: "Astral Surge", description: "Galactic, glowing space.", colors: [0xaa00ff, 0x8855ff, 0x4444ff] },
+      { name: "Neon Bliss", description: "Bright, neon aesthetic for beginners.", colors: [0xff22ff, 0x2222ff, 0x88ffdd] },
+      { name: "Techno Abyss", description: "Metallic visuals with rising difficulty.", colors: [0x55aaff, 0x33ddff, 0x0055ff] },
+      { name: "Astral Surge", description: "Galactic, star-filled chaos.", colors: [0xaa00ff, 0x8855ff, 0x4444ff] },
     ];
 
     const LEVELS = [
@@ -133,7 +133,7 @@
     ];
 
     /***********************
-     * MENU FUNCTIONS
+     * MENU MANAGEMENT
      ***********************/
     const loadModeSelect = () => {
       const container = document.getElementById("game-container");
@@ -149,11 +149,9 @@
 
     const loadCampaignMenu = () => {
       const container = document.getElementById("game-container");
-      const worlds = WORLDS.map(
-        ({ name, description }, i) => `
-          <button onclick="loadWorld(${i})" ${i < progress.worldsUnlocked ? "" : "disabled"}>${name}</button>
-        `
-      ).join("");
+      const worlds = WORLDS.map((world, i) => `
+        <button onclick="loadWorld(${i})" ${i < progress.worldsUnlocked ? "" : "disabled"}>${world.name}</button>
+      `).join("");
 
       container.innerHTML = `
         <div class="menu-screen">
@@ -167,19 +165,31 @@
 
     const loadWorld = (worldIdx) => {
       const container = document.getElementById("game-container");
-      const world = WORLDS[worldIdx];
       const levels = LEVELS.map((level, i) => `
-        <button onclick="startPhaser(${worldIdx}, ${i})" ${i < progress.levelsUnlocked[worldIdx] ? "" : "disabled"}>
+        <button onclick="startPhaser(${worldIdx}, ${i}, 'campaign')" ${i < progress.levelsUnlocked[worldIdx] ? "" : "disabled"}>
           Level ${i + 1} (Best: ${progress.bestScores[worldIdx][i]})
         </button>
       `).join("");
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>${world.name}</h1>
-          <p>${world.description}</p>
+          <h1>${WORLDS[worldIdx].name}</h1>
+          <p>${WORLDS[worldIdx].description}</p>
           ${levels}
           <button onclick="loadCampaignMenu()">Back</button>
+        </div>
+      `;
+    };
+
+    const loadEndlessIntro = () => {
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Endless Mode</h1>
+          <p>Survive as long as you can with increasing difficulty.</p>
+          <p>Best Score: ${progress.endlessBest}</p>
+          <button onclick="startPhaser(null, null, 'endless')">Start Endless</button>
+          <button onclick="loadModeSelect()">Back</button>
         </div>
       `;
     };
@@ -187,12 +197,33 @@
     /***********************
      * PHASER GAME FUNCTIONS
      ***********************/
-    const startPhaser = (worldIdx, levelIdx) => {
-      alert(`Start World ${worldIdx + 1}, Level ${levelIdx + 1}!`);
-      // This is where you pass world and level data to Phaser scenes.
+    const startPhaser = (worldIdx, levelIdx, mode) => {
+      document.getElementById("game-container").style.display = "none";
+      document.getElementById("phaser-container").style.display = "flex";
+
+      if (!window.phaserGame) {
+        window.phaserGame = createPhaserGame();
+      }
+
+      window.phaserGame.scene.stop("Results"); // Ensure fresh start
+      window.phaserGame.scene.start("Play", { mode, worldIdx, levelIdx });
     };
 
-    loadMainMenu = () => {
+    const createPhaserGame = () => {
+      return new Phaser.Game({
+        type: Phaser.AUTO,
+        width: 420,
+        height: 760,
+        parent: "phaser-container",
+        scene: [PlayScene, ResultsScene],
+        physics: { default: "arcade", arcade: { debug: false } },
+      });
+    };
+
+    /***********************
+     * MAIN MENU
+     ***********************/
+    const loadMainMenu = () => {
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div id="main-menu" class="menu-screen">

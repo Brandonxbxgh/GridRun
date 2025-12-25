@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
   <title>TXC GRIDRUN</title>
   <style>
     :root{
@@ -22,21 +22,21 @@
       --btn:#141a38;
       --btnH:#1b2350;
 
-      --lb:#2a1a55;      /* leaderboard button color */
+      --lb:#2a1a55;
       --lbH:#3a2580;
-      --reset:#5a1f1f;   /* reset button color */
+      --reset:#5a1f1f;
       --resetH:#7a2b2b;
 
       --shadow: 0 14px 45px rgba(0,0,0,.45);
       --radius: 18px;
     }
 
-    html,body{height:100%; background:radial-gradient(1200px 800px at 20% 15%, #1a1e4a 0%, var(--bg0) 55%, #02030a 100%); margin:0; color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;}
     *{box-sizing:border-box;}
+    html,body{height:100%; margin:0; color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background: radial-gradient(1200px 800px at 20% 15%, #1a1e4a 0%, var(--bg0) 55%, #02030a 100%);}
     button{font:inherit; color:inherit; -webkit-tap-highlight-color: transparent;}
-    .app{min-height:100%; display:flex; align-items:center; justify-content:center; padding:18px;}
+    a{color:inherit}
 
-    /* Subtle animated grid */
+    /* subtle animated grid background */
     .bg-grid{
       position:fixed; inset:0; pointer-events:none; opacity:.18;
       background:
@@ -51,18 +51,16 @@
       to{ transform: translate3d(-40px,-40px,0); }
     }
 
-    .shell{
-      width:min(1040px, 100%);
-      display:grid;
-      grid-template-columns: 380px 1fr;
-      gap:18px;
-      align-items:stretch;
-    }
-    @media (max-width: 980px){
-      .shell{grid-template-columns:1fr; max-width:700px;}
+    .app{
+      min-height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
     }
 
-    .card{
+    .frame{
+      width:min(740px, 100%);
       background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
       border:1px solid var(--line);
       border-radius: var(--radius);
@@ -71,104 +69,40 @@
       position:relative;
     }
 
-    .left{
-      padding:18px;
+    .topbar{
+      padding:14px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.20);
       display:flex;
-      flex-direction:column;
-      gap:14px;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
     }
+
     .brand{
-      padding:14px 14px 10px;
-      border-radius: 16px;
-      background: linear-gradient(135deg, rgba(110,231,255,.16), rgba(183,255,110,.10));
-      border:1px solid rgba(255,255,255,.12);
-      position:relative;
-      overflow:hidden;
-    }
-    .brand:before{
-      content:"";
-      position:absolute; inset:-40px;
-      background: radial-gradient(400px 160px at 20% 30%, rgba(110,231,255,.24), transparent 60%),
-                  radial-gradient(360px 140px at 70% 55%, rgba(255,110,231,.16), transparent 60%);
-      filter: blur(0px);
-      transform: rotate(-8deg);
-    }
-    .brand > *{position:relative;}
-    .title{
-      display:flex; align-items:center; gap:10px;
-      font-weight:900; letter-spacing:.12em; font-size:22px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:900;
+      letter-spacing:.12em;
       text-transform:uppercase;
+      font-size:18px;
     }
     .glyph{
       width:34px; height:34px; border-radius:12px;
       background: conic-gradient(from 110deg, var(--accent), var(--warn), var(--accent2), var(--accent));
       box-shadow: 0 10px 30px rgba(110,231,255,.22);
       border:1px solid rgba(255,255,255,.14);
+      flex:0 0 auto;
     }
     /* removed subtitle under GRIDRUN per request */
 
-    .menu{
-      display:flex; flex-direction:column; gap:10px;
-      padding:14px;
-      border-radius:16px;
-      background: rgba(255,255,255,.05);
-      border:1px solid rgba(255,255,255,.10);
-    }
-
-    .btn{
-      width:100%;
-      padding:12px 12px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.12);
-      background: linear-gradient(180deg, var(--btn), rgba(255,255,255,.02));
-      cursor:pointer;
-      transition: transform .06s ease, background .15s ease, border-color .15s ease;
-      display:flex; align-items:center; justify-content:space-between;
-      touch-action: manipulation;
-      user-select:none;
-    }
-    .btn:hover{background: linear-gradient(180deg, var(--btnH), rgba(255,255,255,.02));}
-    .btn:active{transform: translateY(1px) scale(.998);}
-    .btn .hint{font-size:12px; color:var(--muted); letter-spacing:.06em;}
-
-    .btn.lb{ background: linear-gradient(180deg, var(--lb), rgba(255,255,255,.02)); }
-    .btn.lb:hover{ background: linear-gradient(180deg, var(--lbH), rgba(255,255,255,.02)); }
-    .btn.reset{ background: linear-gradient(180deg, var(--reset), rgba(255,255,255,.02)); }
-    .btn.reset:hover{ background: linear-gradient(180deg, var(--resetH), rgba(255,255,255,.02)); }
-
-    .tiny{
-      display:flex; gap:10px;
-    }
-    .tiny .btn{padding:10px 12px;}
-    .tiny .btn span{font-size:13px;}
-
-    .panelTitle{
-      font-weight:800; letter-spacing:.08em; text-transform:uppercase;
-      color:rgba(255,255,255,.85); font-size:12px;
-      margin:2px 0 6px;
-    }
-
-    .note{
-      padding:12px 14px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.14);
-      color:rgba(255,255,255,.78);
-      font-size:13px;
-      line-height:1.35;
-    }
-    /* removed bottom PC/mobile instructions text per request */
-
-    .right{padding:0; display:flex; flex-direction:column;}
-    .topbar{
-      padding:12px 14px;
-      border-bottom:1px solid rgba(255,255,255,.10);
-      display:flex; align-items:center; justify-content:space-between;
+    .hud{
+      display:flex;
+      flex-wrap:wrap;
       gap:10px;
-      background: rgba(0,0,0,.20);
-    }
-    .stats{
-      display:flex; flex-wrap:wrap; gap:10px;
+      justify-content:flex-end;
+      align-items:center;
       font-size:12.5px;
       color:rgba(255,255,255,.85);
     }
@@ -178,15 +112,109 @@
       background: rgba(255,255,255,.06);
       border:1px solid rgba(255,255,255,.10);
       display:flex; gap:8px; align-items:center;
+      white-space:nowrap;
     }
     .pill b{color:var(--text); font-weight:800;}
     .pill .dot{width:8px; height:8px; border-radius:999px; background: var(--accent); box-shadow: 0 0 18px rgba(110,231,255,.35);}
 
-    .topActions{
-      display:flex; gap:10px; align-items:center;
+    .content{
+      padding:14px;
+    }
+
+    .screen{display:none;}
+    .screen.active{display:block;}
+
+    .card{
+      background: rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;
+      padding:14px;
+    }
+
+    .titleRow{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+    .titleRow h2{
+      margin:0;
+      font-size:14px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:rgba(255,255,255,.86);
+    }
+    .titleRow .sub{
+      font-size:12.5px;
+      color:rgba(255,255,255,.65);
+    }
+
+    .btn{
+      width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: linear-gradient(180deg, var(--btn), rgba(255,255,255,.02));
+      cursor:pointer;
+      transition: transform .06s ease, background .15s ease, border-color .15s ease, opacity .15s ease;
+      display:flex; align-items:center; justify-content:space-between;
+      touch-action: manipulation;
+      user-select:none;
+    }
+    .btn:hover{background: linear-gradient(180deg, var(--btnH), rgba(255,255,255,.02));}
+    .btn:active{transform: translateY(1px) scale(.998);}
+    .btn:disabled{opacity:.45; cursor:not-allowed;}
+    .hint{font-size:12px; color:var(--muted); letter-spacing:.06em;}
+
+    .btn.lb{ background: linear-gradient(180deg, var(--lb), rgba(255,255,255,.02)); }
+    .btn.lb:hover{ background: linear-gradient(180deg, var(--lbH), rgba(255,255,255,.02)); }
+    .btn.reset{ background: linear-gradient(180deg, var(--reset), rgba(255,255,255,.02)); }
+    .btn.reset:hover{ background: linear-gradient(180deg, var(--resetH), rgba(255,255,255,.02)); }
+
+    .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+    @media (max-width:560px){ .grid2{grid-template-columns:1fr;} }
+
+    .stack{display:flex; flex-direction:column; gap:10px;}
+
+    .note{
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.14);
+      color:rgba(255,255,255,.78);
+      font-size:13px;
+      line-height:1.35;
+      margin-top:10px;
+    }
+
+    /* Game canvas */
+    .gameWrap{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      align-items:center;
+    }
+    canvas{
+      width:100%;
+      max-width: 540px;
+      aspect-ratio: 9/16;
+      border-radius: 18px;
+      border:1px solid rgba(255,255,255,.14);
+      background: linear-gradient(180deg, rgba(6,7,16,1), rgba(2,3,10,1));
+      box-shadow: 0 18px 55px rgba(0,0,0,.55);
+      touch-action: none;
+    }
+
+    .gameActions{
+      width:100%;
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      flex-wrap:wrap;
     }
     .iconBtn{
-      padding:9px 12px;
+      padding:10px 14px;
       border-radius:12px;
       background: rgba(255,255,255,.06);
       border:1px solid rgba(255,255,255,.12);
@@ -198,31 +226,18 @@
     .iconBtn:hover{background: rgba(255,255,255,.09);}
     .iconBtn:active{transform: translateY(1px);}
 
-    .canvasWrap{
-      position:relative;
-      padding:14px;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      background: rgba(0,0,0,.18);
-      flex: 1 1 auto;
-    }
-    canvas{
-      width:100%;
-      max-width: 700px;
-      aspect-ratio: 9/16;
-      border-radius: 18px;
-      border:1px solid rgba(255,255,255,.14);
-      background: linear-gradient(180deg, rgba(6,7,16,1), rgba(2,3,10,1));
-      box-shadow: 0 18px 55px rgba(0,0,0,.55);
-      touch-action: none; /* allow our touch controls without scroll */
-    }
-
+    /* Modal overlay */
     .overlay{
-      position:absolute; inset:14px;
-      display:flex; align-items:center; justify-content:center;
-      pointer-events:none;
+      position:fixed; inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      background: rgba(0,0,0,.45);
+      backdrop-filter: blur(6px);
+      z-index:50;
     }
+    .overlay.show{display:flex;}
     .modal{
       width:min(520px, 100%);
       background: rgba(10,12,26,.92);
@@ -230,16 +245,15 @@
       border-radius: 18px;
       padding:14px;
       box-shadow: var(--shadow);
-      pointer-events:auto;
-      backdrop-filter: blur(8px);
     }
     .modal h3{margin:0 0 10px; font-size:14px; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.86);}
     .modal p{margin:0 0 10px; color:rgba(255,255,255,.76); font-size:13px; line-height:1.35;}
     .modal .row{display:flex; gap:10px; flex-wrap:wrap;}
     .modal .row .btn{width:auto; flex:1 1 160px;}
 
+    /* Leaderboard */
     .leaderboard{
-      margin-top:8px;
+      margin-top:10px;
       border-radius: 14px;
       border:1px solid rgba(255,255,255,.12);
       overflow:hidden;
@@ -252,7 +266,7 @@
       font-size:12px; letter-spacing:.08em; text-transform:uppercase;
       color:rgba(255,255,255,.80);
     }
-    .lbList{max-height: 260px; overflow:auto; background: rgba(0,0,0,.18);}
+    .lbList{max-height: 320px; overflow:auto; background: rgba(0,0,0,.18);}
     .lbRow{
       display:grid;
       grid-template-columns: 42px 1fr 120px;
@@ -274,156 +288,209 @@
     }
     .name{color:rgba(255,255,255,.86); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
     .score{font-variant-numeric: tabular-nums; text-align:right; font-weight:900; color:rgba(255,255,255,.92);}
-    .modeTag{
-      display:inline-flex; align-items:center; gap:8px;
-      margin-top:10px;
-      font-size:12px; color:rgba(255,255,255,.78);
-    }
-    .modeTag .badge{
-      padding:5px 9px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.06);
-      letter-spacing:.08em;
-      text-transform:uppercase;
-      font-weight:800;
-      font-size:11px;
-    }
+
   </style>
 </head>
 
 <body>
   <div class="bg-grid"></div>
   <div class="app">
-    <div class="shell">
-      <div class="card left">
+    <div class="frame">
+      <div class="topbar">
         <div class="brand">
-          <div class="title">
-            <div class="glyph"></div>
-            <div>GRIDRUN</div>
-          </div>
-          <!-- subtitle removed per request -->
+          <div class="glyph"></div>
+          <div>GRIDRUN</div>
         </div>
 
-        <div class="menu" id="menuMain">
-          <div class="panelTitle">Main Menu</div>
-
-          <button class="btn" id="btnCampaign">
-            <span><b>Campaign</b></span>
-            <span class="hint">replay unlocked levels</span>
-          </button>
-
-          <button class="btn" id="btnEndless">
-            <span><b>Endless</b></span>
-            <span class="hint">starts at W1-L1 difficulty</span>
-          </button>
-
-          <button class="btn lb" id="btnLeaderboards">
-            <span><b>Leaderboards</b></span>
-            <span class="hint">campaign / endless</span>
-          </button>
-
-          <div class="tiny">
-            <button class="btn reset" id="btnResetSave">
-              <span><b>Reset Save</b></span>
-              <span class="hint">local only</span>
-            </button>
-            <button class="btn" id="btnExit">
-              <span><b>Exit</b></span>
-              <span class="hint">close tab</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Submenus -->
-        <div class="menu" id="menuCampaign" style="display:none;">
-          <div class="panelTitle">Campaign</div>
-          <div class="note">
-            Pick a level. You can replay any level you’ve beaten.
-            <div class="modeTag"><span class="badge">Campaign</span><span id="campaignProgressText"></span></div>
-          </div>
-          <div id="campaignLevels"></div>
-          <button class="btn" id="btnBackFromCampaign"><span><b>Back</b></span><span class="hint">menu</span></button>
-        </div>
-
-        <div class="menu" id="menuLeaderboards" style="display:none;">
-          <div class="panelTitle">Leaderboards</div>
-
-          <div class="note" style="margin-bottom:10px;">
-            Scoring is the same in both modes, tracked separately.
-            Effects begin at <b>30s</b> and stack earlier.
-          </div>
-
-          <div class="tiny" style="margin-bottom:10px;">
-            <button class="btn lb" id="lbShowCampaign"><span><b>Campaign</b></span><span class="hint">top scores</span></button>
-            <button class="btn lb" id="lbShowEndless"><span><b>Endless</b></span><span class="hint">top scores</span></button>
-          </div>
-
-          <div class="leaderboard">
-            <div class="lbHead">
-              <span id="lbTitle">Campaign</span>
-              <span id="lbCount">Top 10</span>
-            </div>
-            <div class="lbList" id="lbList"></div>
-          </div>
-
-          <button class="btn" id="btnBackFromLB"><span><b>Back</b></span><span class="hint">menu</span></button>
-        </div>
-
-        <div class="note">
-          <!-- bottom instructions removed per request -->
-          <b>Tip:</b> On mobile, drag to move. Tap <b>Pause</b> anytime.
+        <div class="hud">
+          <div class="pill"><span class="dot"></span><span>Mode: <b id="statMode">Menu</b></span></div>
+          <div class="pill"><span>Score: <b id="statScore">0</b></span></div>
+          <div class="pill"><span>Time: <b id="statTime">0.0</b>s</span></div>
+          <div class="pill"><span>Speed: <b id="statSpeed">1.00</b>x</span></div>
         </div>
       </div>
 
-      <div class="card right">
-        <div class="topbar">
-          <div class="stats">
-            <div class="pill"><span class="dot"></span><span>Mode: <b id="statMode">Menu</b></span></div>
-            <div class="pill"><span>Score: <b id="statScore">0</b></span></div>
-            <div class="pill"><span>Time: <b id="statTime">0.0</b>s</span></div>
-            <div class="pill"><span>Speed: <b id="statSpeed">1.00</b>x</span></div>
-          </div>
-          <div class="topActions">
-            <button class="iconBtn" id="btnPause" aria-label="Pause">Pause</button>
-            <button class="iconBtn" id="btnMenu" aria-label="Menu">Menu</button>
-          </div>
-        </div>
+      <div class="content">
 
-        <div class="canvasWrap">
-          <canvas id="game" width="720" height="1280"></canvas>
+        <!-- MAIN MENU -->
+        <div class="screen active" id="screenMain">
+          <div class="card">
+            <div class="titleRow">
+              <h2>Main Menu</h2>
+              <!-- subtitle removed per request -->
+              <div class="sub">Fast • Skill-based • Off-chain gameplay</div>
+            </div>
 
-          <div class="overlay" id="overlay" style="display:none;">
-            <div class="modal" id="modal">
-              <h3 id="modalTitle">Paused</h3>
-              <p id="modalText">Game paused.</p>
-              <div class="row">
-                <button class="btn" id="btnResume"><span><b>Resume</b></span></button>
-                <button class="btn" id="btnRestart"><span><b>Restart</b></span></button>
-                <button class="btn" id="btnToMenu"><span><b>Main Menu</b></span></button>
+            <div class="stack">
+              <button class="btn" id="btnCampaign">
+                <span><b>Campaign</b></span>
+                <span class="hint">worlds & levels</span>
+              </button>
+
+              <button class="btn" id="btnEndless">
+                <span><b>Endless</b></span>
+                <span class="hint">starts at W1-L1 difficulty</span>
+              </button>
+
+              <button class="btn lb" id="btnLeaderboards">
+                <span><b>Leaderboards</b></span>
+                <span class="hint">campaign / endless</span>
+              </button>
+
+              <div class="grid2">
+                <button class="btn reset" id="btnResetSave">
+                  <span><b>Reset Save</b></span>
+                  <span class="hint">local only</span>
+                </button>
+
+                <button class="btn" id="btnExit">
+                  <span><b>Exit</b></span>
+                  <span class="hint">close tab</span>
+                </button>
               </div>
             </div>
+
+            <div class="note">
+              Effects begin at <b>30 seconds</b> and stack earlier (glitch → scanlines → vertical lasers → invert).
+              <br/>Campaign allows replay of any beaten level. Endless uses the same scoring, tracked separately.
+            </div>
           </div>
-
         </div>
-      </div>
 
+        <!-- CAMPAIGN SELECT -->
+        <div class="screen" id="screenCampaign">
+          <div class="card">
+            <div class="titleRow">
+              <h2>Campaign</h2>
+              <div class="sub" id="campaignProgressText">—</div>
+            </div>
+
+            <div class="stack" id="campaignWorlds"></div>
+
+            <div class="grid2" style="margin-top:10px;">
+              <button class="btn" id="btnBackFromCampaign"><span><b>Back</b></span><span class="hint">menu</span></button>
+              <button class="btn" id="btnStartCampaign" disabled><span><b>Start</b></span><span class="hint">select level</span></button>
+            </div>
+
+            <div class="note" id="campaignSelectedNote" style="display:none;"></div>
+          </div>
+        </div>
+
+        <!-- ENDLESS CONFIRM -->
+        <div class="screen" id="screenEndless">
+          <div class="card">
+            <div class="titleRow">
+              <h2>Endless</h2>
+              <div class="sub">Infinite run • ramping difficulty</div>
+            </div>
+
+            <div class="note">
+              Endless starts at <b>World 1 – Level 1</b> difficulty (not easier) and ramps up continuously.
+              <br/>Same scoring as Campaign, but a separate leaderboard.
+            </div>
+
+            <div class="grid2" style="margin-top:10px;">
+              <button class="btn" id="btnBackFromEndless"><span><b>Back</b></span><span class="hint">menu</span></button>
+              <button class="btn" id="btnStartEndless"><span><b>Start</b></span><span class="hint">run</span></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LEADERBOARDS -->
+        <div class="screen" id="screenLeaderboards">
+          <div class="card">
+            <div class="titleRow">
+              <h2>Leaderboards</h2>
+              <div class="sub">separate boards • same scoring</div>
+            </div>
+
+            <div class="grid2">
+              <button class="btn lb" id="lbShowCampaign"><span><b>Campaign</b></span><span class="hint">top scores</span></button>
+              <button class="btn lb" id="lbShowEndless"><span><b>Endless</b></span><span class="hint">top scores</span></button>
+            </div>
+
+            <div class="leaderboard">
+              <div class="lbHead">
+                <span id="lbTitle">Campaign</span>
+                <span id="lbCount">Top 10</span>
+              </div>
+              <div class="lbList" id="lbList"></div>
+            </div>
+
+            <div class="grid2" style="margin-top:10px;">
+              <button class="btn" id="btnBackFromLB"><span><b>Back</b></span><span class="hint">menu</span></button>
+              <button class="btn reset" id="btnClearLB"><span><b>Clear Boards</b></span><span class="hint">local</span></button>
+            </div>
+
+            <div class="note">
+              Note: global leaderboards come later (backend). These are local for now.
+            </div>
+          </div>
+        </div>
+
+        <!-- GAME -->
+        <div class="screen" id="screenGame">
+          <div class="card">
+            <div class="titleRow">
+              <h2>Run</h2>
+              <div class="sub" id="runLabel">—</div>
+            </div>
+
+            <div class="gameWrap">
+              <canvas id="game" width="720" height="1280"></canvas>
+
+              <div class="gameActions">
+                <button class="iconBtn" id="btnPause" aria-label="Pause">Pause</button>
+                <button class="iconBtn" id="btnRestart" aria-label="Restart">Restart</button>
+                <button class="iconBtn" id="btnMenu" aria-label="Menu">Menu</button>
+              </div>
+
+              <!-- bottom control text removed per request -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h3 id="modalTitle">Paused</h3>
+      <p id="modalText">Game paused.</p>
+      <div class="row">
+        <button class="btn" id="btnResume"><span><b>Resume</b></span></button>
+        <button class="btn" id="btnModalRestart"><span><b>Restart</b></span></button>
+        <button class="btn" id="btnToMenu"><span><b>Main Menu</b></span></button>
+      </div>
     </div>
   </div>
 
 <script>
 (() => {
   // =========================
-  // Storage / Save / LB
+  // SAVE / LEADERBOARDS
   // =========================
-  const KEY_SAVE = "gridrun_save_v1";
-  const KEY_LB_CAMPAIGN = "gridrun_lb_campaign_v1";
-  const KEY_LB_ENDLESS = "gridrun_lb_endless_v1";
+  const KEY_SAVE = "gridrun_save_v2";
+  const KEY_LB_CAMPAIGN = "gridrun_lb_campaign_v2";
+  const KEY_LB_ENDLESS = "gridrun_lb_endless_v2";
+
+  // Worlds + levels restored (not "8 straight levels")
+  // Adjust counts/names freely later.
+  const WORLDS = [
+    { id: 1, name: "World 1: Neon Alley", levels: 5 },
+    { id: 2, name: "World 2: Signal Ruins", levels: 5 },
+    { id: 3, name: "World 3: Rift Sector", levels: 5 },
+    { id: 4, name: "World 4: Overclock District", levels: 5 }
+  ];
+
+  const totalLevels = WORLDS.reduce((a,w) => a + w.levels, 0);
 
   const defaultSave = () => ({
     campaign: {
-      unlockedLevel: 1, // 1..N
-      bestPerLevel: {}  // level -> bestScore
+      unlockedIndex: 1,        // 1..totalLevels (linear unlock)
+      bestByIndex: {}          // index -> bestScore
     }
   });
 
@@ -432,14 +499,12 @@
       const raw = localStorage.getItem(KEY_SAVE);
       if(!raw) return defaultSave();
       const obj = JSON.parse(raw);
-      // minimal shape validation:
       if(!obj || !obj.campaign) return defaultSave();
-      if(typeof obj.campaign.unlockedLevel !== "number") obj.campaign.unlockedLevel = 1;
-      if(!obj.campaign.bestPerLevel || typeof obj.campaign.bestPerLevel !== "object") obj.campaign.bestPerLevel = {};
+      if(typeof obj.campaign.unlockedIndex !== "number") obj.campaign.unlockedIndex = 1;
+      if(!obj.campaign.bestByIndex || typeof obj.campaign.bestByIndex !== "object") obj.campaign.bestByIndex = {};
+      obj.campaign.unlockedIndex = clampInt(obj.campaign.unlockedIndex, 1, totalLevels);
       return obj;
-    }catch(e){
-      return defaultSave();
-    }
+    }catch(_){ return defaultSave(); }
   }
   function saveSave(s){ localStorage.setItem(KEY_SAVE, JSON.stringify(s)); }
 
@@ -449,9 +514,7 @@
       if(!raw) return [];
       const arr = JSON.parse(raw);
       return Array.isArray(arr) ? arr : [];
-    }catch(e){
-      return [];
-    }
+    }catch(_){ return []; }
   }
   function saveLB(key, arr){ localStorage.setItem(key, JSON.stringify(arr)); }
 
@@ -459,13 +522,13 @@
     const key = (mode === "campaign") ? KEY_LB_CAMPAIGN : KEY_LB_ENDLESS;
     const list = loadLB(key);
 
-    // keep anonymous names but allow prompt if you want later
     const entry = {
-      name: (meta && meta.name) ? meta.name : "Runner",
+      name: "Runner",
       score: Math.floor(score),
       ts: Date.now(),
       detail: meta || {}
     };
+
     list.push(entry);
     list.sort((a,b) => b.score - a.score || a.ts - b.ts);
     const trimmed = list.slice(0, 10);
@@ -474,30 +537,33 @@
   }
 
   // =========================
-  // UI Wiring
+  // DOM
   // =========================
   const $ = (id) => document.getElementById(id);
 
-  const menuMain = $("menuMain");
-  const menuCampaign = $("menuCampaign");
-  const menuLeaderboards = $("menuLeaderboards");
-  const campaignLevelsEl = $("campaignLevels");
-  const campaignProgressText = $("campaignProgressText");
+  const screens = {
+    main: $("screenMain"),
+    campaign: $("screenCampaign"),
+    endless: $("screenEndless"),
+    lb: $("screenLeaderboards"),
+    game: $("screenGame")
+  };
 
   const statMode = $("statMode");
   const statScore = $("statScore");
   const statTime = $("statTime");
   const statSpeed = $("statSpeed");
 
+  const runLabel = $("runLabel");
+
   const overlay = $("overlay");
   const modalTitle = $("modalTitle");
   const modalText = $("modalText");
 
-  const btnPause = $("btnPause");
-  const btnMenu = $("btnMenu");
-  const btnResume = $("btnResume");
-  const btnRestart = $("btnRestart");
-  const btnToMenu = $("btnToMenu");
+  const campaignWorldsEl = $("campaignWorlds");
+  const campaignProgressText = $("campaignProgressText");
+  const campaignSelectedNote = $("campaignSelectedNote");
+  const btnStartCampaign = $("btnStartCampaign");
 
   const lbListEl = $("lbList");
   const lbTitle = $("lbTitle");
@@ -505,42 +571,112 @@
 
   let save = loadSave();
 
-  function showMenu(which){
-    menuMain.style.display = "none";
-    menuCampaign.style.display = "none";
-    menuLeaderboards.style.display = "none";
-    which.style.display = "flex";
+  function showScreen(name){
+    Object.values(screens).forEach(s => s.classList.remove("active"));
+    screens[name].classList.add("active");
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+    }[c]));
+  }
+
+  // =========================
+  // Campaign selection UI
+  // =========================
+  let selectedIndex = null; // linear level index across worlds
+
+  function linearToWorldLevel(index){
+    let acc = 0;
+    for(const w of WORLDS){
+      if(index <= acc + w.levels){
+        return { worldId: w.id, worldName: w.name, level: index - acc, index };
+      }
+      acc += w.levels;
+    }
+    return { worldId: WORLDS[0].id, worldName: WORLDS[0].name, level: 1, index: 1 };
+  }
+
+  function worldLevelToLinear(worldId, level){
+    let acc = 0;
+    for(const w of WORLDS){
+      if(w.id === worldId) return acc + level;
+      acc += w.levels;
+    }
+    return 1;
   }
 
   function renderCampaignMenu(){
-    const maxLevels = 8; // adjust as desired
-    const unlocked = Math.max(1, Math.min(maxLevels, save.campaign.unlockedLevel));
-    campaignProgressText.textContent = `Unlocked: ${unlocked}/${maxLevels}`;
+    const unlocked = clampInt(save.campaign.unlockedIndex, 1, totalLevels);
+    campaignProgressText.textContent = `Unlocked: ${unlocked}/${totalLevels}`;
 
-    campaignLevelsEl.innerHTML = "";
-    for(let i=1;i<=maxLevels;i++){
-      const isLocked = i > unlocked;
-      const best = save.campaign.bestPerLevel[String(i)] || 0;
+    selectedIndex = null;
+    btnStartCampaign.disabled = true;
+    campaignSelectedNote.style.display = "none";
 
-      const btn = document.createElement("button");
-      btn.className = "btn";
-      btn.disabled = isLocked;
-      btn.style.opacity = isLocked ? ".45" : "1";
-      btn.innerHTML = `<span><b>Level ${i}</b> <span style="color:rgba(255,255,255,.65);font-weight:700;">• Best ${best}</span></span>
-                       <span class="hint">${isLocked ? "locked" : "start"}</span>`;
-      btn.addEventListener("click", () => startCampaign(i), {passive:true});
-      campaignLevelsEl.appendChild(btn);
+    campaignWorldsEl.innerHTML = "";
+
+    let runningIndex = 0;
+    for(const w of WORLDS){
+      const block = document.createElement("div");
+      block.className = "card";
+      block.style.marginBottom = "10px";
+
+      const header = document.createElement("div");
+      header.className = "titleRow";
+      header.innerHTML = `<h2 style="margin:0;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.86)">${escapeHtml(w.name)}</h2>
+                          <div class="sub">Levels: ${w.levels}</div>`;
+      block.appendChild(header);
+
+      const grid = document.createElement("div");
+      grid.className = "grid2";
+
+      for(let lvl=1; lvl<=w.levels; lvl++){
+        runningIndex += 1;
+        const idx = runningIndex;
+
+        const locked = idx > unlocked;
+        const best = save.campaign.bestByIndex[String(idx)] || 0;
+
+        const b = document.createElement("button");
+        b.className = "btn";
+        b.disabled = locked;
+        b.innerHTML = `<span><b>Level ${lvl}</b> <span style="color:rgba(255,255,255,.65);font-weight:700;">• Best ${best}</span></span>
+                       <span class="hint">${locked ? "locked" : "select"}</span>`;
+        b.addEventListener("click", () => {
+          selectedIndex = idx;
+          btnStartCampaign.disabled = false;
+
+          const wl = linearToWorldLevel(selectedIndex);
+          campaignSelectedNote.style.display = "block";
+          campaignSelectedNote.innerHTML =
+            `<b>Selected:</b> ${escapeHtml(wl.worldName)} • Level ${wl.level}
+             <br/>Effects start at <b>30s</b>. Vertical lasers included.`;
+        }, {passive:true});
+
+        grid.appendChild(b);
+      }
+
+      block.appendChild(grid);
+      campaignWorldsEl.appendChild(block);
     }
   }
 
+  // =========================
+  // Leaderboards UI
+  // =========================
+  let currentLBMode = "campaign";
   function renderLeaderboards(mode){
+    currentLBMode = mode;
     const key = (mode === "campaign") ? KEY_LB_CAMPAIGN : KEY_LB_ENDLESS;
     const list = loadLB(key);
+
     lbTitle.textContent = (mode === "campaign") ? "Campaign" : "Endless";
-    lbCount.textContent = `Top ${Math.max(1, Math.min(10, list.length || 10))}`;
+    lbCount.textContent = "Top 10";
 
     lbListEl.innerHTML = "";
-    const shown = list.length ? list : Array.from({length:10}, (_,i)=>({name:"—", score:0, ts:0}));
+    const shown = list.length ? list : Array.from({length:10}, () => ({name:"—", score:0, ts:0}));
     shown.slice(0,10).forEach((e, idx) => {
       const row = document.createElement("div");
       row.className = "lbRow";
@@ -553,23 +689,30 @@
     });
   }
 
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, (c) => ({
-      "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
-    }[c]));
-  }
+  // =========================
+  // Button wiring (tabs / screens)
+  // =========================
+  $("btnCampaign").addEventListener("click", () => { renderCampaignMenu(); showScreen("campaign"); }, {passive:true});
+  $("btnEndless").addEventListener("click", () => { showScreen("endless"); }, {passive:true});
+  $("btnLeaderboards").addEventListener("click", () => { renderLeaderboards("campaign"); showScreen("lb"); }, {passive:true});
 
-  // Buttons
-  $("btnCampaign").addEventListener("click", () => { renderCampaignMenu(); showMenu(menuCampaign); }, {passive:true});
-  $("btnEndless").addEventListener("click", () => startEndless(), {passive:true});
-  $("btnLeaderboards").addEventListener("click", () => { renderLeaderboards("campaign"); showMenu(menuLeaderboards); }, {passive:true});
-  $("btnBackFromCampaign").addEventListener("click", () => showMenu(menuMain), {passive:true});
-  $("btnBackFromLB").addEventListener("click", () => showMenu(menuMain), {passive:true});
+  $("btnBackFromCampaign").addEventListener("click", () => showScreen("main"), {passive:true});
+  $("btnBackFromEndless").addEventListener("click", () => showScreen("main"), {passive:true});
+  $("btnBackFromLB").addEventListener("click", () => showScreen("main"), {passive:true});
+
   $("lbShowCampaign").addEventListener("click", () => renderLeaderboards("campaign"), {passive:true});
   $("lbShowEndless").addEventListener("click", () => renderLeaderboards("endless"), {passive:true});
 
+  $("btnClearLB").addEventListener("click", () => {
+    if(confirm("Clear local leaderboards (Campaign + Endless)?")){
+      saveLB(KEY_LB_CAMPAIGN, []);
+      saveLB(KEY_LB_ENDLESS, []);
+      renderLeaderboards(currentLBMode);
+    }
+  }, {passive:true});
+
   $("btnResetSave").addEventListener("click", () => {
-    if(confirm("Reset local save + best scores?")){
+    if(confirm("Reset local save progress + best scores?")){
       save = defaultSave();
       saveSave(save);
       alert("Save reset.");
@@ -577,22 +720,29 @@
     }
   }, {passive:true});
 
-  $("btnExit").addEventListener("click", () => {
-    // Best-effort "exit"
-    window.close();
+  $("btnExit").addEventListener("click", () => { window.close(); }, {passive:true});
+
+  // Start buttons
+  $("btnStartCampaign").addEventListener("click", () => {
+    if(!selectedIndex) return;
+    const wl = linearToWorldLevel(selectedIndex);
+    startCampaign(wl.worldId, wl.level, wl.index, wl.worldName);
+  }, {passive:true});
+
+  $("btnStartEndless").addEventListener("click", () => {
+    startEndless();
   }, {passive:true});
 
   // =========================
-  // Game Core
+  // GAME CORE
   // =========================
   const canvas = $("game");
   const ctx = canvas.getContext("2d", { alpha: true });
 
-  // Input
-  let inputX = 0;
+  // pointer controls (drag left/right)
+  let inputX = 0.5;
   let dragging = false;
 
-  // Mobile + Desktop controls
   canvas.addEventListener("pointerdown", (e) => {
     dragging = true;
     inputX = getPointerX(e);
@@ -615,71 +765,73 @@
   function getPointerX(e){
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
-    return Math.max(0, Math.min(1, x));
+    return clamp(x, 0, 1);
   }
 
-  // Make pause reliably work on mobile:
-  // - use pointerdown with passive:false so taps always register
-  // - stop propagation to avoid canvas capturing it
-  // - toggle our paused state and overlay
-  function bindPauseButton(btn){
-    const onToggle = (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      if(state.screen === "game"){
-        togglePause();
-      }
-    };
-    btn.addEventListener("pointerdown", onToggle, {passive:false});
-    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); }, {passive:false});
+  // Robust mobile pause: pointerdown + preventDefault + stopPropagation
+  function bindTap(btn, fn){
+    btn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      fn();
+    }, {passive:false});
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, {passive:false});
   }
-  bindPauseButton(btnPause);
 
-  btnMenu.addEventListener("pointerdown", (e) => {
-    e.preventDefault(); e.stopPropagation();
-    goToMenu();
-  }, {passive:false});
+  const btnPause = $("btnPause");
+  const btnRestart = $("btnRestart");
+  const btnMenu = $("btnMenu");
 
-  btnResume.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); setPaused(false); }, {passive:false});
-  btnRestart.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); restartRun(); }, {passive:false});
-  btnToMenu.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); goToMenu(); }, {passive:false});
+  const btnResume = $("btnResume");
+  const btnModalRestart = $("btnModalRestart");
+  const btnToMenu = $("btnToMenu");
 
-  // Auto-pause on tab background / focus loss (mobile safety)
+  bindTap(btnPause, () => { if(state.screen === "game") togglePause(); });
+  bindTap(btnRestart, () => { if(state.screen === "game") restartRun(); });
+  bindTap(btnMenu, () => { goToMenu(); });
+
+  bindTap(btnResume, () => setPaused(false,false));
+  bindTap(btnModalRestart, () => restartRun());
+  bindTap(btnToMenu, () => goToMenu());
+
+  // auto-pause on background (mobile safety)
   document.addEventListener("visibilitychange", () => {
     if(document.hidden && state.screen === "game" && !state.paused){
-      setPaused(true, true);
+      setPaused(true,true);
     }
   }, {passive:true});
   window.addEventListener("blur", () => {
     if(state.screen === "game" && !state.paused){
-      setPaused(true, true);
+      setPaused(true,true);
     }
   }, {passive:true});
 
   // State
   const state = {
-    screen: "menu",       // menu | game
-    mode: "endless",      // endless | campaign
-    level: 1,             // for campaign
+    screen: "menu",         // menu | game
+    mode: "endless",        // campaign | endless
+    worldId: 1,
+    worldName: WORLDS[0].name,
+    level: 1,
+    index: 1,               // linear level index
     paused: false,
     autoPaused: false,
     running: false,
 
-    t: 0,                 // elapsed seconds
+    t: 0,
     score: 0,
 
-    // difficulty
-    baseSpeed: 1.0,       // multiplier
-    hazardRate: 1.0,      // spawn scaling
+    baseSpeed: 1.0,
+    hazardRate: 1.0,
 
-    // player
     player: { x: 0.5, y: 0.86, r: 18, inv: 0 },
 
-    // hazards
     hazards: [],
     particles: [],
 
-    // effects
     effects: {
       glitch: false,
       shake: 0,
@@ -688,7 +840,6 @@
       lasers: false,
     },
 
-    // timers
     spawnAcc: 0,
     laserAcc: 0,
     glitchAcc: 0,
@@ -696,7 +847,6 @@
 
   // Hazards
   function makeBlock(){
-    // horizontal moving blocks descending
     const laneW = 1/7;
     const lane = Math.floor(rand(0, 7));
     const w = laneW * rand(1.4, 2.2);
@@ -708,20 +858,16 @@
       w, h: rand(0.04, 0.07),
       vx: rand(-0.10, 0.10) * pick([-1,1]),
       vy: rand(0.45, 0.72),
-      hot: false
     };
   }
 
   function makeLaserVertical(){
-    // vertical laser columns appear, warn then fire
     const x = rand(0.12, 0.88);
     const w = rand(0.03, 0.06);
     return {
       kind: "vlaser",
       x: x - w/2, w,
-      y: 0,
-      h: 1,
-      phase: "warn",      // warn -> fire -> fade
+      phase: "warn",
       t: 0,
       warnTime: 0.65,
       fireTime: 0.55,
@@ -729,94 +875,84 @@
     };
   }
 
-  // Utility
+  // Utils
   function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function clampInt(v,a,b){ return Math.max(a, Math.min(b, v|0)); }
   function rand(a,b){ return a + Math.random()*(b-a); }
   function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
 
-  // =========================
-  // Scoring (same for both modes)
-  // =========================
-  // - score grows with survival time and difficulty multipliers
-  // - no separate formula; separate leaderboards
+  // Scoring (same formula both modes; tracked separately)
   function scorePerSecond(){
-    // base 30 pts/sec + scaling with speed and active effects
     let mult = 1.0;
     if(state.effects.glitch) mult += 0.15;
     if(state.effects.scanlines) mult += 0.10;
     if(state.effects.invert) mult += 0.10;
     if(state.effects.lasers) mult += 0.20;
-
-    // speed impacts
     mult *= (0.85 + state.baseSpeed * 0.35);
     return 30 * mult;
   }
 
-  // =========================
-  // Effects schedule (start at 30s, earlier variety)
-  // =========================
+  // Effects schedule: first effect at 30s, stack earlier
   function updateEffects(){
     const t = state.t;
 
-    // Always ramp speed slowly
-    // Starts at 1.0 and ramps beyond (endless + campaign)
-    const speedRamp = 1 + (t * 0.010); // ~ +0.6 at 60s
+    // Speed ramps steadily (Endless ramps forever; Campaign also ramps during a run)
+    const speedRamp = 1 + (t * 0.010);
     state.baseSpeed = clamp(speedRamp, 1.0, 3.0);
 
     // Hazard rate ramp
     state.hazardRate = clamp(1 + (t * 0.012), 1, 3.4);
 
-    // Effects begin at 30 seconds (first effect)
-    // Stack earlier than before
+    // Begin at 30s
     state.effects.glitch = (t >= 30);
     state.effects.scanlines = (t >= 42);
-    state.effects.lasers = (t >= 55);     // vertical lasers start early-ish
+    state.effects.lasers = (t >= 55);   // vertical lasers
     state.effects.invert = (t >= 75);
 
-    // screen shake spikes
+    // shake pops
     if(t >= 30 && Math.floor(t) % 12 === 0){
       state.effects.shake = Math.max(state.effects.shake, 6);
     }
   }
 
-  // =========================
-  // Pause handling (robust)
-  // =========================
-  function setPaused(p, auto=false){
+  // Pause
+  function setPaused(p, auto){
     state.paused = p;
-    state.autoPaused = auto;
-    overlay.style.display = p ? "flex" : "none";
-    btnPause.textContent = p ? "Resume" : "Pause";
+    state.autoPaused = !!auto;
+    overlay.classList.toggle("show", p);
 
-    if(p){
-      modalTitle.textContent = auto ? "Paused (Auto)" : "Paused";
-      modalText.textContent = "Game paused.";
-    }
+    btnPause.textContent = p ? "Resume" : "Pause";
+    modalTitle.textContent = auto ? "Paused (Auto)" : (p ? "Paused" : "Paused");
+    modalText.textContent = p
+      ? `Score: ${Math.floor(state.score).toLocaleString()} • Time: ${state.t.toFixed(1)}s`
+      : "Game paused.";
   }
   function togglePause(){
     setPaused(!state.paused, false);
   }
 
-  // =========================
-  // Screens / Start / Restart
-  // =========================
-  function startCampaign(level){
+  // Start / Restart / Menu
+  function startCampaign(worldId, level, index, worldName){
     state.mode = "campaign";
+    state.worldId = worldId;
     state.level = level;
+    state.index = index;
+    state.worldName = worldName;
     startRun();
   }
+
   function startEndless(){
     state.mode = "endless";
+    // Ensure endless starts at W1-L1 difficulty baseline
+    state.worldId = 1;
     state.level = 1;
+    state.index = 1;
+    state.worldName = WORLDS[0].name;
     startRun();
   }
 
   function startRun(){
     state.screen = "game";
-    showMenu(menuMain);
-    overlay.style.display = "none";
-
-    // Reset run state
     state.running = true;
     state.paused = false;
     state.autoPaused = false;
@@ -840,11 +976,9 @@
     state.effects.lasers = false;
     state.effects.shake = 0;
 
-    // Campaign difficulty scaling by level, but ensure Endless starts at at least W1-L1 difficulty:
-    // We'll treat Level 1 baseline as the minimum for BOTH.
-    // Campaign levels slightly bump starting rate/speed.
+    // Campaign baseline bumps by progression, but NEVER below W1-L1 baseline
     if(state.mode === "campaign"){
-      const bump = (state.level - 1) * 0.12;
+      const bump = (state.index - 1) * 0.03; // gentle progression
       state.baseSpeed = 1.0 + bump;
       state.hazardRate = 1.0 + bump;
     } else {
@@ -852,8 +986,17 @@
       state.hazardRate = 1.0;
     }
 
-    statMode.textContent = (state.mode === "campaign") ? `Campaign L${state.level}` : "Endless";
-    setPaused(false);
+    // UI
+    showScreen("game");
+    overlay.classList.remove("show");
+
+    const label = (state.mode === "campaign")
+      ? `Campaign • ${state.worldName} • L${state.level}`
+      : "Endless";
+    runLabel.textContent = label;
+
+    statMode.textContent = (state.mode === "campaign") ? `Campaign` : "Endless";
+    setPaused(false,false);
   }
 
   function restartRun(){
@@ -864,47 +1007,44 @@
   function goToMenu(){
     state.screen = "menu";
     state.running = false;
-    setPaused(false);
+    setPaused(false,false);
+
     statMode.textContent = "Menu";
     statScore.textContent = "0";
     statTime.textContent = "0.0";
     statSpeed.textContent = "1.00";
-    showMenu(menuMain);
+
+    showScreen("main");
   }
 
-  // =========================
-  // Game Over / Results
-  // =========================
+  // End run / save / LB
   function endRun(){
     state.running = false;
-    setPaused(true, false);
-    modalTitle.textContent = "Run Complete";
-    modalText.textContent = `Score: ${Math.floor(state.score).toLocaleString()} • Time: ${state.t.toFixed(1)}s`;
+    setPaused(true,false);
 
-    // Update save + leaderboards
+    // Update save + boards
     if(state.mode === "campaign"){
-      const lvlKey = String(state.level);
-      const prevBest = save.campaign.bestPerLevel[lvlKey] || 0;
+      const idxKey = String(state.index);
+      const prevBest = save.campaign.bestByIndex[idxKey] || 0;
       if(state.score > prevBest){
-        save.campaign.bestPerLevel[lvlKey] = Math.floor(state.score);
+        save.campaign.bestByIndex[idxKey] = Math.floor(state.score);
       }
-      // unlock next level if completed (survived at least 20s OR score threshold)
-      // (This can be tuned. Keeps campaign moving.)
+
+      // Unlock next level if "completed"
       const unlockIf = (state.t >= 20) || (state.score >= 900);
       if(unlockIf){
-        save.campaign.unlockedLevel = Math.max(save.campaign.unlockedLevel, Math.min(8, state.level + 1));
+        save.campaign.unlockedIndex = Math.max(save.campaign.unlockedIndex, Math.min(totalLevels, state.index + 1));
       }
       saveSave(save);
 
-      addLeaderboardScore("campaign", state.score, { level: state.level });
-      renderCampaignMenu();
+      addLeaderboardScore("campaign", state.score, { index: state.index, worldId: state.worldId, level: state.level });
     } else {
-      addLeaderboardScore("endless", state.score, { });
+      addLeaderboardScore("endless", state.score, {});
     }
   }
 
   // =========================
-  // Main Loop
+  // Loop
   // =========================
   let last = performance.now();
 
@@ -914,46 +1054,39 @@
     const dt = Math.min(0.033, (now - last) / 1000);
     last = now;
 
-    if(state.screen !== "game"){
-      // Idle draw background
-      draw(dt);
-      return;
-    }
-
-    // Update UI stats even while paused (time frozen)
+    // Update HUD regardless
     statScore.textContent = Math.floor(state.score).toLocaleString();
     statTime.textContent = state.t.toFixed(1);
     statSpeed.textContent = state.baseSpeed.toFixed(2);
 
-    if(!state.running){
+    if(state.screen !== "game"){
       draw(dt);
       return;
     }
 
-    if(state.paused){
+    if(!state.running || state.paused){
       draw(dt);
       return;
     }
 
-    // ===== update =====
+    // update
     state.t += dt;
 
-    // Effects schedule and difficulty
+    // effects schedule + difficulty
     updateEffects();
 
-    // Score
+    // score
     state.score += scorePerSecond() * dt;
 
-    // Player move towards input
+    // player move
     const targetX = dragging ? inputX : state.player.x;
-    state.player.x += (targetX - state.player.x) * (1 - Math.pow(0.0005, dt)); // smooth
+    state.player.x += (targetX - state.player.x) * (1 - Math.pow(0.0005, dt));
     state.player.x = clamp(state.player.x, 0.07, 0.93);
 
     if(state.player.inv > 0) state.player.inv = Math.max(0, state.player.inv - dt);
 
-    // Spawning hazards
-    // blocks
-    const baseSpawn = 0.55; // seconds
+    // spawning
+    const baseSpawn = 0.55;
     const spawnInterval = clamp(baseSpawn / state.hazardRate, 0.20, 0.55);
     state.spawnAcc += dt;
     while(state.spawnAcc >= spawnInterval){
@@ -961,7 +1094,7 @@
       state.hazards.push(makeBlock());
     }
 
-    // vertical lasers (if active)
+    // vertical lasers
     if(state.effects.lasers){
       const baseLaser = 1.45;
       const laserInterval = clamp(baseLaser / (0.7 + state.hazardRate*0.25), 0.65, 1.45);
@@ -972,7 +1105,7 @@
       }
     }
 
-    // glitch jitter pulses (visual)
+    // glitch pulses
     if(state.effects.glitch){
       state.glitchAcc += dt;
       if(state.glitchAcc >= 0.18){
@@ -981,24 +1114,20 @@
       }
     }
 
-    // Update hazards
+    // hazards update
     for(let i = state.hazards.length - 1; i >= 0; i--){
       const h = state.hazards[i];
 
       if(h.kind === "block"){
         h.y += h.vy * dt * state.baseSpeed;
         h.x += h.vx * dt * (0.6 + state.baseSpeed*0.25);
-        // bounce
         if(h.x < 0.02 || h.x + h.w > 0.98) h.vx *= -1;
-
-        // offscreen
         if(h.y > 1.15){
           state.hazards.splice(i,1);
           continue;
         }
       } else if(h.kind === "vlaser"){
         h.t += dt * state.baseSpeed;
-
         if(h.phase === "warn" && h.t >= h.warnTime){
           h.phase = "fire";
           h.t = 0;
@@ -1013,21 +1142,19 @@
       }
     }
 
-    // Collisions
+    // collision
     const px = state.player.x, py = state.player.y, pr = state.player.r;
     const pRect = {
-      x: px - pr/720, // normalize to canvas-ish units later in draw; for collision we keep normalized
+      x: px - pr/720,
       y: py - pr/1280,
       w: (pr*2)/720,
       h: (pr*2)/1280
     };
 
-    // collision test with normalized rects
     for(const h of state.hazards){
       if(h.kind === "block"){
         const r = { x: h.x, y: h.y, w: h.w, h: h.h };
-        if(rectOverlap(pRect, r) && state.player.inv <= 0){
-          // no "deaths mode" etc; end run
+        if(rectOverlap(pRect, r)){
           spawnBurst(state.player.x, state.player.y);
           endRun();
           break;
@@ -1035,7 +1162,7 @@
       } else if(h.kind === "vlaser"){
         if(h.phase === "fire"){
           const r = { x: h.x, y: 0, w: h.w, h: 1 };
-          if(rectOverlap(pRect, r) && state.player.inv <= 0){
+          if(rectOverlap(pRect, r)){
             spawnBurst(state.player.x, state.player.y);
             endRun();
             break;
@@ -1044,7 +1171,7 @@
       }
     }
 
-    // Particles
+    // particles
     for(let i = state.particles.length - 1; i >= 0; i--){
       const p = state.particles[i];
       p.t += dt;
@@ -1054,13 +1181,9 @@
       if(p.t > p.life) state.particles.splice(i,1);
     }
 
-    // Shake decay
-    state.effects.shake *= Math.pow(0.02, dt); // quick decay
+    // shake decay
+    state.effects.shake *= Math.pow(0.02, dt);
 
-    // Campaign run length cap per level? (optional)
-    // We'll keep it open; you can always replay.
-
-    // Draw
     draw(dt);
   }
 
@@ -1081,12 +1204,12 @@
   }
 
   // =========================
-  // Draw
+  // DRAW
   // =========================
   function draw(dt){
     const W = canvas.width, H = canvas.height;
 
-    // camera shake
+    // shake
     const shake = Math.min(18, state.effects.shake);
     const sx = (Math.random()*2-1) * shake;
     const sy = (Math.random()*2-1) * shake;
@@ -1094,13 +1217,9 @@
     ctx.save();
     ctx.clearRect(0,0,W,H);
 
-    // base background
-    ctx.fillStyle = "rgba(0,0,0,0)";
-    ctx.fillRect(0,0,W,H);
-
     ctx.translate(sx, sy);
 
-    // vignette + gradient
+    // background gradient
     const g = ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0, "rgba(20,22,50,0.95)");
     g.addColorStop(1, "rgba(0,0,0,0.95)");
@@ -1113,20 +1232,14 @@
     ctx.lineWidth = 1;
     const grid = 54;
     for(let y=0;y<=H;y+=grid){
-      ctx.beginPath();
-      ctx.moveTo(0,y);
-      ctx.lineTo(W,y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
     }
     for(let x=0;x<=W;x+=grid){
-      ctx.beginPath();
-      ctx.moveTo(x,0);
-      ctx.lineTo(x,H);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
-    // center lane glow
+    // lane glow
     ctx.globalAlpha = 0.20;
     const gg = ctx.createRadialGradient(W/2,H*0.65, 10, W/2,H*0.65, H*0.7);
     gg.addColorStop(0, "rgba(110,231,255,0.40)");
@@ -1151,12 +1264,13 @@
         ctx.strokeRect(x+1, y+1, w-2, hh-2);
       } else if(h.kind === "vlaser"){
         const x = h.x * W, w = h.w * W;
+
         if(h.phase === "warn"){
-          // warning stripes
           ctx.save();
           ctx.globalAlpha = 0.55;
           ctx.fillStyle = "rgba(110,231,255,0.15)";
           ctx.fillRect(x, 0, w, H);
+
           ctx.globalAlpha = 0.9;
           ctx.strokeStyle = "rgba(110,231,255,0.85)";
           ctx.setLineDash([12, 10]);
@@ -1194,8 +1308,7 @@
     ctx.shadowColor = "rgba(183,255,110,0.45)";
     ctx.shadowBlur = 26;
 
-    // glitch jitter rendering
-    const jitter = (state.effects.glitch && state.screen === "game" && state.running && !state.paused) ? rand(-3,3) : 0;
+    const jitter = (state.effects.glitch && state.running && !state.paused) ? rand(-3,3) : 0;
     ctx.translate(jitter, 0);
 
     ctx.beginPath();
@@ -1203,13 +1316,11 @@
     ctx.fillStyle = "rgba(183,255,110,0.92)";
     ctx.fill();
 
-    // inner core
     ctx.shadowBlur = 0;
     ctx.beginPath();
     ctx.arc(px, py, r*0.45, 0, Math.PI*2);
     ctx.fillStyle = "rgba(255,255,255,0.55)";
     ctx.fill();
-
     ctx.restore();
 
     // particles
@@ -1221,7 +1332,7 @@
     }
     ctx.globalAlpha = 1;
 
-    // scanlines effect
+    // scanlines
     if(state.effects.scanlines){
       ctx.save();
       ctx.globalAlpha = 0.16;
@@ -1232,7 +1343,7 @@
       ctx.restore();
     }
 
-    // invert-ish overlay
+    // invert overlay
     if(state.effects.invert){
       ctx.save();
       ctx.globalAlpha = 0.10;
@@ -1241,20 +1352,24 @@
       ctx.restore();
     }
 
-    // HUD hint minimal (kept clean)
-    // (no bottom device instructions)
-
     ctx.restore();
   }
 
   // =========================
-  // Initialize
+  // INIT
   // =========================
   function init(){
-    showMenu(menuMain);
+    // screens
+    showScreen("main");
+
+    // render initial
     renderCampaignMenu();
     renderLeaderboards("campaign");
+
+    // start in menu
     goToMenu();
+
+    // loop
     requestAnimationFrame(tick);
   }
 

@@ -41,7 +41,7 @@
     button {
       margin: 15px;
       padding: 15px 40px;
-      font-size: 1.5rem;
+      font-size: 1.2rem;
       font-weight: bold;
       color: white;
       background: linear-gradient(45deg, #ff5733, #ff8b3d);
@@ -81,24 +81,69 @@
 </head>
 <body>
   <div id="game-container">
-    <!-- Main menu content -->
-    <div class="menu-screen">
+    <!-- Main Menu -->
+    <div class="menu-screen" id="main-menu">
       <h1>GRIDRUN</h1>
       <button onclick="loadModeSelect()">PLAY</button>
-      <button>SETTINGS</button>
-      <button>CREDITS</button>
+      <button onclick="alert('Login Placeholder')">LOGIN</button>
+      <button onclick="alert('Coming Soon!')">SETTINGS</button>
     </div>
   </div>
 
   <div class="menu-footer">© 2025 GRIDRUN Studios</div>
 
   <script>
-    // Replace this part with functional handlers or navigation
+    // Replace Main Menu Content with Mode Select Screen
     function loadModeSelect() {
-      alert("Mode Select Screen Placeholder");
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <!-- Mode Select -->
+        <div class="menu-screen" id="mode-select">
+          <h1>Select Mode</h1>
+          <button onclick="loadCampaignMode()">Campaign</button>
+          <button onclick="loadEndlessMode()">Endless</button>
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
     }
 
-    // Extra button handlers can be added for Settings, Credits, etc.
+    // Load Campaign Mode (Placeholder for Now)
+    function loadCampaignMode() {
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Campaign Mode</h1>
+          <p>Coming Soon...</p>
+          <button onclick="loadModeSelect()">Back</button>
+        </div>
+      `;
+    }
+
+    // Load Endless Mode (Placeholder for Now)
+    function loadEndlessMode() {
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Endless Mode</h1>
+          <p>Coming Soon...</p>
+          <button onclick="loadModeSelect()">Back</button>
+        </div>
+      `;
+    }
+
+    // Reload Main Menu
+    function loadMainMenu() {
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <!-- Main Menu -->
+        <div class="menu-screen">
+          <h1>GRIDRUN</h1>
+          <button onclick="loadModeSelect()">PLAY</button>
+          <button onclick="alert('Login Placeholder')">LOGIN</button>
+          <button onclick="alert('Coming Soon!')">SETTINGS</button>
+        </div>
+      `;
+    }
   </script>
 </body>
 </html>

@@ -7,9 +7,6 @@
   <style>
     :root{
       --bg0:#070812;
-      --bg1:#0b0f25;
-      --panel:rgba(255,255,255,.06);
-      --panel2:rgba(255,255,255,.10);
       --line:rgba(255,255,255,.10);
       --text:rgba(255,255,255,.92);
       --muted:rgba(255,255,255,.65);
@@ -17,7 +14,6 @@
       --accent:#6ee7ff;
       --accent2:#b7ff6e;
       --warn:#ff6ee7;
-      --danger:#ff4d4d;
 
       --btn:#141a38;
       --btnH:#1b2350;
@@ -34,9 +30,7 @@
     *{box-sizing:border-box;}
     html,body{height:100%; margin:0; color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background: radial-gradient(1200px 800px at 20% 15%, #1a1e4a 0%, var(--bg0) 55%, #02030a 100%);}
     button{font:inherit; color:inherit; -webkit-tap-highlight-color: transparent;}
-    a{color:inherit}
 
-    /* subtle animated grid background */
     .bg-grid{
       position:fixed; inset:0; pointer-events:none; opacity:.18;
       background:
@@ -46,19 +40,9 @@
       mask-image: radial-gradient(closest-side at 50% 45%, rgba(0,0,0,1), rgba(0,0,0,.25) 60%, rgba(0,0,0,0) 100%);
       animation: drift 14s linear infinite;
     }
-    @keyframes drift{
-      from{ transform: translate3d(0,0,0); }
-      to{ transform: translate3d(-40px,-40px,0); }
-    }
+    @keyframes drift{ from{transform:translate3d(0,0,0)} to{transform:translate3d(-40px,-40px,0)} }
 
-    .app{
-      min-height:100%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:18px;
-    }
-
+    .app{min-height:100%; display:flex; align-items:center; justify-content:center; padding:18px;}
     .frame{
       width:min(740px, 100%);
       background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
@@ -66,27 +50,18 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow:hidden;
-      position:relative;
     }
 
     .topbar{
       padding:14px;
       border-bottom:1px solid rgba(255,255,255,.10);
       background: rgba(0,0,0,.20);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
     }
 
     .brand{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      font-weight:900;
-      letter-spacing:.12em;
-      text-transform:uppercase;
-      font-size:18px;
+      display:flex; align-items:center; gap:10px;
+      font-weight:900; letter-spacing:.12em; text-transform:uppercase; font-size:18px;
     }
     .glyph{
       width:34px; height:34px; border-radius:12px;
@@ -95,32 +70,21 @@
       border:1px solid rgba(255,255,255,.14);
       flex:0 0 auto;
     }
-    /* removed subtitle under GRIDRUN per request */
 
     .hud{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      justify-content:flex-end;
-      align-items:center;
-      font-size:12.5px;
-      color:rgba(255,255,255,.85);
+      display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; align-items:center;
+      font-size:12.5px; color:rgba(255,255,255,.85);
     }
     .pill{
-      padding:6px 10px;
-      border-radius:999px;
+      padding:6px 10px; border-radius:999px;
       background: rgba(255,255,255,.06);
       border:1px solid rgba(255,255,255,.10);
-      display:flex; gap:8px; align-items:center;
-      white-space:nowrap;
+      display:flex; gap:8px; align-items:center; white-space:nowrap;
     }
     .pill b{color:var(--text); font-weight:800;}
     .pill .dot{width:8px; height:8px; border-radius:999px; background: var(--accent); box-shadow: 0 0 18px rgba(110,231,255,.35);}
 
-    .content{
-      padding:14px;
-    }
-
+    .content{padding:14px;}
     .screen{display:none;}
     .screen.active{display:block;}
 
@@ -132,11 +96,7 @@
     }
 
     .titleRow{
-      display:flex;
-      align-items:flex-end;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:10px;
+      display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:10px;
     }
     .titleRow h2{
       margin:0;
@@ -145,10 +105,7 @@
       text-transform:uppercase;
       color:rgba(255,255,255,.86);
     }
-    .titleRow .sub{
-      font-size:12.5px;
-      color:rgba(255,255,255,.65);
-    }
+    .titleRow .sub{font-size:12.5px; color:rgba(255,255,255,.65);}
 
     .btn{
       width:100%;
@@ -157,7 +114,7 @@
       border:1px solid rgba(255,255,255,.12);
       background: linear-gradient(180deg, var(--btn), rgba(255,255,255,.02));
       cursor:pointer;
-      transition: transform .06s ease, background .15s ease, border-color .15s ease, opacity .15s ease;
+      transition: transform .06s ease, background .15s ease, opacity .15s ease;
       display:flex; align-items:center; justify-content:space-between;
       touch-action: manipulation;
       user-select:none;
@@ -174,7 +131,6 @@
 
     .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
     @media (max-width:560px){ .grid2{grid-template-columns:1fr;} }
-
     .stack{display:flex; flex-direction:column; gap:10px;}
 
     .note{
@@ -188,13 +144,7 @@
       margin-top:10px;
     }
 
-    /* Game canvas */
-    .gameWrap{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      align-items:center;
-    }
+    .gameWrap{display:flex; flex-direction:column; gap:10px; align-items:center;}
     canvas{
       width:100%;
       max-width: 540px;
@@ -205,7 +155,6 @@
       box-shadow: 0 18px 55px rgba(0,0,0,.55);
       touch-action: none;
     }
-
     .gameActions{
       width:100%;
       display:flex;
@@ -226,7 +175,6 @@
     .iconBtn:hover{background: rgba(255,255,255,.09);}
     .iconBtn:active{transform: translateY(1px);}
 
-    /* Modal overlay */
     .overlay{
       position:fixed; inset:0;
       display:none;
@@ -251,7 +199,6 @@
     .modal .row{display:flex; gap:10px; flex-wrap:wrap;}
     .modal .row .btn{width:auto; flex:1 1 160px;}
 
-    /* Leaderboard */
     .leaderboard{
       margin-top:10px;
       border-radius: 14px;
@@ -288,7 +235,6 @@
     }
     .name{color:rgba(255,255,255,.86); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
     .score{font-variant-numeric: tabular-nums; text-align:right; font-weight:900; color:rgba(255,255,255,.92);}
-
   </style>
 </head>
 
@@ -297,11 +243,7 @@
   <div class="app">
     <div class="frame">
       <div class="topbar">
-        <div class="brand">
-          <div class="glyph"></div>
-          <div>GRIDRUN</div>
-        </div>
-
+        <div class="brand"><div class="glyph"></div><div>GRIDRUN</div></div>
         <div class="hud">
           <div class="pill"><span class="dot"></span><span>Mode: <b id="statMode">Menu</b></span></div>
           <div class="pill"><span>Score: <b id="statScore">0</b></span></div>
@@ -311,42 +253,22 @@
       </div>
 
       <div class="content">
-
         <!-- MAIN MENU -->
         <div class="screen active" id="screenMain">
           <div class="card">
             <div class="titleRow">
               <h2>Main Menu</h2>
-              <!-- subtitle removed per request -->
               <div class="sub">Fast • Skill-based • Off-chain gameplay</div>
             </div>
 
             <div class="stack">
-              <button class="btn" id="btnCampaign">
-                <span><b>Campaign</b></span>
-                <span class="hint">worlds & levels</span>
-              </button>
-
-              <button class="btn" id="btnEndless">
-                <span><b>Endless</b></span>
-                <span class="hint">starts at W1-L1 difficulty</span>
-              </button>
-
-              <button class="btn lb" id="btnLeaderboards">
-                <span><b>Leaderboards</b></span>
-                <span class="hint">campaign / endless</span>
-              </button>
+              <button class="btn" id="btnCampaign"><span><b>Campaign</b></span><span class="hint">worlds & levels</span></button>
+              <button class="btn" id="btnEndless"><span><b>Endless</b></span><span class="hint">starts at W1-L1 difficulty</span></button>
+              <button class="btn lb" id="btnLeaderboards"><span><b>Leaderboards</b></span><span class="hint">campaign / endless</span></button>
 
               <div class="grid2">
-                <button class="btn reset" id="btnResetSave">
-                  <span><b>Reset Save</b></span>
-                  <span class="hint">local only</span>
-                </button>
-
-                <button class="btn" id="btnExit">
-                  <span><b>Exit</b></span>
-                  <span class="hint">close tab</span>
-                </button>
+                <button class="btn reset" id="btnResetSave"><span><b>Reset Save</b></span><span class="hint">local only</span></button>
+                <button class="btn" id="btnExit"><span><b>Exit</b></span><span class="hint">close tab</span></button>
               </div>
             </div>
 
@@ -410,10 +332,7 @@
             </div>
 
             <div class="leaderboard">
-              <div class="lbHead">
-                <span id="lbTitle">Campaign</span>
-                <span id="lbCount">Top 10</span>
-              </div>
+              <div class="lbHead"><span id="lbTitle">Campaign</span><span id="lbCount">Top 10</span></div>
               <div class="lbList" id="lbList"></div>
             </div>
 
@@ -422,9 +341,7 @@
               <button class="btn reset" id="btnClearLB"><span><b>Clear Boards</b></span><span class="hint">local</span></button>
             </div>
 
-            <div class="note">
-              Note: global leaderboards come later (backend). These are local for now.
-            </div>
+            <div class="note">Note: global leaderboards come later (backend). These are local for now.</div>
           </div>
         </div>
 
@@ -444,8 +361,9 @@
                 <button class="iconBtn" id="btnRestart" aria-label="Restart">Restart</button>
                 <button class="iconBtn" id="btnMenu" aria-label="Menu">Menu</button>
               </div>
-
-              <!-- bottom control text removed per request -->
+              <div class="note" style="margin-top:0;">
+                <b>Direct-follow movement:</b> drag anywhere on the game to move <b>up/down/left/right</b> (your dot follows your finger).
+              </div>
             </div>
           </div>
         </div>
@@ -472,24 +390,21 @@
   // =========================
   // SAVE / LEADERBOARDS
   // =========================
-  const KEY_SAVE = "gridrun_save_v2";
-  const KEY_LB_CAMPAIGN = "gridrun_lb_campaign_v2";
-  const KEY_LB_ENDLESS = "gridrun_lb_endless_v2";
+  const KEY_SAVE = "gridrun_save_v3";
+  const KEY_LB_CAMPAIGN = "gridrun_lb_campaign_v3";
+  const KEY_LB_ENDLESS = "gridrun_lb_endless_v3";
 
-  // Worlds + levels restored (not "8 straight levels")
-  // Adjust counts/names freely later.
   const WORLDS = [
     { id: 1, name: "World 1: Neon Alley", levels: 5 },
     { id: 2, name: "World 2: Signal Ruins", levels: 5 },
     { id: 3, name: "World 3: Rift Sector", levels: 5 },
     { id: 4, name: "World 4: Overclock District", levels: 5 }
   ];
-
   const totalLevels = WORLDS.reduce((a,w) => a + w.levels, 0);
 
   const defaultSave = () => ({
     campaign: {
-      unlockedIndex: 1,        // 1..totalLevels (linear unlock)
+      unlockedIndex: 1,        // 1..totalLevels
       bestByIndex: {}          // index -> bestScore
     }
   });
@@ -521,17 +436,9 @@
   function addLeaderboardScore(mode, score, meta){
     const key = (mode === "campaign") ? KEY_LB_CAMPAIGN : KEY_LB_ENDLESS;
     const list = loadLB(key);
-
-    const entry = {
-      name: "Runner",
-      score: Math.floor(score),
-      ts: Date.now(),
-      detail: meta || {}
-    };
-
-    list.push(entry);
+    list.push({ name:"Runner", score:Math.floor(score), ts:Date.now(), detail: meta || {} });
     list.sort((a,b) => b.score - a.score || a.ts - b.ts);
-    const trimmed = list.slice(0, 10);
+    const trimmed = list.slice(0,10);
     saveLB(key, trimmed);
     return trimmed;
   }
@@ -555,7 +462,6 @@
   const statSpeed = $("statSpeed");
 
   const runLabel = $("runLabel");
-
   const overlay = $("overlay");
   const modalTitle = $("modalTitle");
   const modalText = $("modalText");
@@ -583,28 +489,19 @@
   }
 
   // =========================
-  // Campaign selection UI
+  // Campaign selection
   // =========================
-  let selectedIndex = null; // linear level index across worlds
+  let selectedIndex = null;
 
   function linearToWorldLevel(index){
     let acc = 0;
     for(const w of WORLDS){
       if(index <= acc + w.levels){
-        return { worldId: w.id, worldName: w.name, level: index - acc, index };
+        return { worldId:w.id, worldName:w.name, level:index-acc, index };
       }
       acc += w.levels;
     }
-    return { worldId: WORLDS[0].id, worldName: WORLDS[0].name, level: 1, index: 1 };
-  }
-
-  function worldLevelToLinear(worldId, level){
-    let acc = 0;
-    for(const w of WORLDS){
-      if(w.id === worldId) return acc + level;
-      acc += w.levels;
-    }
-    return 1;
+    return { worldId:WORLDS[0].id, worldName:WORLDS[0].name, level:1, index:1 };
   }
 
   function renderCampaignMenu(){
@@ -664,7 +561,7 @@
   }
 
   // =========================
-  // Leaderboards UI
+  // Leaderboards
   // =========================
   let currentLBMode = "campaign";
   function renderLeaderboards(mode){
@@ -690,7 +587,7 @@
   }
 
   // =========================
-  // Button wiring (tabs / screens)
+  // Buttons / screens
   // =========================
   $("btnCampaign").addEventListener("click", () => { renderCampaignMenu(); showScreen("campaign"); }, {passive:true});
   $("btnEndless").addEventListener("click", () => { showScreen("endless"); }, {passive:true});
@@ -722,37 +619,39 @@
 
   $("btnExit").addEventListener("click", () => { window.close(); }, {passive:true});
 
-  // Start buttons
   $("btnStartCampaign").addEventListener("click", () => {
     if(!selectedIndex) return;
     const wl = linearToWorldLevel(selectedIndex);
     startCampaign(wl.worldId, wl.level, wl.index, wl.worldName);
   }, {passive:true});
 
-  $("btnStartEndless").addEventListener("click", () => {
-    startEndless();
-  }, {passive:true});
+  $("btnStartEndless").addEventListener("click", () => startEndless(), {passive:true});
 
   // =========================
-  // GAME CORE
+  // GAME (Direct-follow 2D)
   // =========================
   const canvas = $("game");
   const ctx = canvas.getContext("2d", { alpha: true });
 
-  // pointer controls (drag left/right)
-  let inputX = 0.5;
+  // Direct-follow input (normalized 0..1)
+  let target = { x: 0.5, y: 0.86 };
   let dragging = false;
+
+  // Clamp area for player movement (keep off extreme edges)
+  const MOVE_BOUNDS = { xMin: 0.07, xMax: 0.93, yMin: 0.10, yMax: 0.92 };
 
   canvas.addEventListener("pointerdown", (e) => {
     dragging = true;
-    inputX = getPointerX(e);
+    const p = getPointerNorm(e);
+    target.x = p.x; target.y = p.y;
     canvas.setPointerCapture(e.pointerId);
     e.preventDefault();
   }, {passive:false});
 
   canvas.addEventListener("pointermove", (e) => {
     if(!dragging) return;
-    inputX = getPointerX(e);
+    const p = getPointerNorm(e);
+    target.x = p.x; target.y = p.y;
     e.preventDefault();
   }, {passive:false});
 
@@ -762,23 +661,20 @@
     e.preventDefault();
   }, {passive:false});
 
-  function getPointerX(e){
+  function getPointerNorm(e){
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
-    return clamp(x, 0, 1);
+    const y = (e.clientY - rect.top) / rect.height;
+    return {
+      x: clamp(x, MOVE_BOUNDS.xMin, MOVE_BOUNDS.xMax),
+      y: clamp(y, MOVE_BOUNDS.yMin, MOVE_BOUNDS.yMax),
+    };
   }
 
-  // Robust mobile pause: pointerdown + preventDefault + stopPropagation
+  // Robust mobile taps for buttons
   function bindTap(btn, fn){
-    btn.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      fn();
-    }, {passive:false});
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    }, {passive:false});
+    btn.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); fn(); }, {passive:false});
+    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); }, {passive:false});
   }
 
   const btnPause = $("btnPause");
@@ -797,26 +693,21 @@
   bindTap(btnModalRestart, () => restartRun());
   bindTap(btnToMenu, () => goToMenu());
 
-  // auto-pause on background (mobile safety)
   document.addEventListener("visibilitychange", () => {
-    if(document.hidden && state.screen === "game" && !state.paused){
-      setPaused(true,true);
-    }
+    if(document.hidden && state.screen === "game" && !state.paused) setPaused(true,true);
   }, {passive:true});
   window.addEventListener("blur", () => {
-    if(state.screen === "game" && !state.paused){
-      setPaused(true,true);
-    }
+    if(state.screen === "game" && !state.paused) setPaused(true,true);
   }, {passive:true});
 
   // State
   const state = {
-    screen: "menu",         // menu | game
-    mode: "endless",        // campaign | endless
+    screen: "menu",
+    mode: "endless",
     worldId: 1,
     worldName: WORLDS[0].name,
     level: 1,
-    index: 1,               // linear level index
+    index: 1,
     paused: false,
     autoPaused: false,
     running: false,
@@ -827,7 +718,7 @@
     baseSpeed: 1.0,
     hazardRate: 1.0,
 
-    player: { x: 0.5, y: 0.86, r: 18, inv: 0 },
+    player: { x: 0.5, y: 0.86, r: 18 },
 
     hazards: [],
     particles: [],
@@ -881,7 +772,7 @@
   function rand(a,b){ return a + Math.random()*(b-a); }
   function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
 
-  // Scoring (same formula both modes; tracked separately)
+  // Scoring
   function scorePerSecond(){
     let mult = 1.0;
     if(state.effects.glitch) mult += 0.15;
@@ -892,24 +783,18 @@
     return 30 * mult;
   }
 
-  // Effects schedule: first effect at 30s, stack earlier
+  // Effects schedule (starts 30s)
   function updateEffects(){
     const t = state.t;
-
-    // Speed ramps steadily (Endless ramps forever; Campaign also ramps during a run)
     const speedRamp = 1 + (t * 0.010);
     state.baseSpeed = clamp(speedRamp, 1.0, 3.0);
-
-    // Hazard rate ramp
     state.hazardRate = clamp(1 + (t * 0.012), 1, 3.4);
 
-    // Begin at 30s
     state.effects.glitch = (t >= 30);
     state.effects.scanlines = (t >= 42);
-    state.effects.lasers = (t >= 55);   // vertical lasers
+    state.effects.lasers = (t >= 55);
     state.effects.invert = (t >= 75);
 
-    // shake pops
     if(t >= 30 && Math.floor(t) % 12 === 0){
       state.effects.shake = Math.max(state.effects.shake, 6);
     }
@@ -920,16 +805,14 @@
     state.paused = p;
     state.autoPaused = !!auto;
     overlay.classList.toggle("show", p);
-
     btnPause.textContent = p ? "Resume" : "Pause";
+
     modalTitle.textContent = auto ? "Paused (Auto)" : (p ? "Paused" : "Paused");
     modalText.textContent = p
       ? `Score: ${Math.floor(state.score).toLocaleString()} • Time: ${state.t.toFixed(1)}s`
       : "Game paused.";
   }
-  function togglePause(){
-    setPaused(!state.paused, false);
-  }
+  function togglePause(){ setPaused(!state.paused, false); }
 
   // Start / Restart / Menu
   function startCampaign(worldId, level, index, worldName){
@@ -943,7 +826,6 @@
 
   function startEndless(){
     state.mode = "endless";
-    // Ensure endless starts at W1-L1 difficulty baseline
     state.worldId = 1;
     state.level = 1;
     state.index = 1;
@@ -960,9 +842,6 @@
     state.t = 0;
     state.score = 0;
 
-    state.player.x = 0.5;
-    state.player.inv = 0;
-
     state.hazards.length = 0;
     state.particles.length = 0;
 
@@ -976,9 +855,9 @@
     state.effects.lasers = false;
     state.effects.shake = 0;
 
-    // Campaign baseline bumps by progression, but NEVER below W1-L1 baseline
+    // baseline
     if(state.mode === "campaign"){
-      const bump = (state.index - 1) * 0.03; // gentle progression
+      const bump = (state.index - 1) * 0.03;
       state.baseSpeed = 1.0 + bump;
       state.hazardRate = 1.0 + bump;
     } else {
@@ -986,23 +865,24 @@
       state.hazardRate = 1.0;
     }
 
+    // Reset player + direct-follow target
+    state.player.x = 0.5;
+    state.player.y = 0.86;
+    target.x = state.player.x;
+    target.y = state.player.y;
+
     // UI
     showScreen("game");
     overlay.classList.remove("show");
-
-    const label = (state.mode === "campaign")
+    runLabel.textContent = (state.mode === "campaign")
       ? `Campaign • ${state.worldName} • L${state.level}`
       : "Endless";
-    runLabel.textContent = label;
 
-    statMode.textContent = (state.mode === "campaign") ? `Campaign` : "Endless";
+    statMode.textContent = (state.mode === "campaign") ? "Campaign" : "Endless";
     setPaused(false,false);
   }
 
-  function restartRun(){
-    if(state.screen !== "game") return;
-    startRun();
-  }
+  function restartRun(){ if(state.screen === "game") startRun(); }
 
   function goToMenu(){
     state.screen = "menu";
@@ -1017,20 +897,16 @@
     showScreen("main");
   }
 
-  // End run / save / LB
+  // End run
   function endRun(){
     state.running = false;
     setPaused(true,false);
 
-    // Update save + boards
     if(state.mode === "campaign"){
       const idxKey = String(state.index);
       const prevBest = save.campaign.bestByIndex[idxKey] || 0;
-      if(state.score > prevBest){
-        save.campaign.bestByIndex[idxKey] = Math.floor(state.score);
-      }
+      if(state.score > prevBest) save.campaign.bestByIndex[idxKey] = Math.floor(state.score);
 
-      // Unlock next level if "completed"
       const unlockIf = (state.t >= 20) || (state.score >= 900);
       if(unlockIf){
         save.campaign.unlockedIndex = Math.max(save.campaign.unlockedIndex, Math.min(totalLevels, state.index + 1));
@@ -1044,46 +920,35 @@
   }
 
   // =========================
-  // Loop
+  // MAIN LOOP
   // =========================
   let last = performance.now();
-
   function tick(now){
     requestAnimationFrame(tick);
-
     const dt = Math.min(0.033, (now - last) / 1000);
     last = now;
 
-    // Update HUD regardless
+    // HUD
     statScore.textContent = Math.floor(state.score).toLocaleString();
     statTime.textContent = state.t.toFixed(1);
     statSpeed.textContent = state.baseSpeed.toFixed(2);
 
-    if(state.screen !== "game"){
-      draw(dt);
-      return;
-    }
-
-    if(!state.running || state.paused){
-      draw(dt);
-      return;
-    }
+    if(state.screen !== "game"){ draw(dt); return; }
+    if(!state.running || state.paused){ draw(dt); return; }
 
     // update
     state.t += dt;
-
-    // effects schedule + difficulty
     updateEffects();
-
-    // score
     state.score += scorePerSecond() * dt;
 
-    // player move
-    const targetX = dragging ? inputX : state.player.x;
-    state.player.x += (targetX - state.player.x) * (1 - Math.pow(0.0005, dt));
-    state.player.x = clamp(state.player.x, 0.07, 0.93);
-
-    if(state.player.inv > 0) state.player.inv = Math.max(0, state.player.inv - dt);
+    // DIRECT-FOLLOW MOVEMENT (2D)
+    // player position matches finger target quickly (no "lane lock")
+    // If not dragging, the last target remains (so player stays put).
+    const follow = 1 - Math.pow(0.000001, dt); // extremely fast smoothing (feels direct)
+    state.player.x += (target.x - state.player.x) * follow;
+    state.player.y += (target.y - state.player.y) * follow;
+    state.player.x = clamp(state.player.x, MOVE_BOUNDS.xMin, MOVE_BOUNDS.xMax);
+    state.player.y = clamp(state.player.y, MOVE_BOUNDS.yMin, MOVE_BOUNDS.yMax);
 
     // spawning
     const baseSpawn = 0.55;
@@ -1117,56 +982,42 @@
     // hazards update
     for(let i = state.hazards.length - 1; i >= 0; i--){
       const h = state.hazards[i];
-
       if(h.kind === "block"){
         h.y += h.vy * dt * state.baseSpeed;
         h.x += h.vx * dt * (0.6 + state.baseSpeed*0.25);
         if(h.x < 0.02 || h.x + h.w > 0.98) h.vx *= -1;
-        if(h.y > 1.15){
-          state.hazards.splice(i,1);
-          continue;
-        }
+        if(h.y > 1.15){ state.hazards.splice(i,1); continue; }
       } else if(h.kind === "vlaser"){
         h.t += dt * state.baseSpeed;
         if(h.phase === "warn" && h.t >= h.warnTime){
-          h.phase = "fire";
-          h.t = 0;
+          h.phase = "fire"; h.t = 0;
           state.effects.shake = Math.max(state.effects.shake, 10);
         } else if(h.phase === "fire" && h.t >= h.fireTime){
-          h.phase = "fade";
-          h.t = 0;
+          h.phase = "fade"; h.t = 0;
         } else if(h.phase === "fade" && h.t >= h.fadeTime){
-          state.hazards.splice(i,1);
-          continue;
+          state.hazards.splice(i,1); continue;
         }
       }
     }
 
-    // collision
+    // collision (player as small rect around circle)
     const px = state.player.x, py = state.player.y, pr = state.player.r;
-    const pRect = {
-      x: px - pr/720,
-      y: py - pr/1280,
-      w: (pr*2)/720,
-      h: (pr*2)/1280
-    };
+    const pRect = { x: px - pr/720, y: py - pr/1280, w: (pr*2)/720, h: (pr*2)/1280 };
 
     for(const h of state.hazards){
       if(h.kind === "block"){
-        const r = { x: h.x, y: h.y, w: h.w, h: h.h };
+        const r = { x:h.x, y:h.y, w:h.w, h:h.h };
         if(rectOverlap(pRect, r)){
           spawnBurst(state.player.x, state.player.y);
           endRun();
           break;
         }
-      } else if(h.kind === "vlaser"){
-        if(h.phase === "fire"){
-          const r = { x: h.x, y: 0, w: h.w, h: 1 };
-          if(rectOverlap(pRect, r)){
-            spawnBurst(state.player.x, state.player.y);
-            endRun();
-            break;
-          }
+      } else if(h.kind === "vlaser" && h.phase === "fire"){
+        const r = { x:h.x, y:0, w:h.w, h:1 };
+        if(rectOverlap(pRect, r)){
+          spawnBurst(state.player.x, state.player.y);
+          endRun();
+          break;
         }
       }
     }
@@ -1181,9 +1032,7 @@
       if(p.t > p.life) state.particles.splice(i,1);
     }
 
-    // shake decay
     state.effects.shake *= Math.pow(0.02, dt);
-
     draw(dt);
   }
 
@@ -1193,13 +1042,7 @@
 
   function spawnBurst(x,y){
     for(let i=0;i<26;i++){
-      state.particles.push({
-        x,y,
-        vx: rand(-0.6,0.6),
-        vy: rand(-0.9,0.2),
-        t:0,
-        life: rand(0.35, 0.9)
-      });
+      state.particles.push({ x,y, vx: rand(-0.6,0.6), vy: rand(-0.9,0.2), t:0, life: rand(0.35,0.9) });
     }
   }
 
@@ -1208,18 +1051,14 @@
   // =========================
   function draw(dt){
     const W = canvas.width, H = canvas.height;
-
-    // shake
     const shake = Math.min(18, state.effects.shake);
     const sx = (Math.random()*2-1) * shake;
     const sy = (Math.random()*2-1) * shake;
 
     ctx.save();
     ctx.clearRect(0,0,W,H);
-
     ctx.translate(sx, sy);
 
-    // background gradient
     const g = ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0, "rgba(20,22,50,0.95)");
     g.addColorStop(1, "rgba(0,0,0,0.95)");
@@ -1231,12 +1070,8 @@
     ctx.strokeStyle = "rgba(255,255,255,0.55)";
     ctx.lineWidth = 1;
     const grid = 54;
-    for(let y=0;y<=H;y+=grid){
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
-    }
-    for(let x=0;x<=W;x+=grid){
-      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
-    }
+    for(let y=0;y<=H;y+=grid){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    for(let x=0;x<=W;x+=grid){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
     ctx.globalAlpha = 1;
 
     // lane glow
@@ -1337,9 +1172,7 @@
       ctx.save();
       ctx.globalAlpha = 0.16;
       ctx.fillStyle = "rgba(255,255,255,0.20)";
-      for(let y=0; y<H; y+=8){
-        ctx.fillRect(0, y, W, 1);
-      }
+      for(let y=0; y<H; y+=8) ctx.fillRect(0, y, W, 1);
       ctx.restore();
     }
 
@@ -1359,20 +1192,12 @@
   // INIT
   // =========================
   function init(){
-    // screens
     showScreen("main");
-
-    // render initial
     renderCampaignMenu();
     renderLeaderboards("campaign");
-
-    // start in menu
     goToMenu();
-
-    // loop
     requestAnimationFrame(tick);
   }
-
   init();
 
 })();

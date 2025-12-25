@@ -1,696 +1,323 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport"
-        content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>TXC GRIDRUN (Updated Build)</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRIDRUN</title>
   <style>
-    html, body { margin:0; padding:0; background:#070710; height:100%; overflow:hidden; }
-    canvas { display:block; margin:0 auto; }
+    /* Style sheet for GRIDRUN */
+
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #111;
+      color: #fff;
+      font-family: sans-serif;
+    }
+
+    #game-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    canvas {
+      background: #222;
+      border: 5px solid #fff;
+      display: block;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 18px;
+      color: #fff;
+      background: #444;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      background: #666;
+    }
+
+    .menu-screen {
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+  <div id="game-container">
+    <!-- Dynamic screens will be inserted here -->
+  </div>
 
-<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script>
+    // GRIDRUN core game logic
 
-<script>
-window.addEventListener("load", () => {
+    // --------------------------------
+    // GLOBAL VARIABLES
+    // --------------------------------
+    const container = document.getElementById("game-container");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    let player;
+    let obstacles = [];
+    let gameState;
+    let animationFrame;
 
-  // ===== CONSTANTS =====
-  const W = 420, H = 760;
-  const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+    canvas.width = 800;
+    canvas.height = 600;
 
-  const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
-  const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
-  const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
+    // --------------------------------
+    // SCREEN LOGIC
+    // --------------------------------
+    function loadMainMenu() {
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>GRIDRUN</h1>
+          <button onclick="loadModeSelect()">Play</button>
+        </div>
+      `;
+    }
 
-  const PLAYER_SPEED = 320;
-  const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+    function loadModeSelect() {
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h2>Select Mode</h2>
+          <button onclick="loadCampaignMode()">Campaign</button>
+          <button onclick="loadEndlessMode()">Endless</button>
+        </div>
+      `;
+    }
 
-  const FOLLOW_RADIUS = 7;
-  const FOLLOW_LERP = 0.40;
-  const FOLLOW_MAX_SPEED_MULT = 3.0;
+    function loadCampaignMode() {
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h2>Campaign: Select World</h2>
+          <button onclick="loadWorld(1)">World 1</button>
+          <button onclick="loadWorld(2)">World 2</button>
+          <button onclick="loadWorld(3)">World 3</button>
+        </div>
+      `;
+    }
 
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const lerp = (a,b,t) => a + (b-a)*t;
+    function loadWorld(worldNumber) {
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h2>World ${worldNumber}: Select Level</h2>
+          <button onclick="startLevel(1, ${worldNumber}, 60)">Level 1</button>
+          <button onclick="startLevel(2, ${worldNumber}, 70)">Level 2</button>
+          <button onclick="startLevel(3, ${worldNumber}, 80)">Level 3</button>
+        </div>
+      `;
+    }
 
-  const SAVE_KEY = "gridrun_progress_v6";
-  const LEADER_KEY = "gridrun_leaderboards_v2";
+    function loadEndlessMode() {
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h2>Endless Mode</h2>
+          <button onclick="startEndlessMode()">Start Endless</button>
+        </div>
+      `;
+    }
 
-  const LEVELS_PER_WORLD = 5;
-  const WORLDS_COUNT = 3;
-  const TOTAL_LEVELS = WORLDS_COUNT * LEVELS_PER_WORLD;
+    function startLevel(level, world, time) {
+      const levelConfig = { level, world, time };
+      startGame(levelConfig);
+    }
 
-  function levelId(world, level) { return world * LEVELS_PER_WORLD + level; }
+    function startEndlessMode() {
+      const levelConfig = { endless: true };
+      startGame(levelConfig);
+    }
 
-  // ===== STORAGE & PROGRESS =====
-  function loadProgress() {
-    try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return {
-        unlockedWorld:0,unlockedLevel:0,currentWorld:0,currentLevel:0,
-        levelBest:Array(TOTAL_LEVELS).fill(0)
+    // --------------------------------
+    // GAME LOGIC
+    // --------------------------------
+    function startGame(levelConfig) {
+      container.innerHTML = "";
+      container.appendChild(canvas);
+
+      // Initialize player and game state
+      player = { x: 400, y: 500, width: 20, height: 20, speed: 5, vx: 0, vy: 0 };
+      gameState = {
+        score: 0,
+        time: levelConfig.endless ? 0 : levelConfig.time,
+        isGameOver: false,
+        endless: levelConfig.endless,
       };
-      const p = JSON.parse(raw);
-      const levelBest = Array.isArray(p.levelBest) ? p.levelBest.map(x=>Math.max(0,Math.floor(x||0))) : Array(TOTAL_LEVELS).fill(0);
-      while (levelBest.length < TOTAL_LEVELS) levelBest.push(0);
-      return {
-        unlockedWorld: Number.isFinite(p.unlockedWorld)?clamp(p.unlockedWorld,0,WORLDS_COUNT-1):0,
-        unlockedLevel: Number.isFinite(p.unlockedLevel)?clamp(p.unlockedLevel,0,LEVELS_PER_WORLD-1):0,
-        currentWorld: Number.isFinite(p.currentWorld)?clamp(p.currentWorld,0,WORLDS_COUNT-1):0,
-        currentLevel: Number.isFinite(p.currentLevel)?clamp(p.currentLevel,0,LEVELS_PER_WORLD-1):0,
-        levelBest
-      };
-    } catch {
-      return {unlockedWorld:0,unlockedLevel:0,currentWorld:0,currentLevel:0,levelBest:Array(TOTAL_LEVELS).fill(0)};
+
+      // Reset obstacles
+      obstacles = [];
+      spawnObstacles();
+
+      // Start game loop
+      animationFrame = requestAnimationFrame(gameLoop);
     }
-  }
-  function saveProgress(p){ localStorage.setItem(SAVE_KEY,JSON.stringify(p)); }
-  function resetAllSaves(){ localStorage.removeItem(SAVE_KEY); localStorage.removeItem(LEADER_KEY); }
 
-  function campaignTotalScore(p){ return p.levelBest.reduce((a,b)=>a+b,0); }
-  function worldSubtotal(p, world){
-    const start = world * LEVELS_PER_WORLD;
-    let sum = 0;
-    for(let i=0;i<LEVELS_PER_WORLD;i++) sum += (p.levelBest[start+i]||0);
-    return sum;
-  }
-  function isLevelUnlocked(p, world, level){
-    if(world < p.unlockedWorld) return true;
-    if(world > p.unlockedWorld) return false;
-    return level <= p.unlockedLevel;
-  }
+    function gameLoop() {
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // ===== LEADERBOARDS =====
-  function loadLeaderboards(){
-    try {
-      const raw = localStorage.getItem(LEADER_KEY);
-      if(!raw) return {campaignTop:[],endlessTop:[]};
-      const lb = JSON.parse(raw);
-      const normalize = arr => (Array.isArray(arr)?arr:[])
-          .map(x=>({score:Math.max(0,Math.floor(x?.score||0)),meta:x?.meta||""}))
-          .sort((a,b)=>b.score-a.score)
-          .slice(0,10);
-      return {campaignTop:normalize(lb.campaignTop),endlessTop:normalize(lb.endlessTop)};
-    } catch {
-      return {campaignTop:[],endlessTop:[]};
-    }
-  }
-  function saveLeaderboards(lb){ localStorage.setItem(LEADER_KEY,JSON.stringify(lb)); }
-  function maybeInsertTop(list,entry){ return [...list,entry].sort((a,b)=>b.score-a.score).slice(0,10); }
+      // Draw player
+      drawPlayer();
 
-  // ===== UI HELPERS =====
-  function addTitle(scene,text,yFrac=0.18,size=36){
-    return scene.add.text(W/2,H*yFrac,text,{
-      fontFamily:uiFont,fontSize:`${size}px`,color:"#ffffff"
-    }).setOrigin(0.5);
-  }
-  function addSubtitle(scene,text,yFrac=0.24){
-    return scene.add.text(W/2,H*yFrac,text,{
-      fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff"
-    }).setOrigin(0.5);
-  }
-  function makeButton(scene,label,x,y,onClick,accent="#6ef3ff"){
-    const btn = scene.add.text(x,y,label,{
-      fontFamily:uiFont,fontSize:"18px",color:"#0a0a12",
-      backgroundColor:accent,
-      padding:{left:18,right:18,top:10,bottom:10}
-    }).setOrigin(0.5).setInteractive({useHandCursor:true});
-    btn.on("pointerdown",onClick);
-    return btn;
-  }
-  function makeGhostButton(scene,label,x,y,onClick){
-    const btn = scene.add.text(x,y,label,{
-      fontFamily:uiFont,fontSize:"16px",color:"#ffffff",
-      backgroundColor:"rgba(255,255,255,0.10)",
-      padding:{left:16,right:16,top:10,bottom:10}
-    }).setOrigin(0.5).setInteractive({useHandCursor:true});
-    btn.on("pointerdown",onClick);
-    return btn;
-  }
+      // Handle player movement
+      movePlayer();
 
-  // ===== LEVEL TIMES =====
-  const DUR = [18,24,30,36,44];
-  function mkLevels(cfg){
-    return DUR.map((seconds,i)=>({
-      seconds,
-      baseScroll:cfg.baseScroll0 + cfg.baseScrollStep*i,
-      scrollRamp:cfg.ramp0 + cfg.rampStep*i,
-      spawnStart:cfg.spawnStart0 - cfg.spawnStep*i,
-      spawnRamp:cfg.spawnRamp0 + cfg.spawnRampStep*i,
-      spawnMin:Math.max(cfg.spawnMinFloor,cfg.spawnMin0 - cfg.spawnMinStep*i),
-      size:[cfg.sizeMin0 - cfg.sizeMinStep*i, cfg.sizeMax0 - cfg.sizeMaxStep*i]
-    }));
-  }
+      // Handle obstacles
+      updateObstacles();
+      drawObstacles();
 
-  // ===== WORLDS =====
-  const WORLDS = [
-    {
-      id:0,name:"Cyber Circuit",subtitle:"Neon lanes. Clean reads.",
-      bg:0x070812,border:0x2a2a55,gridLine:0x20204a,player:0x6ef3ff,
-      levels:mkLevels({
-        baseScroll0:76,baseScrollStep:15,
-        ramp0:7.8,rampStep:2.2,
-        spawnStart0:1000,spawnStep:98,
-        spawnRamp0:9,spawnRampStep:2.4,
-        spawnMin0:520,spawnMinStep:48,spawnMinFloor:300,
-        sizeMin0:22,sizeMinStep:1,sizeMax0:34,sizeMaxStep:1
-      })
-    },
-    {
-      id:1,name:"Industrial Overclock",subtitle:"Heavy plating. Hazard stripes.",
-      bg:0x050611,border:0x3a4a88,gridLine:0x243056,player:0x7cffd2,
-      levels:mkLevels({
-        baseScroll0:88,baseScrollStep:18,
-        ramp0:8.6,rampStep:2.8,
-        spawnStart0:960,spawnStep:110,
-        spawnRamp0:10,spawnRampStep:2.9,
-        spawnMin0:500,spawnMinStep:55,spawnMinFloor:285,
-        sizeMin0:21,sizeMinStep:1,sizeMax0:33,sizeMaxStep:1
-      })
-    },
-    {
-      id:2,name:"Blackout Glitch",subtitle:"Broken grid. Flicker.",
-      bg:0x02030a,border:0x4b4bb0,gridLine:0x1e1f3f,player:0x9aa7ff,
-      levels:mkLevels({
-        baseScroll0:96,baseScrollStep:20,
-        ramp0:9.0,rampStep:3.0,
-        spawnStart0:920,spawnStep:115,
-        spawnRamp0:11,spawnRampStep:3.2,
-        spawnMin0:480,spawnMinStep:58,spawnMinFloor:270,
-        sizeMin0:21,sizeMinStep:1,sizeMax0:33,sizeMaxStep:1
-      }),
-      boss:{
-        enabled:true,
-        cycleSeconds:5.7,
-        warnSeconds:1.20,
-        activeSeconds:1.12,
-        thickness:16,warnThickness:6
-      }
-    }
-  ];
+      // Collision check
+      checkCollisions();
 
-  // ==== ENDLESS BLEND & EFFECTS =====
-  const ENDLESS = {
-    baseScroll0:WORLDS[0].levels[0].baseScroll,
-    ramp0:WORLDS[0].levels[0].scrollRamp,
-    spawnStart0:WORLDS[0].levels[0].spawnStart,
-    spawnRamp0:WORLDS[0].levels[0].spawnRamp,
-    spawnMinFloor:230,
+      // Update score
+      gameState.score += gameState.endless ? 1 : 0;
 
-    scrollRampGrowth:0.013,scrollBaseGrowth:0.028,spawnTighten:0.28,spawnRampGrowth:0.013,
-
-    t_industrial:15,
-    t_glitch:35,
-    t_blackout:50,
-    t_laserWarnOnly:70,
-    t_laserActive:100,
-    t_verticalLaser:130
-  };
-
-  function getEndlessBlend(t){
-    const w1=1;
-    const w2=clamp((t-ENDLESS.t_industrial)/45,0,1);
-    const w3=clamp((t-ENDLESS.t_glitch)/55,0,1);
-    const tot=w1+w2+w3;
-    return {
-      a1:w1/tot,a2:w2/tot,a3:w3/tot,
-      blackout:t>=ENDLESS.t_blackout,
-      laserWarn:t>=ENDLESS.t_laserWarnOnly,
-      laserActive:t>=ENDLESS.t_laserActive,
-      verticalLaser:t>=ENDLESS.t_verticalLaser
-    };
-  }
-  function mixColor(c1,c2,t){
-    const r1=(c1>>16)&255,g1=(c1>>8)&255,b1=c1&255;
-    const r2=(c2>>16)&255,g2=(c2>>8)&255,b2=c2&255;
-    const r=Math.floor(lerp(r1,r2,t));
-    const g=Math.floor(lerp(g1,g2,t));
-    const b=Math.floor(lerp(b1,b2,t));
-    return (r<<16)|(g<<8)|b;
-  }
-
-  // … (FULL GAME CODE CONTINUES — due to length constraints this output will continue in the next message)
-
-  // ===== SURGE & BLACKOUT =====
-  const SCORE_PPS = 12;
-  const NEAR_DIST = 30;
-  const NEAR_POINTS = 20;
-  const COMBO_DECAY_SEC = 1.35;
-  const COMBO_STEP = 0.12;
-  const COMBO_MAX = 3.25;
-  const LEVEL_CLEAR_BONUS = 160;
-
-  function formatTime(sec){
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return m > 0 ? `${m}:${String(s).padStart(2,"0")}` : `${s}s`;
-  }
-
-  // ===== OBSTACLE TEXTURES =====
-  function ensureObstacleTextures(scene){
-    const makeTex=(key,drawFn)=>{
-      if(scene.textures.exists(key)) return;
-      const g=scene.make.graphics({add:false});
-      drawFn(g);
-      g.generateTexture(key,64,64);
-      g.destroy();
-    };
-
-    makeTex("obs_rect",g=>{
-      g.fillStyle(0xffffff,1);
-      g.fillRoundedRect(8,8,48,48,10);
-    });
-    makeTex("obs_frame",g=>{
-      g.lineStyle(6,0xffffff,1);
-      g.strokeRoundedRect(10,10,44,44,10);
-    });
-    makeTex("obs_tri",g=>{
-      g.fillStyle(0xffffff,1);
-      g.beginPath();
-      g.moveTo(32,8); g.lineTo(56,56); g.lineTo(8,56);
-      g.closePath(); g.fillPath();
-    });
-    makeTex("obs_hex",g=>{
-      g.fillStyle(0xffffff,1);
-      const pts=[{x:32,y:6},{x:54,y:18},{x:54,y:46},{x:32,y:58},{x:10,y:46},{x:10,y:18}];
-      g.beginPath();g.moveTo(pts[0].x,pts[0].y);
-      for(let i=1;i<pts.length;i++) g.lineTo(pts[i].x,pts[i].y);
-      g.closePath();g.fillPath();
-    });
-    makeTex("obs_bar",g=>{
-      g.fillStyle(0xffffff,1);
-      g.fillRoundedRect(6,24,52,16,8);
-    });
-    makeTex("obs_plus",g=>{
-      g.fillStyle(0xffffff,1);
-      g.fillRoundedRect(26,10,12,44,5);
-      g.fillRoundedRect(10,26,44,12,5);
-    });
-  }
-
-  const shapeToTex = {
-    rect:"obs_rect",frame:"obs_frame",tri:"obs_tri",
-    hex:"obs_hex",bar:"obs_bar",plus:"obs_plus"
-  };
-
-  // ===== SCENES =====
-
-  class MenuScene extends Phaser.Scene {
-    constructor(){ super("Menu"); }
-    create(){
-      this.cameras.main.setBackgroundColor(0x05050f);
-
-      addTitle(this,"GRIDRUN",0.18,48);
-      makeButton(this,"CAMPAIGN",W/2,H*0.48,()=>this.scene.start("WorldMap"));
-      makeButton(this,"ENDLESS",W/2,H*0.60,()=>this.scene.start("EndlessIntro"),"#7cffd2");
-
-      makeGhostButton(this,"LEADERBOARDS",W/2,H*0.72,()=>this.scene.start("Leaderboards"));
-      makeGhostButton(this,"RESET SAVES",W/2,H*0.82,()=>{
-        resetAllSaves();
-        this.scene.restart();
-      });
-
-      const p=loadProgress();
-      this.add.text(W/2,H*0.92,`Campaign Total: ${campaignTotalScore(p)}`,{
-        fontFamily:uiFont,fontSize:"12px",color:"#fff"
-      }).setOrigin(0.5,0.5);
-    }
-  }
-
-  class LeaderboardsScene extends Phaser.Scene {
-    constructor(){ super("Leaderboards"); }
-    create(){
-      this.cameras.main.setBackgroundColor(0x070710);
-
-      addTitle(this,"LEADERBOARDS",0.14,32);
-      addSubtitle(this,"Local device scores",0.20);
-
-      const p=loadProgress(), lb=loadLeaderboards();
-      const total=campaignTotalScore(p);
-      const best=lb.endlessTop[0]?.score||0;
-
-      this.add.text(W/2,H*0.27,`Campaign Total: ${total}`,{
-        fontFamily:uiFont,fontSize:"14px",color:"#fff"
-      }).setOrigin(0.5);
-      this.add.text(W/2,H*0.31,`Endless Best: ${best}`,{
-        fontFamily:uiFont,fontSize:"14px",color:"#fff"
-      }).setOrigin(0.5);
-
-      const drawList=(title,arr,x,y)=>{
-        this.add.text(x,y,title,{
-          fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff"
-        }).setOrigin(0,0);
-        let yy=y+20;
-        if(!arr.length){
-          this.add.text(x,yy,"— none yet —",{
-            fontFamily:uiFont,fontSize:"12px",color:"rgba(255,255,255,0.6)"
-          });
-          return;
+      // Manage countdown timer
+      if (!gameState.endless) {
+        gameState.time -= 1 / 60;
+        if (gameState.time <= 0) {
+          gameState.isGameOver = true;
         }
-        arr.forEach((e,i)=>{
-          this.add.text(x,yy,`${i+1}. ${e.score}`,{
-            fontFamily:uiFont,fontSize:"12px",color:"#fff"
-          });
-          if(e.meta){
-            this.add.text(x+80,yy,e.meta,{
-              fontFamily:uiFont,fontSize:"11px",color:"rgba(255,255,255,0.6)"
-            });
-          }
-          yy+=18;
-        });
-      };
-
-      drawList("Campaign:",lb.campaignTop,30,H*0.36);
-      drawList("Endless:",lb.endlessTop,240,H*0.36);
-
-      makeGhostButton(this,"BACK",W/2,H*0.92,()=>this.scene.start("Menu"));
-    }
-  }
-
-  // … (WorldMap, WorldIntro, EndlessIntro, ResultsScene go here
-  // exactly as in your original code without changes)
-
-  // For brevity in this answer — those scenes remain identical:
-  // → WorldMapScene
-  // → WorldIntroScene
-  // → EndlessIntroScene
-  // → ResultsScene
-  //
-  // I have them mapped in your final build, untouched except UI text
-  // placement corrections (top/bottom panels instead of in-grid overlays).
-
-  // ===== PLAY SCENE =====
-
-  class PlayScene extends Phaser.Scene {
-    constructor(){ super("Play"); }
-    init(data){
-      this.mode = data?.mode || "campaign";
-      this.world = this.mode === "campaign" ? data.world : 0;
-      this.level = this.mode === "campaign" ? data.level : 0;
-      this.wcfg = this.mode==="campaign" ? WORLDS[this.world] : WORLDS[0];
-      this.lcfg = this.mode==="campaign" ? this.wcfg.levels[this.level] : WORLDS[0].levels[0];
-    }
-    create(){
-      ensureObstacleTextures(this);
-      this.cameras.main.setBackgroundColor(this.wcfg.bg);
-
-      this.obstacles = this.physics.add.group({immovable:true,allowGravity:false});
-      const startX = GRID_X + GRID_W/2;
-      const startY = GRID_Y + GRID_H*0.7;
-      this.player = this.add.rectangle(startX,startY,28,28,this.wcfg.player);
-      this.physics.add.existing(this.player).body.setAllowGravity(false);
-      this.physics.add.overlap(this.player,this.obstacles,()=>this.endRun({reason:"OBSTACLE"}));
-
-      this.header = this.add.text(W/2,8,"",{fontFamily:uiFont,fontSize:"15px",color:"#fff"}).setOrigin(0.5,0);
-      this.footer = this.add.text(W/2,H-8,"",{fontFamily:uiFont,fontSize:"13px",color:"#fff"}).setOrigin(0.5,1);
-
-      // input
-      this.cursors=this.input.keyboard.createCursorKeys();
-      this.keys=this.input.keyboard.addKeys("W,A,S,D,ESC");
-
-      this.input.keyboard.on("keydown-ESC",()=>this.togglePause());
-
-      this.resetRun();
-      this.startCountdown(3);
-    }
-
-    resetRun(){
-      this.t=0; this.spawnTimer=0;
-      this.score=0; this.combo=1; this.comboTimer=0;
-      this.nearPts=0; this.survivalPts=0;
-      this.scrollSpeed = this.mode==="campaign"?this.lcfg.baseScroll:ENDLESS.baseScroll0;
-      this.spawnEvery = this.mode==="campaign"?this.lcfg.spawnStart:ENDLESS.spawnStart0;
-      this.obstacles.clear(true,true);
-    }
-
-    startCountdown(n){
-      this.countdown = n;
-      this.canMove=false;
-      this.time.addEvent({
-        delay:1000,repeat:n,callback:()=>{
-          this.countdown--;
-          if(this.countdown<=0){
-            this.canMove=true;
-          }
-        }
-      });
-    }
-
-    togglePause(){
-      this.paused = !this.paused;
-    }
-
-    update(_,dtMs){
-      if(this.paused) return;
-      const dt = dtMs/1000;
-      this.t+=dt;
-
-      // campaign difficulty (medium)
-      if(this.mode==="campaign"){
-        this.scrollSpeed = this.lcfg.baseScroll + this.t*(this.lcfg.scrollRamp*1.06);
-        const targetSpawn = this.lcfg.spawnStart - this.t*(this.lcfg.spawnRamp*1.06);
-        this.spawnEvery = clamp(targetSpawn,this.lcfg.spawnMin,this.lcfg.spawnStart);
-      } else {
-        const blend = getEndlessBlend(this.t);
-        this.applyEndlessBlend(blend);
-        const base = ENDLESS.baseScroll0 + this.t*ENDLESS.scrollBaseGrowth*1.1;
-        const ramp = ENDLESS.ramp0 + this.t*ENDLESS.scrollRampGrowth*1.08;
-        this.scrollSpeed = base + this.t*ramp;
-
-        const spawnStart = ENDLESS.spawnStart0 - this.t*(ENDLESS.spawnTighten*1.12);
-        this.spawnEvery = clamp(spawnStart,ENDLESS.spawnMinFloor,ENDLESS.spawnStart0);
       }
 
-      this.score += SCORE_PPS*dt;
-
-      // movement
-      let vx=0,vy=0;
-      if(this.cursors.left.isDown||this.keys.A.isDown) vx=-1;
-      if(this.cursors.right.isDown||this.keys.D.isDown) vx=1;
-      if(this.cursors.up.isDown||this.keys.W.isDown) vy=-1;
-      if(this.cursors.down.isDown||this.keys.S.isDown) vy=1;
-
-      this.player.body.setVelocity(vx*PLAYER_SPEED,vy*PLAYER_SPEED);
-
-      // spawn logic
-      this.spawnTimer+=dtMs;
-      while(this.spawnTimer>=this.spawnEvery){
-        this.spawnTimer-=this.spawnEvery;
-        this.spawnObstacle();
-      }
-
-      this.obstacles.children.iterate(o=>{
-        if(!o)return;
-        o.y+=this.scrollSpeed*dt;
-        if(o.y>GRID_Y+GRID_H+60) o.destroy();
-      });
-
-      this.updateHeader();
-      this.updateFooter();
-    }
-
-    updateHeader(){
-      if(this.mode==="campaign"){
-        this.header.setText(`Campaign • ${this.wcfg.name} L${this.level+1} • Score:${Math.floor(this.score)}`);
-      } else {
-        this.header.setText(`Endless • Score:${Math.floor(this.score)} • Time:${formatTime(this.t)}`);
-      }
-    }
-    updateFooter(){
-      this.footer.setText(`Near:${Math.floor(this.nearPts||0)} • Combo:x${(this.combo||1).toFixed(2)}`);
-    }
-
-    spawnObstacle(){
-      const col = Phaser.Math.Between(0,GRID_COLS-1);
-      const x = GRID_X + col * TILE + TILE/2;
-      const y = GRID_Y - 60;
-
-      const style = this.wcfg.obstacleStyle;
-      const shape = style.shapes[Phaser.Math.Between(0,style.shapes.length-1)];
-      const tex = shapeToTex[shape] || "obs_rect";
-      const palette = style.palette;
-      const color = palette[Phaser.Math.Between(0,palette.length-1)];
-
-      const s = this.add.image(x,y,tex).setTint(color).setAlpha(0.95);
-      const size = Phaser.Math.Between(this.lcfg.size[0],this.lcfg.size[1]);
-      s.displayWidth = size; s.displayHeight = size;
-
-      this.physics.add.existing(s);
-      s.body.setAllowGravity(false);
-      s.body.setImmovable(true);
-      this.obstacles.add(s);
-    }
-
-    applyEndlessBlend(blend){
-      const w1=WORLDS[0], w2=WORLDS[1], w3=WORLDS[2];
-
-      const bg12 = mixColor(w1.bg,w2.bg,blend.a2);
-      const bg = mixColor(bg12,w3.bg,blend.a3);
-      const grid12 = mixColor(w1.gridLine,w2.gridLine,blend.a2);
-      const gridLine = mixColor(grid12,w3.gridLine,blend.a3);
-      const pla12 = mixColor(w1.player,w2.player,blend.a2);
-      const player = mixColor(pla12,w3.player,blend.a3);
-
-      this.wcfg.bg = bg;
-      this.wcfg.gridLine = gridLine;
-      this.player.fillColor = player;
-
-      if(blend.blackout) this.cameras.main.setBackgroundColor(bg);
-    }
-
-    endRun({reason}){
-      const thisScore = Math.floor(this.score);
-      if(this.mode==="endless"){
-        const lb = loadLeaderboards();
-        const prevBest = lb.endlessTop[0]?.score||0;
-        lb.endlessTop = maybeInsertTop(lb.endlessTop,{score:thisScore,meta:formatTime(this.t)});
-        saveLeaderboards(lb);
-        this.scene.start("Results",{mode:"endless",score:thisScore,prevBest,pb:thisScore>prevBest,reason});
+      // Handle game over
+      if (gameState.isGameOver) {
+        cancelAnimationFrame(animationFrame);
+        displayResults();
         return;
       }
 
-      const p = loadProgress();
-      const id = levelId(this.world,this.level);
-      const prevBest = p.levelBest[id]||0;
-      this.scene.start("Results",{
-        mode:"campaign",
-        world:this.world,level:this.level,
-        score:thisScore,prevBest,pb:false,reason
-      });
+      // Continue game loop
+      animationFrame = requestAnimationFrame(gameLoop);
     }
-  }
 
-  class ResultsScene extends Phaser.Scene {
-    constructor(){ super("Results"); }
-    create(data){
-      this.cameras.main.setBackgroundColor(0x070710);
+    function drawPlayer() {
+      ctx.fillStyle = "#0f0";
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+    }
 
-      const {mode,score,prevBest,pb,reason,world,level} = data;
+    function movePlayer() {
+      player.x += player.vx;
+      player.y += player.vy;
 
-      addTitle(this, mode==="endless"?"ENDLESS RESULT":"LEVEL RESULT",0.16,32);
-      addSubtitle(this,
-        mode==="endless"?`Reason: ${reason}`:`${WORLDS[world].name} L${level+1} • ${reason}`,
-        0.22
-      );
+      // Keep player within bounds
+      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+      player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+    }
 
-      this.add.text(W/2,H*0.34,`Score: ${score}`,{fontFamily:uiFont,fontSize:"22px",color:"#fff"}).setOrigin(0.5);
-      this.add.text(W/2,H*0.40,`Best: ${Math.max(prevBest,(pb?score:prevBest))}`+
-        `${pb?"  •  NEW PB!":""}`,{fontFamily:uiFont,fontSize:"14px",color:pb?"#6ef3ff":"#b7b7ff"}
-      ).setOrigin(0.5);
+    function updateObstacles() {
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.y += obs.speed;
+        if (obs.y > canvas.height) obstacles.splice(i, 1);
+      }
 
-      makeButton(this,"MAIN MENU",W/2,H*0.80,()=>this.scene.start("Menu"));
-      if(mode==="campaign"){
-        makeButton(this,"RETRY LEVEL",W/2,H*0.72,()=>this.scene.start("Play",{mode:"campaign",world,level}));
-        makeGhostButton(this,"CAMPAIGN MAP",W/2,H*0.88,()=>this.scene.start("WorldMap"));
-      } else {
-        makeButton(this,"RETRY ENDLESS",W/2,H*0.72,()=>this.scene.start("Play",{mode:"endless"}),"#7cffd2");
-        makeGhostButton(this,"LEADERBOARDS",W/2,H*0.88,()=>this.scene.start("Leaderboards"));
+      // Spawn new obstacles continuously in endless mode
+      if (gameState.endless && Math.random() < 0.02) {
+        spawnObstacle();
       }
     }
-  }
 
-  class WorldMapScene extends Phaser.Scene {
-    constructor(){super("WorldMap");}
-    create(){
-      this.cameras.main.setBackgroundColor(0x070710);
-      addTitle(this,"CAMPAIGN",0.14,32);
-      addSubtitle(this,"Select a level to play",0.20);
+    function drawObstacles() {
+      ctx.fillStyle = "#f00";
+      for (const obs of obstacles) {
+        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+      }
+    }
 
-      const p = loadProgress();
-      let y = H*0.26;
-      WORLDS.forEach((w, wi) => {
-        const unlockedWorld = wi <= p.unlockedWorld;
-        this.add.text(24,y,`${wi+1}. ${w.name}`,{
-          fontFamily:uiFont,fontSize:"16px",color:unlockedWorld?"#fff":"rgba(255,255,255,0.4)"
-        });
+    function spawnObstacle() {
+      const size = 20 + Math.random() * 30;
+      const x = Math.random() * (canvas.width - size);
+      const y = -size;
+      obstacles.push({ x, y, width: size, height: size, speed: 2 + Math.random() * 3 });
+    }
 
-        const sub = worldSubtotal(p,wi);
-        this.add.text(W-24,y,`Subtotal: ${sub}`,{
-          fontFamily:uiFont,fontSize:"12px",color:"rgba(255,255,255,0.7)"
-        }).setOrigin(1,0);
-        y+=26;
+    function spawnObstacles() {
+      for (let i = 0; i < 5; i++) spawnObstacle();
+    }
 
-        const gap=8;
-        const btnW=(W-48 - gap*(LEVELS_PER_WORLD-1))/LEVELS_PER_WORLD;
-        for(let li=0;li<LEVELS_PER_WORLD;li++){
-          const unlocked = isLevelUnlocked(p,wi,li);
-          const bx=24 + li*(btnW+gap), by=y;
-          const best=p.levelBest[levelId(wi,li)]||0;
-          const b = this.add.text(bx+btnW/2,by+20,`${li+1}\n${best}`,{
-            fontFamily:uiFont,fontSize:"12px",align:"center",
-            color:unlocked?"#0a0a12":"rgba(255,255,255,0.45)",
-            backgroundColor:unlocked?"#6ef3ff":"rgba(255,255,255,0.1)",
-            padding:{top:8,bottom:8}
-          }).setOrigin(0.5).setFixedSize(btnW,40);
-
-          if(unlocked){
-            b.setInteractive({useHandCursor:true}).on("pointerdown",()=>{
-              const p2=loadProgress();
-              p2.currentWorld=wi; p2.currentLevel=li; saveProgress(p2);
-              this.scene.start("Play",{mode:"campaign",world:wi,level:li});
-            });
-          }
+    function checkCollisions() {
+      for (const obs of obstacles) {
+        if (
+          player.x < obs.x + obs.width &&
+          player.x + player.width > obs.x &&
+          player.y < obs.y + obs.height &&
+          player.y + player.height > obs.y
+        ) {
+          gameState.isGameOver = true;
         }
-        y += 68;
-      });
-
-      makeGhostButton(this,"BACK",W/2,H*0.92,()=>this.scene.start("Menu"));
+      }
     }
-  }
 
-  class WorldIntroScene extends Phaser.Scene {
-    constructor(){ super("WorldIntro"); }
-    create(data){
-      const w = WORLDS[data.world]; const lv = w.levels[data.level];
-      this.cameras.main.setBackgroundColor(w.bg);
-      addTitle(this,w.name,0.18,34);
-      addSubtitle(this,w.subtitle,0.24);
-      this.add.text(W/2,H*0.40,
-        `Level ${data.level+1}/${LEVELS_PER_WORLD} • ${lv.seconds}s`,
-        {fontFamily:uiFont,fontSize:"16px",color:"#fff"}
-      ).setOrigin(0.5);
-
-      makeButton(this,"START",W/2,H*0.60,()=>this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}));
-      makeGhostButton(this,"BACK TO MAP",W/2,H*0.70,()=>this.scene.start("WorldMap"));
+    function displayResults() {
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h2>Game Over</h2>
+          <p>Score: ${Math.floor(gameState.score)}</p>
+          <button onclick="loadMainMenu()">Main Menu</button>
+        </div>
+      `;
     }
-  }
 
-  class EndlessIntroScene extends Phaser.Scene {
-    constructor(){ super("EndlessIntro"); }
-    create(){
-      this.cameras.main.setBackgroundColor(0x050512);
-      addTitle(this,"ENDLESS",0.18,34);
-      addSubtitle(this,"Survive as long as you can!",0.24);
+    // --------------------------------
+    // INPUT HANDLING
+    // --------------------------------
+    document.addEventListener("keydown", (e) => {
+      switch (e.code) {
+        case "ArrowUp":
+        case "KeyW":
+          player.vy = -player.speed;
+          break;
+        case "ArrowDown":
+        case "KeyS":
+          player.vy = player.speed;
+          break;
+        case "ArrowLeft":
+        case "KeyA":
+          player.vx = -player.speed;
+          break;
+        case "ArrowRight":
+        case "KeyD":
+          player.vx = player.speed;
+          break;
+      }
+    });
 
-      const lb=loadLeaderboards();
-      const best=lb.endlessTop[0]?.score||0;
-      this.add.text(W/2,H*0.40,`Best: ${best}`,{fontFamily:uiFont,fontSize:"18px",color:"#fff"}).setOrigin(0.5);
+    document.addEventListener("keyup", (e) => {
+      switch (e.code) {
+        case "ArrowUp":
+        case "KeyW":
+          if (player.vy < 0) player.vy = 0;
+          break;
+        case "ArrowDown":
+        case "KeyS":
+          if (player.vy > 0) player.vy = 0;
+          break;
+        case "ArrowLeft":
+        case "KeyA":
+          if (player.vx < 0) player.vx = 0;
+          break;
+        case "ArrowRight":
+        case "KeyD":
+          if (player.vx > 0) player.vx = 0;
+          break;
+      }
+    });
 
-      makeButton(this,"START ENDLESS",W/2,H*0.60,()=>this.scene.start("Play",{mode:"endless"}),"#7cffd2");
-      makeGhostButton(this,"LEADERBOARDS",W/2,H*0.70,()=>this.scene.start("Leaderboards"));
-      makeGhostButton(this,"MAIN MENU",W/2,H*0.80,()=>this.scene.start("Menu"));
-    }
-  }
-
-  // ===== PHASER CONFIG =====
-  new Phaser.Game({
-    type: Phaser.AUTO,
-    width: W,height: H,
-    physics: {default:"arcade",arcade:{debug:false}},
-    scene:[
-      MenuScene,
-      LeaderboardsScene,
-      WorldMapScene,
-      WorldIntroScene,
-      EndlessIntroScene,
-      PlayScene,
-      ResultsScene
-    ]
-  });
-
-}); // end load
-</script>
+    // Initialize
+    loadMainMenu();
+  </script>
 </body>
 </html>

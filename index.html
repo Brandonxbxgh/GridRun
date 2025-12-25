@@ -31,11 +31,18 @@
       text-align: center;
     }
 
+    canvas {
+      background: #000;
+      border: 3px solid #fff;
+      display: block;
+    }
+
     h1 {
       font-size: 3rem;
       font-weight: bold;
       color: #fff;
       text-shadow: 0 0 20px #ff5733, 0 0 30px #ff5733;
+      margin: 10px;
     }
 
     p {
@@ -94,21 +101,9 @@
       levelsUnlocked: [1, 0, 0], // Tracks unlocked levels for each world (World 1, 2, 3)
     };
 
-    // World Names and Descriptions
-    const worlds = [
-      { name: "Neon Plains", description: "A beginner-friendly area to learn the game mechanics." },
-      { name: "Quantum Abyss", description: "Faster movements and denser obstacles. Watch out!" },
-      { name: "Hypernova Zone", description: "Master your skills in this high-intensity zone." },
-    ];
-
-    // Level Data (Dynamic Times and Score Requirements)
-    const levels = [
-      { time: 30, scores: { bronze: 100, silver: 200, gold: 300 } },
-      { time: 45, scores: { bronze: 150, silver: 300, gold: 450 } },
-      { time: 60, scores: { bronze: 200, silver: 400, gold: 600 } },
-      { time: 75, scores: { bronze: 250, silver: 500, gold: 750 } },
-      { time: 90, scores: { bronze: 300, silver: 600, gold: 900 } },
-    ];
+    // Grid gameplay variables
+    let canvas, ctx;
+    let player, obstacles, gameState, gridSize, gridCellSize;
 
     // Main Menu -> Mode Select Screen
     function loadModeSelect() {
@@ -126,87 +121,137 @@
     // Campaign -> World Selection Screen
     function loadCampaignMode() {
       const container = document.getElementById("game-container");
-      const worldButtons = worlds.map((world, i) => `
-        <button onclick="loadWorld(${i + 1})" ${progress.worldsUnlocked > i ? '' : 'disabled'}>
-          ${progress.worldsUnlocked > i ? world.name : 'Locked'}
+      const worlds = [
+        { name: "Neon Plains", unlocked: true },
+        { name: "Quantum Abyss", unlocked: progress.worldsUnlocked >= 2 },
+        { name: "Hypernova Zone", unlocked: progress.worldsUnlocked >= 3 },
+      ];
+
+      const worldButtons = worlds.map((world, index) => `
+        <button onclick="startGridGameplay(${index + 1}, 1)" ${world.unlocked ? '' : 'disabled'}>
+          ${world.unlocked ? world.name : 'Locked'}
         </button>
-      `).join("");
+      `).join('');
 
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Campaign</h1>
-          <p>Select a World</p>
           ${worldButtons}
           <button onclick="loadModeSelect()">Back</button>
         </div>
       `;
     }
 
-    // World Selection -> Level Selection Screen
-    function loadWorld(worldNumber) {
-      const container = document.getElementById("game-container");
-      const levelsUnlocked = progress.levelsUnlocked[worldNumber - 1];
-      const levelButtons = Array.from({ length: 5 }, (_, i) => `
-        <button onclick="loadLevelIntro(${worldNumber}, ${i + 1})" ${i < levelsUnlocked ? '' : 'disabled'}>
-          ${i < levelsUnlocked ? `Level ${i + 1}` : 'Locked'}
-        </button>
-      `).join("");
+    // Start Gameplay Action for a World
+    function startGridGameplay(world, level) {
+      // Initialize canvas and variables
+      canvas = document.createElement('canvas');
+      ctx = canvas.getContext('2d');
+      canvas.width = 500;
+      canvas.height = 500;
+      document.getElementById('game-container').innerHTML = '';
+      document.getElementById('game-container').appendChild(canvas);
 
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>${worlds[worldNumber - 1].name}</h1>
-          <p>${worlds[worldNumber - 1].description}</p>
-          ${levelButtons}
-          <button onclick="loadCampaignMode()">Back</button>
-        </div>
-      `;
+      gridSize = 10; // 10x10 grid
+      gridCellSize = canvas.width / gridSize;
+
+      player = { x: 5, y: 5, size: gridCellSize, color: '#0f0' }; // Player starting in the middle
+      obstacles = [];
+      gameState = { score: 0, running: true };
+
+      document.addEventListener('keydown', handlePlayerMovement);
+
+      spawnObstacles();
+      gameLoop();
     }
 
-    // Level Selection -> Level Intro Screen
-    function loadLevelIntro(worldNumber, levelNumber) {
-      const levelData = levels[levelNumber - 1]; // Get data for the selected level
-      const container = document.getElementById("game-container");
+    // Player Movement
+    function handlePlayerMovement(event) {
+      const key = event.key.toLowerCase();
+      if (!gameState.running) return;
 
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Level ${levelNumber} - ${worlds[worldNumber - 1].name}</h1>
-          <p>Requirement: Survive <strong>${levelData.time} seconds</strong></p>
-          <p>Performance Tiers:</p>
-          <ul style="list-style: none; padding: 0; text-align: left;">
-            <li>Bronze: ${levelData.scores.bronze} points</li>
-            <li>Silver: ${levelData.scores.silver} points</li>
-            <li>Gold: ${levelData.scores.gold} points</li>
-          </ul>
-          <button onclick="playLevel(${worldNumber}, ${levelNumber})">Start</button>
-          <button onclick="loadWorld(${worldNumber})">Back</button>
-        </div>
-      `;
+      switch (key) {
+        case 'arrowup':
+        case 'w':
+          if (player.y > 0) player.y--;
+          break;
+        case 'arrowdown':
+        case 's':
+          if (player.y < gridSize - 1) player.y++;
+          break;
+        case 'arrowleft':
+        case 'a':
+          if (player.x > 0) player.x--;
+          break;
+        case 'arrowright':
+        case 'd':
+          if (player.x < gridSize - 1) player.x++;
+          break;
+      }
     }
 
-    // Placeholder for Gameplay Implementation
-    function playLevel(worldNumber, levelNumber) {
-      const container = document.getElementById("game-container");
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Playing Level ${levelNumber}</h1>
-          <p>${worlds[worldNumber - 1].name}</p>
-          <p>Gameplay placeholder. Implement mechanics here.</p>
-          <button onclick="alert('Simulating Level Completion'); completeLevel(${worldNumber}, ${levelNumber});">Complete Level</button>
-        </div>
-      `;
+    // Game Loop
+    function gameLoop() {
+      if (!gameState.running) return;
+
+      updateGame();
+      renderGame();
+
+      if (gameState.running) {
+        requestAnimationFrame(gameLoop);
+      }
     }
 
-    // Unlock the Next Level or World
-    function completeLevel(worldNumber, levelNumber) {
-      if (progress.levelsUnlocked[worldNumber - 1] === levelNumber) {
-        progress.levelsUnlocked[worldNumber - 1]++;
-        if (levelNumber === 5 && worldNumber < 3) {
-          // Unlock the next world and its first level
-          progress.worldsUnlocked = Math.max(progress.worldsUnlocked, worldNumber + 1);
-          progress.levelsUnlocked[worldNumber] = 1;
+    // Update Game State
+    function updateGame() {
+      // Check collisions
+      for (const obstacle of obstacles) {
+        if (obstacle.x === player.x && obstacle.y === player.y) {
+          gameState.running = false;
+          endGame();
         }
       }
-      loadWorld(worldNumber);
+    }
+
+    // Render Game
+    function renderGame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw grid
+      ctx.strokeStyle = '#444';
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          ctx.strokeRect(i * gridCellSize, j * gridCellSize, gridCellSize, gridCellSize);
+        }
+      }
+
+      // Draw player
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x * gridCellSize, player.y * gridCellSize, player.size, player.size);
+
+      // Draw obstacles
+      ctx.fillStyle = '#f00';
+      for (const obstacle of obstacles) {
+        ctx.fillRect(obstacle.x * gridCellSize, obstacle.y * gridCellSize, gridCellSize, gridCellSize);
+      }
+    }
+
+    // Spawn obstacles randomly
+    function spawnObstacles() {
+      for (let i = 0; i < 3; i++) {
+        const randomX = Math.floor(Math.random() * gridSize);
+        const randomY = Math.floor(Math.random() * gridSize);
+
+        if (randomX !== player.x || randomY !== player.y) {
+          obstacles.push({ x: randomX, y: randomY });
+        }
+      }
+    }
+
+    // End Game
+    function endGame() {
+      alert(`Game Over! Your score: ${gameState.score}`);
+      loadMainMenu(); // Return to main menu after game is over
     }
 
     // Reload Main Menu

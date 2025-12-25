@@ -15,10 +15,12 @@
       --accent:#6ee7ff;
       --good:#b7ff6e;
       --bad:#ff6ee7;
+      --warn:#ffd36e;
     }
     *{box-sizing:border-box;}
     html,body{height:100%; margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text);}
     button{font:inherit; color:inherit; -webkit-tap-highlight-color:transparent;}
+
     .wrap{min-height:100%; display:flex; align-items:center; justify-content:center; padding:14px;}
     .app{width:min(720px,100%); border:1px solid var(--line); background:rgba(0,0,0,.20); border-radius:14px; overflow:hidden;}
     .top{
@@ -34,9 +36,11 @@
     }
     .title{font-weight:900; letter-spacing:.12em; text-transform:uppercase;}
     .subtitle{font-size:12px; color:var(--muted); margin-top:2px;}
+
     .hud{display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; font-size:12px; color:rgba(255,255,255,.85);}
     .pill{padding:5px 8px; border:1px solid rgba(255,255,255,.12); border-radius:999px; background:rgba(255,255,255,.06); white-space:nowrap;}
     .pill b{color:var(--text);}
+    .pill .dot{display:inline-block; width:8px; height:8px; border-radius:99px; background:var(--accent); box-shadow:0 0 14px rgba(110,231,255,.35); margin-right:6px; vertical-align:middle;}
 
     .content{padding:14px;}
     .screen{display:none;}
@@ -62,8 +66,10 @@
       user-select:none;
     }
     .btn:active{transform:translateY(1px);}
+    .btn:disabled{opacity:.45; cursor:not-allowed;}
     .hint{font-size:12px; color:var(--muted);}
     .divider{height:10px;}
+
     .note{
       margin-top:10px;
       padding:10px;
@@ -75,6 +81,17 @@
       line-height:1.35;
     }
 
+    .tag{
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      font-size:12px;
+      color:rgba(255,255,255,.82);
+      margin-left:6px;
+    }
+
     .gameWrap{display:flex; flex-direction:column; align-items:center; gap:10px;}
     canvas{
       width:100%;
@@ -83,7 +100,7 @@
       border-radius:14px;
       border:1px solid rgba(255,255,255,.16);
       background:#050612;
-      touch-action:none; /* critical for mobile drag */
+      touch-action:none;
     }
     .controls{
       width:100%;
@@ -100,7 +117,7 @@
     }
     .mini:active{transform:translateY(1px);}
 
-    /* Simple overlay modal */
+    /* overlay modal */
     .overlay{
       position:fixed; inset:0; display:none;
       align-items:center; justify-content:center;
@@ -129,15 +146,15 @@
         <div class="logo"></div>
         <div>
           <div class="title">GRIDRUN</div>
-          <!-- restored text under GRIDRUN (old style) -->
           <div class="subtitle">Dodge • Survive • Score</div>
         </div>
       </div>
 
       <div class="hud">
-        <div class="pill">Mode: <b id="statMode">Menu</b></div>
+        <div class="pill"><span class="dot"></span>Mode: <b id="statMode">Menu</b></div>
         <div class="pill">Score: <b id="statScore">0</b></div>
         <div class="pill">Time: <b id="statTime">0.0</b>s</div>
+        <div class="pill">Goal: <b id="statGoal">—</b></div>
       </div>
     </div>
 
@@ -155,9 +172,9 @@
             <button class="btn" id="resetSave"><span><b>Reset Save</b></span><span class="hint">local only</span></button>
           </div>
 
-          <!-- restored bottom instructions (old style) -->
           <div class="note">
-            <b>PC:</b> WASD / Arrow Keys • <b>Mobile:</b> drag anywhere to move • Tap <b>Pause</b> to stop.
+            <b>PC:</b> WASD / Arrow Keys • <b>Mobile:</b> drag anywhere to move (2D) • Tap <b>Pause</b> to stop.
+            <br/>Campaign levels are cleared by meeting the <b>goal</b> shown before and during the run.
           </div>
         </div>
       </div>
@@ -171,7 +188,10 @@
           </div>
           <div class="divider"></div>
           <div id="campaignList"></div>
-          <div class="note">Replay any beaten level. Progress unlocks forward.</div>
+          <div class="note">
+            Effects start at <b>30s</b>: glitch → scanlines → vertical lasers → invert.
+            <br/>Each world has a theme; goals get tougher as you progress.
+          </div>
         </div>
       </div>
 
@@ -211,9 +231,19 @@
       <div class="screen" id="screenGame">
         <div class="panel">
           <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
-            <div><b id="runLabel">Run</b></div>
+            <div>
+              <b id="runLabel">Run</b>
+              <span class="tag" id="runThemeTag">—</span>
+            </div>
             <div style="color:var(--muted); font-size:12px;" id="runHint">Drag (mobile) / WASD (PC)</div>
           </div>
+
+          <div class="divider"></div>
+
+          <div class="note" id="goalNote" style="margin-top:0;">
+            <b>Goal:</b> — (shown here before you start)
+          </div>
+
           <div class="divider"></div>
 
           <div class="gameWrap">
@@ -225,9 +255,9 @@
             </div>
           </div>
 
-          <!-- restored bottom instructions -->
           <div class="note">
-            <b>PC:</b> WASD / Arrows • <b>Mobile:</b> drag anywhere (2D) • Avoid blocks + lasers.
+            <b>PC:</b> WASD / Arrows • <b>Mobile:</b> drag anywhere (2D)
+            <br/>Watch for effect shifts starting at <b>30s</b> (glitch/scanlines/lasers/invert).
           </div>
         </div>
       </div>
@@ -251,19 +281,19 @@
 <script>
 (() => {
   // =========================
-  // Minimal, stable baseline
+  // Stable UI + fixed Campaign indexing + effects/themes/goals
   // =========================
 
-  const KEY_SAVE = "gridrun_save_stable_v1";
-  const KEY_LB_C = "gridrun_lb_campaign_stable_v1";
-  const KEY_LB_E = "gridrun_lb_endless_stable_v1";
+  const KEY_SAVE = "gridrun_save_stable_v2";
+  const KEY_LB_C = "gridrun_lb_campaign_stable_v2";
+  const KEY_LB_E = "gridrun_lb_endless_stable_v2";
 
-  // Restore worlds/levels structure
+  // World names + themes (you can edit these freely)
   const WORLDS = [
-    { id: 1, name: "World 1", levels: 5 },
-    { id: 2, name: "World 2", levels: 5 },
-    { id: 3, name: "World 3", levels: 5 },
-    { id: 4, name: "World 4", levels: 5 },
+    { id: 1, name: "World 1: Neon Alley", theme: "Neon rain • tight dodges", levels: 5, tint: [110,231,255] },
+    { id: 2, name: "World 2: Signal Ruins", theme: "Static haze • broken rhythm", levels: 5, tint: [183,255,110] },
+    { id: 3, name: "World 3: Rift Sector", theme: "Warp spikes • unstable lanes", levels: 5, tint: [255,110,231] },
+    { id: 4, name: "World 4: Overclock District", theme: "High heat • fast patterns", levels: 5, tint: [255,211,110] },
   ];
   const totalLevels = WORLDS.reduce((a,w)=>a+w.levels,0);
 
@@ -310,11 +340,26 @@
     let acc = 0;
     for(const w of WORLDS){
       if(index <= acc + w.levels){
-        return { world:w.id, worldName:w.name, level:index-acc, index };
+        return { worldId:w.id, worldName:w.name, theme:w.theme, tint:w.tint, level:index-acc, index };
       }
       acc += w.levels;
     }
-    return { world:1, worldName:"World 1", level:1, index:1 };
+    const w0 = WORLDS[0];
+    return { worldId:w0.id, worldName:w0.name, theme:w0.theme, tint:w0.tint, level:1, index:1 };
+  }
+
+  // -------------------------
+  // Completion goals
+  // -------------------------
+  // Campaign: both thresholds must be met (time AND score).
+  // You can tweak these numbers later.
+  function getCampaignGoal(levelIndex){
+    // Increase requirements as you progress
+    const baseTime = 18;                 // seconds
+    const time = baseTime + Math.floor((levelIndex-1) * 1.5);   // ramps
+    const baseScore = 500;
+    const score = baseScore + Math.floor((levelIndex-1) * 90);  // ramps
+    return { time, score };
   }
 
   // -------------------------
@@ -349,7 +394,7 @@
   }
 
   // -------------------------
-  // Campaign menu render
+  // Campaign menu render (FIXED index bug)
   // -------------------------
   function renderCampaign(){
     $("campProgress").textContent = `Unlocked ${save.unlocked}/${totalLevels}`;
@@ -363,20 +408,35 @@
       box.className = "note";
       box.style.marginTop = "10px";
       box.style.whiteSpace = "normal";
-      box.innerHTML = `<b>${w.name}</b><div style="height:8px"></div>`;
+
+      box.innerHTML = `<b>${w.name}</b> <span class="tag">${w.theme}</span><div style="height:8px"></div>`;
+
       for(let l=1;l<=w.levels;l++){
         idx++;
-        const locked = idx > save.unlocked;
-        const best = save.best[String(idx)] || 0;
+        const levelIndex = idx; // ✅ CAPTURE HERE (fixes wrong world/level)
+        const locked = levelIndex > save.unlocked;
+        const best = save.best[String(levelIndex)] || 0;
+        const goal = getCampaignGoal(levelIndex);
 
         const btn = document.createElement("button");
         btn.className = "btn";
         btn.disabled = locked;
-        btn.innerHTML = `<span><b>Level ${l}</b> <span class="hint">best ${best}</span></span><span class="hint">${locked?"locked":"start"}</span>`;
-        btn.addEventListener("click", ()=> startCampaign(idx), {passive:true});
+        btn.innerHTML = `
+          <span>
+            <b>Level ${l}</b>
+            <span class="hint">best ${best}</span>
+            <span class="hint">• goal ${goal.time}s + ${goal.score} score</span>
+          </span>
+          <span class="hint">${locked?"locked":"start"}</span>
+        `;
+        btn.addEventListener("click", ()=> startCampaign(levelIndex), {passive:true});
+
         box.appendChild(btn);
-        box.appendChild(document.createElement("div")).style.height = "8px";
+        const spacer = document.createElement("div");
+        spacer.style.height = "8px";
+        box.appendChild(spacer);
       }
+
       root.appendChild(box);
     }
   }
@@ -402,9 +462,26 @@
 
     hazards: [],
     spawnAcc: 0,
+    laserAcc: 0,
 
-    // very simple difficulty (stable)
+    // difficulty
     speed: 1.0,
+    hazardRate: 1.0,
+
+    // effects flags
+    fx: {
+      glitch:false,
+      scanlines:false,
+      lasers:false,
+      invert:false,
+      shake:0
+    },
+
+    worldTint: [110,231,255],
+    worldName: "—",
+    worldTheme: "—",
+    goalTime: null,
+    goalScore: null,
   };
 
   // Direct-follow (2D) target for mobile drag
@@ -472,14 +549,45 @@
     if(state.running && !state.paused) setPaused(true);
   }, {passive:true});
 
+  function setWorldFromLevelIndex(levelIndex){
+    const wl = linearToWorldLevel(levelIndex);
+    state.worldName = wl.worldName;
+    state.worldTheme = wl.theme;
+    state.worldTint = wl.tint;
+    $("runThemeTag").textContent = wl.theme;
+    return wl;
+  }
+
+  function updateGoalUI(){
+    if(state.mode === "campaign"){
+      $("statGoal").textContent = `${state.goalTime}s + ${state.goalScore}`;
+      $("goalNote").innerHTML =
+        `<b>Goal:</b> Survive <b>${state.goalTime}s</b> AND reach <b>${state.goalScore}</b> score.
+         <br/><span style="color:rgba(255,255,255,.70)">Progress: time ${state.t.toFixed(1)} / ${state.goalTime}s • score ${Math.floor(state.score)} / ${state.goalScore}</span>`;
+    } else {
+      $("statGoal").textContent = "—";
+      $("goalNote").innerHTML = `<b>Goal:</b> Endless (no completion) • survive as long as possible.`;
+    }
+  }
+
   function startEndless(){
     state.mode = "endless";
     state.levelIndex = 1;
+    setWorldFromLevelIndex(1);
+    state.goalTime = null;
+    state.goalScore = null;
     startRun();
   }
+
   function startCampaign(levelIndex){
     state.mode = "campaign";
     state.levelIndex = levelIndex;
+
+    const wl = setWorldFromLevelIndex(levelIndex);
+    const goal = getCampaignGoal(levelIndex);
+    state.goalTime = goal.time;
+    state.goalScore = goal.score;
+
     startRun();
   }
 
@@ -492,7 +600,11 @@
 
     state.t = 0;
     state.score = 0;
-    state.speed = 1.0; // stable baseline
+
+    // baseline difficulty: campaign ramps slightly by level; endless baseline at W1-L1
+    const bump = (state.mode === "campaign") ? (state.levelIndex - 1) * 0.04 : 0;
+    state.speed = 1.0 + bump;
+    state.hazardRate = 1.0 + bump;
 
     state.player.x = 0.5;
     state.player.y = 0.8;
@@ -501,12 +613,28 @@
 
     state.hazards.length = 0;
     state.spawnAcc = 0;
+    state.laserAcc = 0;
+
+    // reset effects
+    state.fx.glitch = false;
+    state.fx.scanlines = false;
+    state.fx.lasers = false;
+    state.fx.invert = false;
+    state.fx.shake = 0;
 
     $("statMode").textContent = state.mode === "campaign" ? "Campaign" : "Endless";
-    $("runLabel").textContent = state.mode === "campaign"
-      ? `Campaign • ${linearToWorldLevel(state.levelIndex).worldName} • L${linearToWorldLevel(state.levelIndex).level}`
-      : "Endless";
+
+    if(state.mode === "campaign"){
+      const wl = linearToWorldLevel(state.levelIndex);
+      $("runLabel").textContent = `Campaign • ${wl.worldName} • Level ${wl.level}`;
+      $("runHint").textContent = `Goal: ${state.goalTime}s + ${state.goalScore} • Effects start at 30s`;
+    } else {
+      $("runLabel").textContent = "Endless";
+      $("runHint").textContent = "Survive as long as possible • Effects start at 30s";
+    }
+
     setPaused(false);
+    updateGoalUI();
   }
 
   function goMenu(){
@@ -516,39 +644,79 @@
     $("statMode").textContent = "Menu";
     $("statScore").textContent = "0";
     $("statTime").textContent = "0.0";
+    $("statGoal").textContent = "—";
     showScreen("main");
   }
 
-  function endRun(){
+  function isCampaignComplete(){
+    if(state.mode !== "campaign") return false;
+    return (state.t >= state.goalTime) && (state.score >= state.goalScore);
+  }
+
+  function endRun(completed){
     state.running = false;
     setPaused(true);
 
-    // Save + unlock + LB
     if(state.mode === "campaign"){
       const idx = String(state.levelIndex);
       const prev = save.best[idx] || 0;
       if(state.score > prev) save.best[idx] = Math.floor(state.score);
 
-      // simple unlock rule: survive 15s
-      if(state.t >= 15) save.unlocked = clampInt(Math.max(save.unlocked, state.levelIndex + 1), 1, totalLevels);
-
+      if(completed){
+        save.unlocked = clampInt(Math.max(save.unlocked, state.levelIndex + 1), 1, totalLevels);
+      }
       saveJSON(KEY_SAVE, save);
-      addLB("campaign", state.score, { levelIndex: state.levelIndex });
-    }else{
+      addLB("campaign", state.score, { levelIndex: state.levelIndex, completed: !!completed });
+    } else {
       addLB("endless", state.score, {});
     }
+
+    $("modalTitle").textContent = completed ? "Level Complete!" : "Run Over";
+    $("modalText").textContent = `${completed ? "Completed the goal." : "You crashed."}  Score: ${Math.floor(state.score)} • Time: ${state.t.toFixed(1)}s`;
   }
 
-  // Hazards (simple descending blocks only — stability first)
+  // -------------------------
+  // Hazards
+  // -------------------------
   function spawnBlock(){
     const w = rand(0.08, 0.16);
-    return { x: rand(0.04, 0.96-w), y: -0.15, w, h: rand(0.05, 0.09), vy: rand(0.55, 0.85) };
+    return { kind:"block", x: rand(0.04, 0.96-w), y: -0.15, w, h: rand(0.05, 0.09), vy: rand(0.55, 0.85) };
+  }
+
+  function spawnVerticalLaser(){
+    const w = rand(0.035, 0.06);
+    const x = rand(0.08, 0.92 - w);
+    return { kind:"vlaser", x, w, phase:"warn", t:0, warn:0.65, fire:0.55, fade:0.35 };
   }
 
   function rectOverlap(a,b){
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
 
+  // -------------------------
+  // Effects schedule: starts at 30s
+  // -------------------------
+  function updateEffects(dt){
+    const t = state.t;
+
+    // ramps
+    state.speed = clamp(state.speed + dt*0.004, 1.0, 3.0);
+    state.hazardRate = clamp(state.hazardRate + dt*0.006, 1.0, 3.4);
+
+    state.fx.glitch = (t >= 30);
+    state.fx.scanlines = (t >= 42);
+    state.fx.lasers = (t >= 55);
+    state.fx.invert = (t >= 75);
+
+    if(state.fx.glitch && (Math.floor(t*10) % 18 === 0)){
+      state.fx.shake = Math.max(state.fx.shake, 6);
+    }
+    state.fx.shake *= Math.pow(0.02, dt);
+  }
+
+  // -------------------------
+  // Loop
+  // -------------------------
   let last = performance.now();
   function tick(now){
     requestAnimationFrame(tick);
@@ -564,16 +732,21 @@
     }
 
     state.t += dt;
-    state.score += 25 * dt;
+
+    // scoring baseline + slight ramp
+    state.score += (25 + state.hazardRate*6) * dt;
+
+    // effects + difficulty
+    updateEffects(dt);
 
     // PC movement
-    const sp = 0.85 * dt;
+    const sp = (0.85 + state.speed*0.10) * dt;
     if(keys.has("w") || keys.has("arrowup")) state.player.y -= sp;
     if(keys.has("s") || keys.has("arrowdown")) state.player.y += sp;
     if(keys.has("a") || keys.has("arrowleft")) state.player.x -= sp;
     if(keys.has("d") || keys.has("arrowright")) state.player.x += sp;
 
-    // Mobile direct follow overrides smoothly when dragging
+    // Mobile direct follow
     if(dragging){
       const follow = 1 - Math.pow(0.000001, dt);
       state.player.x += (target.x - state.player.x) * follow;
@@ -583,47 +756,89 @@
     state.player.x = clamp(state.player.x, 0.06, 0.94);
     state.player.y = clamp(state.player.y, 0.10, 0.92);
 
-    // Spawn cadence
+    // Spawn blocks
     state.spawnAcc += dt;
-    const interval = clamp(0.55 / state.speed, 0.22, 0.55);
+    const interval = clamp(0.55 / state.hazardRate, 0.20, 0.55);
     while(state.spawnAcc >= interval){
       state.spawnAcc -= interval;
       state.hazards.push(spawnBlock());
     }
 
+    // Spawn lasers (vertical) when enabled
+    if(state.fx.lasers){
+      state.laserAcc += dt;
+      const laserInterval = clamp(1.35 / (0.7 + state.hazardRate*0.25), 0.65, 1.35);
+      if(state.laserAcc >= laserInterval){
+        state.laserAcc = 0;
+        state.hazards.push(spawnVerticalLaser());
+      }
+    }
+
     // Update hazards
     for(let i=state.hazards.length-1;i>=0;i--){
       const h = state.hazards[i];
-      h.y += h.vy * dt * state.speed;
-      if(h.y > 1.2) state.hazards.splice(i,1);
+      if(h.kind === "block"){
+        h.y += h.vy * dt * state.speed;
+        if(h.y > 1.2) state.hazards.splice(i,1);
+      } else if(h.kind === "vlaser"){
+        h.t += dt * state.speed;
+        if(h.phase === "warn" && h.t >= h.warn){ h.phase="fire"; h.t=0; state.fx.shake = Math.max(state.fx.shake, 10); }
+        else if(h.phase === "fire" && h.t >= h.fire){ h.phase="fade"; h.t=0; }
+        else if(h.phase === "fade" && h.t >= h.fade){ state.hazards.splice(i,1); }
+      }
     }
 
-    // Collisions
+    // Update goal UI (live)
+    updateGoalUI();
+
+    // If campaign goal met, complete the level instantly (clean finish)
+    if(isCampaignComplete()){
+      endRun(true);
+      draw();
+      return;
+    }
+
+    // Collision
     const pr = state.player.r;
     const pRect = { x: state.player.x - pr/720, y: state.player.y - pr/1280, w:(pr*2)/720, h:(pr*2)/1280 };
+
     for(const h of state.hazards){
-      const r = { x:h.x, y:h.y, w:h.w, h:h.h };
-      if(rectOverlap(pRect, r)){
-        endRun();
-        break;
+      if(h.kind === "block"){
+        const r = { x:h.x, y:h.y, w:h.w, h:h.h };
+        if(rectOverlap(pRect, r)){ endRun(false); break; }
+      } else if(h.kind === "vlaser" && h.phase === "fire"){
+        const r = { x:h.x, y:0, w:h.w, h:1 };
+        if(rectOverlap(pRect, r)){ endRun(false); break; }
       }
     }
 
     draw();
   }
 
+  // -------------------------
+  // Draw
+  // -------------------------
   function draw(){
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0,0,W,H);
 
-    // Background
+    // themed background using world tint
+    const [tr,tg,tb] = state.worldTint;
     const g = ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0, "rgba(14,18,55,1)");
+    g.addColorStop(0, `rgba(${tr},${tg},${tb},0.14)`);
+    g.addColorStop(0.35, "rgba(14,18,55,1)");
     g.addColorStop(1, "rgba(3,4,14,1)");
     ctx.fillStyle = g;
     ctx.fillRect(0,0,W,H);
 
-    // Grid (simple)
+    // glitch shake
+    const shake = Math.min(18, state.fx.shake);
+    const sx = (Math.random()*2-1) * shake;
+    const sy = (Math.random()*2-1) * shake;
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    // grid
     ctx.globalAlpha = 0.14;
     ctx.strokeStyle = "rgba(255,255,255,.7)";
     ctx.lineWidth = 1;
@@ -631,16 +846,46 @@
     for(let x=0;x<=W;x+=60){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
     ctx.globalAlpha = 1;
 
-    // Hazards
+    // hazards
     for(const h of state.hazards){
-      ctx.fillStyle = "rgba(255,110,231,0.85)";
-      ctx.fillRect(h.x*W, h.y*H, h.w*W, h.h*H);
+      if(h.kind === "block"){
+        ctx.fillStyle = "rgba(255,110,231,0.85)";
+        ctx.fillRect(h.x*W, h.y*H, h.w*W, h.h*H);
+      } else if(h.kind === "vlaser"){
+        const x = h.x*W, w = h.w*W;
+        if(h.phase === "warn"){
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = "rgba(110,231,255,0.18)";
+          ctx.fillRect(x,0,w,H);
+          ctx.globalAlpha = 0.9;
+          ctx.strokeStyle = "rgba(110,231,255,0.85)";
+          ctx.setLineDash([12,10]);
+          ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(x+w/2,0); ctx.lineTo(x+w/2,H); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.globalAlpha = 1;
+        } else if(h.phase === "fire"){
+          ctx.fillStyle = "rgba(110,231,255,0.85)";
+          ctx.fillRect(x,0,w,H);
+        } else {
+          const a = 1 - (h.t / h.fade);
+          ctx.globalAlpha = a*0.8;
+          ctx.fillStyle = "rgba(110,231,255,0.75)";
+          ctx.fillRect(x,0,w,H);
+          ctx.globalAlpha = 1;
+        }
+      }
     }
 
-    // Player
+    // player
     const px = state.player.x * W;
     const py = state.player.y * H;
     const r = state.player.r;
+
+    // glitch jitter (visual only)
+    const jitter = (state.fx.glitch && state.running && !state.paused) ? rand(-3,3) : 0;
+    ctx.translate(jitter, 0);
+
     ctx.shadowColor = "rgba(183,255,110,0.45)";
     ctx.shadowBlur = 18;
     ctx.beginPath();
@@ -648,10 +893,31 @@
     ctx.fillStyle = "rgba(183,255,110,0.92)";
     ctx.fill();
     ctx.shadowBlur = 0;
+
     ctx.beginPath();
     ctx.arc(px, py, r*0.45, 0, Math.PI*2);
     ctx.fillStyle = "rgba(255,255,255,0.55)";
     ctx.fill();
+
+    ctx.restore();
+
+    // scanlines overlay
+    if(state.fx.scanlines){
+      ctx.save();
+      ctx.globalAlpha = 0.14;
+      ctx.fillStyle = "rgba(255,255,255,0.20)";
+      for(let y=0;y<H;y+=8) ctx.fillRect(0,y,W,1);
+      ctx.restore();
+    }
+
+    // invert tint overlay (simple)
+    if(state.fx.invert){
+      ctx.save();
+      ctx.globalAlpha = 0.10;
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.fillRect(0,0,W,H);
+      ctx.restore();
+    }
   }
 
   // -------------------------
@@ -685,10 +951,6 @@
     }
   }, {passive:true});
 
-  $("btnCampaign")?.addEventListener?.("click", ()=>{}, {passive:true});
-
-  $("btnExit")?.addEventListener?.("click", ()=> window.close(), {passive:true});
-
   // game buttons (robust tap)
   bindTap("pauseBtn", ()=> togglePause());
   bindTap("restartBtn", ()=> startRun());
@@ -700,6 +962,7 @@
 
   // Init
   showScreen("main");
+  renderLB("campaign");
   requestAnimationFrame(tick);
 
 })();

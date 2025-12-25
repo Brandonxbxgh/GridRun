@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <title>TXC GRIDRUN</title>
   <style>
-    html, body { margin:0; padding:0; background:#0a0a12; height:100%; overflow:hidden; }
+    html, body { margin:0; padding:0; background:#070710; height:100%; overflow:hidden; }
     canvas { display:block; margin:0 auto; }
     .hint{
       position:fixed; left:12px; bottom:10px;
       font:12px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-      color:rgba(255,255,255,.75);
-      background:rgba(0,0,0,0.35);
+      color:rgba(255,255,255,.70);
+      background:rgba(0,0,0,0.30);
       padding:8px 10px; border-radius:10px;
       user-select:none; z-index:10;
     }
   </style>
 </head>
 <body>
-  <div class="hint">PC: WASD/Arrows • Mobile: DIRECT FOLLOW (drag) • Campaign + Endless • Separate Leaderboards • Same scoring rules</div>
+  <div class="hint">PC: WASD/Arrows • Mobile: DIRECT FOLLOW (drag) • Pause works on mobile • Endless blends earlier + adds vertical lasers</div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
@@ -38,59 +38,33 @@
 
         // ===== Movement =====
         const PLAYER_SPEED = 320;
+        const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
 
-        // ✅ Mobile DIRECT FOLLOW only (tunable in Settings)
+        // Mobile DIRECT FOLLOW tuning (no Settings UI)
         const FOLLOW_RADIUS = 7;
-        const DEFAULT_FOLLOW_LERP = 0.38;
-        const DEFAULT_FOLLOW_MAX_MULT = 2.8;
+        const FOLLOW_LERP = 0.40;
+        const FOLLOW_MAX_SPEED_MULT = 3.0;
 
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
         const lerp = (a,b,t) => a + (b-a)*t;
-        const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
 
         // ===== Storage =====
-        const SAVE_KEY = "gridrun_progress_v5";
-        const SETTINGS_KEY = "gridrun_settings_v1";
-        const LEADER_KEY = "gridrun_leaderboards_v1";
+        const SAVE_KEY = "gridrun_progress_v6";
+        const LEADER_KEY = "gridrun_leaderboards_v2";
 
         const LEVELS_PER_WORLD = 5;
         const WORLDS_COUNT = 3;
         const TOTAL_LEVELS = WORLDS_COUNT * LEVELS_PER_WORLD;
 
-        // ===== Settings =====
-        function loadSettings() {
-          try {
-            const raw = localStorage.getItem(SETTINGS_KEY);
-            if (!raw) return {
-              shake: true,
-              sfx: false,
-              followLerp: DEFAULT_FOLLOW_LERP,
-              followMaxMult: DEFAULT_FOLLOW_MAX_MULT
-            };
-            const s = JSON.parse(raw);
-            return {
-              shake: s.shake !== false,
-              sfx: s.sfx === true,
-              followLerp: Number.isFinite(s.followLerp) ? clamp(s.followLerp, 0.18, 0.70) : DEFAULT_FOLLOW_LERP,
-              followMaxMult: Number.isFinite(s.followMaxMult) ? clamp(s.followMaxMult, 1.6, 4.0) : DEFAULT_FOLLOW_MAX_MULT
-            };
-          } catch {
-            return { shake:true, sfx:false, followLerp: DEFAULT_FOLLOW_LERP, followMaxMult: DEFAULT_FOLLOW_MAX_MULT };
-          }
-        }
-        function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+        function levelId(world, level) { return world * LEVELS_PER_WORLD + level; }
 
-        // ===== Progress =====
         function loadProgress() {
           try {
             const raw = localStorage.getItem(SAVE_KEY);
             if (!raw) {
               return {
-                unlockedWorld: 0,
-                unlockedLevel: 0,
-                currentWorld: 0,
-                currentLevel: 0,
-                // per-level best score (campaign)
+                unlockedWorld: 0, unlockedLevel: 0,
+                currentWorld: 0, currentLevel: 0,
                 levelBest: Array(TOTAL_LEVELS).fill(0)
               };
             }
@@ -114,7 +88,6 @@
           localStorage.removeItem(LEADER_KEY);
         }
 
-        function levelId(world, level) { return world * LEVELS_PER_WORLD + level; }
         function campaignTotalScore(p) { return p.levelBest.reduce((a,b)=>a+b, 0); }
         function worldSubtotal(p, world) {
           const start = world * LEVELS_PER_WORLD;
@@ -129,7 +102,6 @@
         }
 
         // ===== Leaderboards (local) =====
-        // Separate: Campaign Total and Endless Best Run
         function loadLeaderboards() {
           try {
             const raw = localStorage.getItem(LEADER_KEY);
@@ -154,19 +126,19 @@
         function addTitle(scene, text, yFrac = 0.22, size = 40) {
           return scene.add.text(W/2, H*yFrac, text, {
             fontFamily: uiFont, fontSize: `${size}px`, color: "#ffffff",
-          }).setOrigin(0.5).setAlpha(0.96);
+          }).setOrigin(0.5).setAlpha(0.98);
         }
         function addSubtitle(scene, text, yFrac = 0.28) {
           return scene.add.text(W/2, H*yFrac, text, {
             fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff",
-          }).setOrigin(0.5).setAlpha(0.9);
+          }).setOrigin(0.5).setAlpha(0.92);
         }
-        function makeButton(scene, label, x, y, onClick) {
+        function makeButton(scene, label, x, y, onClick, accent="#6ef3ff") {
           const btn = scene.add.text(x, y, label, {
             fontFamily: uiFont,
             fontSize: "18px",
             color: "#0a0a12",
-            backgroundColor: "#6ef3ff",
+            backgroundColor: accent,
             padding: { left: 18, right: 18, top: 10, bottom: 10 },
           }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
@@ -193,7 +165,6 @@
         // ===== Level times =====
         const DUR = [20, 25, 30, 38, 45];
 
-        // Difficulty builder
         function mkLevels(cfg) {
           return DUR.map((seconds, i) => ({
             seconds,
@@ -286,12 +257,12 @@
           }
         ];
 
-        // ===== Background FX =====
+        // ===== FX =====
         function buildBackdrop(scene, fxType, colorA, colorB) {
           const items = [];
           if (fxType === "scanlines") {
             const g = scene.add.graphics();
-            g.setAlpha(0.22);
+            g.setAlpha(0.20);
             g.lineStyle(1, colorB, 1);
             for (let y = 0; y < H; y += 8) {
               g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.strokePath();
@@ -307,7 +278,7 @@
                 2,
                 Phaser.Math.Between(18, 48),
                 colorB
-              ).setAlpha(0.16);
+              ).setAlpha(0.14);
               r._vy = Phaser.Math.FloatBetween(240, 460);
               drops.push(r);
             }
@@ -327,7 +298,7 @@
                 Phaser.Math.Between(0, W),
                 Phaser.Math.Between(0, H),
                 2, 2, colorA
-              ).setAlpha(Phaser.Math.FloatBetween(0.07, 0.32));
+              ).setAlpha(Phaser.Math.FloatBetween(0.06, 0.28));
               s._vy = Phaser.Math.FloatBetween(12, 52);
               stars.push(s);
             }
@@ -358,14 +329,12 @@
             g.fillStyle(0xffffff, 1);
             g.fillRoundedRect(8, 8, 48, 48, 10);
           });
-
           makeTex("obs_frame", (g) => {
             g.lineStyle(6, 0xffffff, 1);
             g.strokeRoundedRect(10, 10, 44, 44, 10);
             g.lineStyle(2, 0xffffff, 0.7);
             g.strokeRoundedRect(16, 16, 32, 32, 8);
           });
-
           makeTex("obs_tri", (g) => {
             g.fillStyle(0xffffff, 1);
             g.beginPath();
@@ -377,7 +346,6 @@
             g.lineStyle(2, 0xffffff, 0.35);
             g.strokePath();
           });
-
           makeTex("obs_hex", (g) => {
             g.fillStyle(0xffffff, 1);
             const pts = [
@@ -390,14 +358,12 @@
             g.lineStyle(2, 0xffffff, 0.35);
             g.strokePath();
           });
-
           makeTex("obs_bar", (g) => {
             g.fillStyle(0xffffff, 1);
             g.fillRoundedRect(6, 24, 52, 16, 8);
             g.lineStyle(2, 0xffffff, 0.35);
             g.strokeRoundedRect(6, 24, 52, 16, 8);
           });
-
           makeTex("obs_plus", (g) => {
             g.fillStyle(0xffffff, 1);
             g.fillRoundedRect(26, 10, 12, 44, 5);
@@ -417,18 +383,15 @@
           plus: "obs_plus"
         };
 
-        // ===== Scoring (shared rules; separate totals per mode) =====
-        // Survival points per second
+        // ===== Scoring (shared rules; separate leaderboards) =====
         const SCORE_PPS = 12;
 
-        // Near miss: if obstacle passes within NEAR_DIST of player center, award points; chain multiplier
-        const NEAR_DIST = 30; // pixels
+        const NEAR_DIST = 30;
         const NEAR_POINTS = 20;
-        const COMBO_DECAY_SEC = 1.35;  // if no near-miss in this time, combo resets
-        const COMBO_STEP = 0.12;       // multiplier increase per near-miss
+        const COMBO_DECAY_SEC = 1.35;
+        const COMBO_STEP = 0.12;
         const COMBO_MAX = 3.25;
 
-        // Campaign clear bonus per level (small, consistent)
         const LEVEL_CLEAR_BONUS = 160;
 
         function formatTime(sec) {
@@ -437,41 +400,42 @@
           return m > 0 ? `${m}:${String(s).padStart(2,"0")}` : `${s}s`;
         }
 
-        // ===== Endless blending model =====
-        // Starts at >= World 1 Level 1 difficulty (your requirement).
-        // We blend visuals & hazards over time and ramp difficulty forever.
+        // ===== Endless blending (moved earlier per request) =====
+        // Starts at World 1 Level 1 difficulty (not easier).
         const ENDLESS = {
-          // baseline anchored to World 1 L1
           baseScroll0: WORLDS[0].levels[0].baseScroll,
           ramp0: WORLDS[0].levels[0].scrollRamp,
           spawnStart0: WORLDS[0].levels[0].spawnStart,
           spawnRamp0: WORLDS[0].levels[0].spawnRamp,
           spawnMinFloor: 230,
 
-          // how fast endless increases over time
-          scrollRampGrowth: 0.010,   // extra ramp per second
-          scrollBaseGrowth: 0.020,   // base speed growth per second
-          spawnTighten: 0.20,        // ms per second tighten
-          spawnRampGrowth: 0.010,    // extra spawnRamp per second
+          // growth
+          scrollRampGrowth: 0.012,
+          scrollBaseGrowth: 0.025,
+          spawnTighten: 0.26,
+          spawnRampGrowth: 0.012,
 
-          // stage timeline (seconds)
-          t_industrial: 70,
-          t_glitch: 150,
-          t_laserWarnOnly: 220,
-          t_laserActive: 320
+          // earlier stages
+          t_industrial: 45,
+          t_glitch: 90,
+          t_blackout: 105,     // blackout pulses begin
+          t_laserWarnOnly: 120,
+          t_laserActive: 160,
+          t_verticalLaser: 210 // vertical lasers begin
         };
 
         function getEndlessBlend(t) {
-          // returns blend weights for world styles + hazard unlocks
           const w1 = 1;
-          const w2 = clamp((t - ENDLESS.t_industrial) / 80, 0, 1);
-          const w3 = clamp((t - ENDLESS.t_glitch) / 90, 0, 1);
-          // normalize feel (not strictly necessary)
+          const w2 = clamp((t - ENDLESS.t_industrial) / 70, 0, 1);
+          const w3 = clamp((t - ENDLESS.t_glitch) / 80, 0, 1);
           const total = w1 + w2 + w3;
+
           return {
             a1: w1/total, a2: w2/total, a3: w3/total,
+            blackout: t >= ENDLESS.t_blackout,
             laserWarn: t >= ENDLESS.t_laserWarnOnly,
-            laserActive: t >= ENDLESS.t_laserActive
+            laserActive: t >= ENDLESS.t_laserActive,
+            verticalLaser: t >= ENDLESS.t_verticalLaser
           };
         }
 
@@ -484,81 +448,131 @@
           return (r<<16)|(g<<8)|b;
         }
 
+        // ===== Surge speed window modifier =====
+        const SURGE = {
+          period: 9.0,     // seconds
+          active: 1.2,     // seconds
+          mult: 1.22       // scroll speed multiplier during surge
+        };
+
+        // ===== Blackout pulse modifier =====
+        const BLACKOUT = {
+          period: 10.5,
+          active: 0.65,
+          alpha: 0.35
+        };
+
         // ===== Scenes =====
         class MenuScene extends Phaser.Scene {
           constructor() { super("Menu"); }
           create() {
-            this.cameras.main.setBackgroundColor(0x0a0a12);
-            addTitle(this, "GRIDRUN", 0.20, 46);
-            addSubtitle(this, "Campaign + Endless • Skill-only • Separate leaderboards", 0.27);
+            // More appealing menu: animated neon backdrop + particles + frame
+            this.cameras.main.setBackgroundColor(0x05050f);
 
-            makeButton(this, "CAMPAIGN", W/2, H*0.44, () => this.scene.start("WorldMap"));
-            makeGhostButton(this, "ENDLESS", W/2, H*0.54, () => this.scene.start("EndlessIntro"));
+            const bg = this.add.graphics();
+            const frame = this.add.graphics();
+
+            // particles
+            const dots = [];
+            for (let i=0;i<36;i++){
+              const d = this.add.circle(
+                Phaser.Math.Between(0,W),
+                Phaser.Math.Between(0,H),
+                Phaser.Math.Between(1,3),
+                0x6ef3ff
+              ).setAlpha(Phaser.Math.FloatBetween(0.08, 0.22));
+              d._vx = Phaser.Math.FloatBetween(-12, 12);
+              d._vy = Phaser.Math.FloatBetween(18, 62);
+              dots.push(d);
+            }
+
+            // glow bars
+            const bars = [];
+            for (let i=0;i<6;i++){
+              const r = this.add.rectangle(
+                Phaser.Math.Between(30, W-30),
+                Phaser.Math.Between(0, H),
+                Phaser.Math.Between(80, 170),
+                8,
+                0xff4d7d
+              ).setAlpha(0.06);
+              r._vy = Phaser.Math.FloatBetween(20, 70);
+              bars.push(r);
+            }
+
+            // scanlines
+            const scan = this.add.graphics().setAlpha(0.13);
+            scan.lineStyle(1, 0x2a2a55, 1);
+            for (let y=0;y<H;y+=10){
+              scan.beginPath(); scan.moveTo(0,y); scan.lineTo(W,y); scan.strokePath();
+            }
+
+            // Title block
+            const title = this.add.text(W/2, H*0.18, "GRIDRUN", {
+              fontFamily: uiFont,
+              fontSize: "52px",
+              color: "#ffffff"
+            }).setOrigin(0.5).setAlpha(0.98);
+
+            const sub = this.add.text(W/2, H*0.25, "Campaign + Endless • Skill-only • TXC L2 optional later", {
+              fontFamily: uiFont,
+              fontSize: "13px",
+              color: "#b7b7ff"
+            }).setOrigin(0.5).setAlpha(0.92);
+
+            // Buttons
+            const accent = "#6ef3ff";
+            makeButton(this, "CAMPAIGN", W/2, H*0.44, () => this.scene.start("WorldMap"), accent);
+            makeButton(this, "ENDLESS", W/2, H*0.54, () => this.scene.start("EndlessIntro"), "#7cffd2");
             makeGhostButton(this, "LEADERBOARDS", W/2, H*0.64, () => this.scene.start("Leaderboards"));
-            makeGhostButton(this, "SETTINGS", W/2, H*0.74, () => this.scene.start("Settings"));
-            makeGhostButton(this, "RESET SAVES", W/2, H*0.84, () => { resetAllSaves(); this.scene.restart(); }).setAlpha(0.75);
+            makeGhostButton(this, "RESET SAVES", W/2, H*0.76, () => { resetAllSaves(); this.scene.restart(); }).setAlpha(0.70);
 
             const p = loadProgress();
-            const total = campaignTotalScore(p);
-            this.add.text(W/2, H*0.92, `Campaign Total: ${total}`, {
-              fontFamily: uiFont, fontSize: "12px", color: "#ffffff"
-            }).setOrigin(0.5).setAlpha(0.55);
-          }
-        }
+            this.totalText = this.add.text(W/2, H*0.86, `Campaign Total: ${campaignTotalScore(p)}`, {
+              fontFamily: uiFont, fontSize: "12px", color: "rgba(255,255,255,0.75)"
+            }).setOrigin(0.5);
 
-        class SettingsScene extends Phaser.Scene {
-          constructor() { super("Settings"); }
-          create() {
-            this.cameras.main.setBackgroundColor(0x070710);
-            addTitle(this, "SETTINGS", 0.16, 34);
-            addSubtitle(this, "Tweak feel • Saved locally", 0.22);
+            this.add.text(W/2, H*0.92, "Mobile: drag anywhere on the grid to move. Tap PAUSE to pause.", {
+              fontFamily: uiFont, fontSize:"11px", color:"rgba(255,255,255,0.55)"
+            }).setOrigin(0.5);
 
-            const s = loadSettings();
+            this.t = 0;
+            this.events.on("update", (_, dtMs) => {
+              const dt = dtMs/1000;
+              this.t += dt;
 
-            const mkToggle = (label, y, value, onToggle) => {
-              const t = this.add.text(W/2, y, `${label}: ${value ? "ON" : "OFF"}`, {
-                fontFamily: uiFont, fontSize: "16px", color: "#ffffff",
-                backgroundColor: "rgba(255,255,255,0.10)",
-                padding: { left: 16, right: 16, top: 10, bottom: 10 },
-              }).setOrigin(0.5).setInteractive({ useHandCursor:true });
-              t.on("pointerdown", () => onToggle(t));
-              return t;
-            };
+              // gradient-ish background
+              bg.clear();
+              const a = 0.10 + 0.05*Math.sin(this.t*0.7);
+              bg.fillStyle(0x6ef3ff, a);
+              bg.fillRect(-40, H*0.12 + 30*Math.sin(this.t*0.9), W+80, 120);
+              bg.fillStyle(0xff4d7d, 0.06 + 0.04*Math.sin(this.t*0.6+1.4));
+              bg.fillRect(-40, H*0.62 + 30*Math.sin(this.t*0.8+2.1), W+80, 120);
 
-            const mkSlider = (label, y, min, max, step, get, set) => {
-              const text = this.add.text(W/2, y, "", {
-                fontFamily: uiFont, fontSize: "14px", color: "#b7b7ff"
-              }).setOrigin(0.5);
+              // frame
+              frame.clear();
+              frame.lineStyle(2, 0x2a2a55, 0.9);
+              frame.strokeRoundedRect(18, 18, W-36, H-36, 18);
+              frame.lineStyle(1, 0x6ef3ff, 0.25);
+              frame.strokeRoundedRect(26, 26, W-52, H-52, 16);
 
-              const minus = makeGhostButton(this, "−", W/2 - 110, y + 40, () => {
-                const v = clamp(get() - step, min, max); set(v); refresh();
-              });
-              const plus  = makeGhostButton(this, "+", W/2 + 110, y + 40, () => {
-                const v = clamp(get() + step, min, max); set(v); refresh();
-              });
+              // animate dots
+              for (const d of dots) {
+                d.x += d._vx * dt;
+                d.y += d._vy * dt;
+                if (d.y > H+10) { d.y = -10; d.x = Phaser.Math.Between(0,W); }
+                if (d.x < -10) d.x = W+10;
+                if (d.x > W+10) d.x = -10;
+              }
 
-              const refresh = () => text.setText(`${label}: ${get().toFixed(2)}  (− / +)`);
-              refresh();
-              return { text, minus, plus, refresh };
-            };
+              for (const r of bars) {
+                r.y += r._vy * dt;
+                if (r.y > H+30) { r.y = -30; r.x = Phaser.Math.Between(30,W-30); }
+              }
 
-            const tShake = mkToggle("Screen Shake", H*0.32, s.shake, (t)=>{
-              s.shake = !s.shake; t.setText(`Screen Shake: ${s.shake?"ON":"OFF"}`); saveSettings(s);
+              // subtle title pulse
+              title.setAlpha(0.92 + 0.06*Math.sin(this.t*1.1));
             });
-
-            const tSfx = mkToggle("SFX (stub)", H*0.40, s.sfx, (t)=>{
-              s.sfx = !s.sfx; t.setText(`SFX (stub): ${s.sfx?"ON":"OFF"}`); saveSettings(s);
-            });
-
-            mkSlider("Touch Follow Lerp", H*0.50, 0.18, 0.70, 0.02,
-              ()=>s.followLerp, (v)=>{ s.followLerp=v; saveSettings(s); }
-            );
-
-            mkSlider("Touch Max Speed Mult", H*0.63, 1.60, 4.00, 0.10,
-              ()=>s.followMaxMult, (v)=>{ s.followMaxMult=v; saveSettings(s); }
-            );
-
-            makeGhostButton(this, "BACK", W/2, H*0.90, () => this.scene.start("Menu"));
           }
         }
 
@@ -589,13 +603,11 @@
                 return;
               }
               arr.forEach((e, i) => {
-                this.add.text(x, yy, `${i+1}. ${e.score}`, {
-                  fontFamily: uiFont, fontSize:"12px", color:"#ffffff"
-                }).setOrigin(0,0).setAlpha(0.9);
+                this.add.text(x, yy, `${i+1}. ${e.score}`, { fontFamily: uiFont, fontSize:"12px", color:"#ffffff" })
+                  .setOrigin(0,0).setAlpha(0.9);
                 if (e.meta) {
-                  this.add.text(x+70, yy, e.meta, {
-                    fontFamily: uiFont, fontSize:"11px", color:"rgba(255,255,255,0.55)"
-                  }).setOrigin(0,0);
+                  this.add.text(x+70, yy, e.meta, { fontFamily: uiFont, fontSize:"11px", color:"rgba(255,255,255,0.55)" })
+                    .setOrigin(0,0);
                 }
                 yy += 18;
               });
@@ -709,7 +721,7 @@
             p2.currentLevel = level;
             saveProgress(p2);
 
-            makeButton(this, "START", W/2, H*0.58, () => this.scene.start("Play", { mode:"campaign", world, level }));
+            makeButton(this, "START", W/2, H*0.58, () => this.scene.start("Play", { mode:"campaign", world, level }), "#6ef3ff");
             makeGhostButton(this, "CAMPAIGN MAP", W/2, H*0.70, () => this.scene.start("WorldMap"));
             makeGhostButton(this, "MAIN MENU", W/2, H*0.80, () => this.scene.start("Menu"));
           }
@@ -720,7 +732,7 @@
           create() {
             this.cameras.main.setBackgroundColor(0x050512);
             addTitle(this, "ENDLESS", 0.20, 36);
-            addSubtitle(this, "Starts at World 1 Level 1 difficulty • Ramps forever • Blends all worlds", 0.27);
+            addSubtitle(this, "Starts at World 1 Level 1 difficulty • Changes begin early • Vertical lasers added later", 0.27);
 
             const lb = loadLeaderboards();
             const best = lb.endlessTop[0]?.score || 0;
@@ -729,27 +741,30 @@
               fontFamily: uiFont, fontSize:"18px", color:"#ffffff"
             }).setOrigin(0.5).setAlpha(0.9);
 
-            makeButton(this, "START ENDLESS", W/2, H*0.58, () => this.scene.start("Play", { mode:"endless" }));
+            makeButton(this, "START ENDLESS", W/2, H*0.58, () => this.scene.start("Play", { mode:"endless" }), "#7cffd2");
             makeGhostButton(this, "LEADERBOARDS", W/2, H*0.70, () => this.scene.start("Leaderboards"));
             makeGhostButton(this, "MAIN MENU", W/2, H*0.80, () => this.scene.start("Menu"));
           }
         }
 
-        // ===== Play Scene (Campaign + Endless) =====
+        // ===== Play Scene =====
         class PlayScene extends Phaser.Scene {
           constructor() {
             super("Play");
-            this.mode = "campaign"; // or "endless"
+            this.mode = "campaign";
             this.world = 0;
             this.level = 0;
 
             this.wcfg = WORLDS[0];
             this.lcfg = WORLDS[0].levels[0];
 
-            // runtime
-            this.t = 0;
+            this.t = 0;             // active time (after countdown)
+            this.rawTime = 0;        // includes countdown
             this.score = 0;
             this.paused = false;
+
+            this.countdown = 0;
+            this.canMove = false;
 
             // scoring breakdown
             this.survivalPts = 0;
@@ -761,14 +776,21 @@
 
             // pacing
             this.scrollSpeed = 0;
+            this.baseScroll = 0;
             this.spawnEvery = 0;
             this.spawnTimer = 0;
 
-            // rendering
+            // surge
+            this.surgeMult = 1;
+
+            // blackout
+            this.blackoutOn = false;
+
+            // graphics
             this.gridGraphics = null;
             this.gridOffset = 0;
 
-            // entities
+            // groups
             this.obstacles = null;
             this.player = null;
 
@@ -776,25 +798,27 @@
             this.touchTarget = null;
             this.touchDot = null;
 
-            // pause UI
+            // UI
+            this.pauseBtn = null;
             this.pauseOverlay = null;
 
-            // boss laser (campaign W3 + endless later)
-            this.laser = null;
-            this.laserWarn = null;
+            // lasers
+            this.hLaser = null;
+            this.hLaserWarn = null;
+            this.vLaser = null;
+            this.vLaserWarn = null;
+
             this.bossT = 0;
-            this.laserEnabled = false;
-            this.laserWarnOnly = false;
+            this.hLaserMode = "off"; // off | warn | active
+            this.vLaserMode = "off";
+
+            // overlays
+            this.flash = null;
+            this.blackout = null;
 
             // decor
             this.decor = [];
             this.glitchFlash = null;
-
-            // settings
-            this.settings = loadSettings();
-
-            // near-miss bookkeeping
-            this.nearSeen = new WeakSet();
           }
 
           init(data) {
@@ -805,7 +829,6 @@
               this.wcfg = WORLDS[this.world];
               this.lcfg = this.wcfg.levels[this.level];
             } else {
-              // endless starts at >= world1 level1 difficulty
               this.world = 0;
               this.level = 0;
               this.wcfg = WORLDS[0];
@@ -816,7 +839,6 @@
           create() {
             ensureObstacleTextures(this);
 
-            this.settings = loadSettings();
             this.cameras.main.setBackgroundColor(this.wcfg.bg);
             buildBackdrop(this, this.wcfg.fx, this.wcfg.player, this.wcfg.border);
 
@@ -832,26 +854,63 @@
             this.physics.add.existing(this.player);
             this.player.body.setAllowGravity(false);
 
-            this.physics.add.overlap(this.player, this.obstacles, (_, o) => {
-              // obstacle hit
-              this.endRun({ reason: "OBSTACLE" });
-            });
+            this.physics.add.overlap(this.player, this.obstacles, () => this.endRun({ reason: "OBSTACLE" }));
 
             // keyboard
             this.cursors = this.input.keyboard.createCursorKeys();
             this.keys = this.input.keyboard.addKeys("W,A,S,D,ESC");
 
-            // touch indicator
-            this.touchDot = this.add.circle(0, 0, 6, this.wcfg.player).setAlpha(0);
+            // overlays
+            this.flash = this.add.rectangle(W/2, H/2, W, H, 0xffffff).setAlpha(0).setDepth(200);
+            this.blackout = this.add.rectangle(W/2, H/2, W, H, 0x000000).setAlpha(0).setDepth(180);
+
+            // touch dot
+            this.touchDot = this.add.circle(0, 0, 6, this.wcfg.player).setAlpha(0).setDepth(50);
             this.touchTarget = null;
+
+            // HUD
+            this.uiTop = this.add.text(14, 10, "", { fontFamily: uiFont, fontSize: "14px", color: "#ffffff" }).setAlpha(0.95).setDepth(60);
+            this.uiSub = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95).setDepth(60);
+            this.uiCombo = this.add.text(W-14, 10, "", { fontFamily: uiFont, fontSize: "12px", color: "#ffffff" })
+              .setOrigin(1,0).setAlpha(0.85).setDepth(60);
+
+            // PAUSE button (mobile + desktop) — FIXED: always wins taps
+            this.pauseBtn = this.add.text(W-14, 30, "PAUSE", {
+              fontFamily: uiFont, fontSize: "12px",
+              color: "#ffffff", backgroundColor: "rgba(255,255,255,0.16)",
+              padding: { left: 10, right: 10, top: 6, bottom: 6 }
+            }).setOrigin(1,0).setDepth(120).setInteractive({ useHandCursor:true });
+
+            // Make the hit area generous for thumbs
+            const pb = this.pauseBtn.getBounds();
+            this.pauseBtn.input.hitArea.setTo(pb.x-18, pb.y-10, pb.width+28, pb.height+18);
+
+            this.pauseBtn.on("pointerdown", (p) => {
+              p.event?.stopPropagation?.();
+              this.togglePause(!this.paused);
+            });
+
+            // Countdown text
+            this.countText = this.add.text(W/2, H*0.42, "", {
+              fontFamily: uiFont, fontSize:"54px", color:"#ffffff"
+            }).setOrigin(0.5).setDepth(160).setAlpha(0);
+
+            this.countSub = this.add.text(W/2, H*0.50, "", {
+              fontFamily: uiFont, fontSize:"14px", color:"#b7b7ff"
+            }).setOrigin(0.5).setDepth(160).setAlpha(0);
+
+            // Input: global pointer handlers, but ignore the pause area (FIX)
+            this.uiNoTouchZone = { x: W-160, y: 0, w: 160, h: 82 };
 
             this.input.on("pointerdown", (p) => {
               if (this.paused) { this.togglePause(false); return; }
+              if (this.isInNoTouchZone(p.x, p.y)) return; // don't steal pause taps
               this.touchTarget = { x: p.x, y: p.y };
               this.touchDot.setPosition(p.x, p.y).setAlpha(0.85);
             });
             this.input.on("pointermove", (p) => {
               if (!p.isDown || this.paused) return;
+              if (this.isInNoTouchZone(p.x, p.y)) return;
               this.touchTarget = { x: p.x, y: p.y };
               this.touchDot.setPosition(p.x, p.y).setAlpha(0.85);
             });
@@ -860,27 +919,31 @@
               this.touchDot.setAlpha(0);
             });
 
-            // HUD
-            this.uiTop = this.add.text(14, 10, "", { fontFamily: uiFont, fontSize: "14px", color: "#ffffff" }).setAlpha(0.95);
-            this.uiSub = this.add.text(14, 30, "", { fontFamily: uiFont, fontSize: "12px", color: "#b7b7ff" }).setAlpha(0.95);
-            this.uiCombo = this.add.text(W-14, 10, "", { fontFamily: uiFont, fontSize: "12px", color: "#ffffff" })
-              .setOrigin(1,0).setAlpha(0.85);
+            // ESC pause
+            this.input.keyboard.on("keydown-ESC", () => this.togglePause(!this.paused));
 
-            // pause button (mobile)
-            this.pauseBtn = this.add.text(W-14, 30, "PAUSE", {
-              fontFamily: uiFont, fontSize: "12px",
-              color: "#ffffff", backgroundColor: "rgba(255,255,255,0.10)",
-              padding: { left: 10, right: 10, top: 6, bottom: 6 }
-            }).setOrigin(1,0).setInteractive({ useHandCursor:true }).setAlpha(0.9);
-            this.pauseBtn.on("pointerdown", () => this.togglePause(!this.paused));
+            // Reset run state
+            this.resetRunState();
 
-            // overlay for glitch flash
-            this.glitchFlash = this.add.rectangle(W/2, H/2, W, H, 0xffffff).setAlpha(0).setDepth(50);
+            // Setup decor + lasers
+            this.setupDecor();
+            this.setupLasers();
 
-            // reset state
+            // Start countdown
+            this.startCountdown(3);
+          }
+
+          isInNoTouchZone(x,y){
+            const z = this.uiNoTouchZone;
+            return x >= z.x && x <= z.x+z.w && y >= z.y && y <= z.y+z.h;
+          }
+
+          resetRunState(){
             this.t = 0;
+            this.rawTime = 0;
             this.score = 0;
             this.paused = false;
+            this.canMove = false;
 
             this.survivalPts = 0;
             this.nearPts = 0;
@@ -890,33 +953,78 @@
             this.maxCombo = 1;
 
             this.spawnTimer = 0;
-            this.nearSeen = new WeakSet();
 
-            // initial pacing
             if (this.mode === "campaign") {
+              this.baseScroll = this.lcfg.baseScroll;
               this.scrollSpeed = this.lcfg.baseScroll;
               this.spawnEvery = this.lcfg.spawnStart;
             } else {
+              this.baseScroll = ENDLESS.baseScroll0;
               this.scrollSpeed = ENDLESS.baseScroll0;
               this.spawnEvery = ENDLESS.spawnStart0;
             }
 
-            this.setupBoss();
-            this.setupDecor();
-            this.updateHud();
+            this.surgeMult = 1;
+            this.blackoutOn = false;
 
-            // ESC pause
-            this.input.keyboard.on("keydown-ESC", () => this.togglePause(!this.paused));
+            // clear existing obstacles
+            if (this.obstacles) {
+              this.obstacles.children.iterate((o)=>{ if(o) o.destroy(); });
+            }
           }
 
-          togglePause(on) {
+          startCountdown(n){
+            this.countdown = n;
+            this.countText.setAlpha(1);
+            this.countSub.setAlpha(1);
+
+            const show = (txt, subtxt) => {
+              this.countText.setText(txt);
+              this.countSub.setText(subtxt || "");
+              this.countText.setScale(1.0);
+              this.tweens.add({ targets: this.countText, scale: 1.10, yoyo: true, duration: 180, ease: "Sine.easeInOut" });
+            };
+
+            show(String(this.countdown), this.mode==="endless" ? "ENDLESS" : `${this.wcfg.name} • LEVEL ${this.level+1}`);
+
+            this.time.addEvent({
+              delay: 1000,
+              repeat: n, // counts down to GO
+              callback: () => {
+                this.countdown--;
+                if (this.countdown > 0) {
+                  show(String(this.countdown), "");
+                } else if (this.countdown === 0) {
+                  show("GO", "");
+                  this.flash.setAlpha(0.10);
+                  this.tweens.add({ targets: this.flash, alpha: 0, duration: 180, ease: "Linear" });
+                  this.time.addEvent({
+                    delay: 450,
+                    callback: () => {
+                      this.countText.setAlpha(0);
+                      this.countSub.setAlpha(0);
+                      this.canMove = true;
+                    }
+                  });
+                } else {
+                  // nothing
+                }
+              }
+            });
+          }
+
+          togglePause(on){
             this.paused = on;
+
             if (on) {
-              this.pauseOverlay = this.add.rectangle(W/2, H/2, W, H, 0x000000).setAlpha(0.55).setDepth(90);
+              this.pauseOverlay = this.add.rectangle(W/2, H/2, W, H, 0x000000).setAlpha(0.55).setDepth(140);
               this.pauseText = this.add.text(W/2, H*0.44, "PAUSED", { fontFamily: uiFont, fontSize:"28px", color:"#ffffff" })
-                .setOrigin(0.5).setDepth(91);
-              this.pauseSub = this.add.text(W/2, H*0.52, "Tap / Press ESC to resume", { fontFamily: uiFont, fontSize:"14px", color:"#b7b7ff" })
-                .setOrigin(0.5).setDepth(91).setAlpha(0.9);
+                .setOrigin(0.5).setDepth(141);
+              this.pauseSub = this.add.text(W/2, H*0.52, "Tap anywhere to resume", { fontFamily: uiFont, fontSize:"14px", color:"#b7b7ff" })
+                .setOrigin(0.5).setDepth(141).setAlpha(0.9);
+              // tapping anywhere resumes (reliable mobile)
+              this.pauseOverlay.setInteractive();
+              this.pauseOverlay.on("pointerdown", () => this.togglePause(false));
             } else {
               if (this.pauseOverlay) this.pauseOverlay.destroy();
               if (this.pauseText) this.pauseText.destroy();
@@ -926,6 +1034,7 @@
           }
 
           setupDecor() {
+            // Clear prior decor
             for (const d of this.decor) d.destroy();
             this.decor = [];
 
@@ -945,63 +1054,135 @@
                   Phaser.Math.Between(10, 26),
                   Phaser.Math.Between(4, 12),
                   0x9aa7ff
-                ).setAlpha(Phaser.Math.FloatBetween(0.06, 0.14));
+                ).setAlpha(Phaser.Math.FloatBetween(0.05, 0.12));
                 b._vy = Phaser.Math.FloatBetween(40, 110);
                 this.decor.push(b);
               }
             }
           }
 
-          setupBoss() {
+          setupLasers() {
+            const boss = WORLDS[2].boss;
+
+            // horizontal laser
+            this.hLaserWarn = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.warnThickness, 0xffffff)
+              .setAlpha(0).setDepth(90);
+            this.hLaser = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.thickness, 0xff4d7d)
+              .setAlpha(0).setDepth(91);
+
+            // vertical laser (NEW)
+            this.vLaserWarn = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, boss.warnThickness, GRID_H, 0xffffff)
+              .setAlpha(0).setDepth(90);
+            this.vLaser = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, boss.thickness, GRID_H, 0xff4d7d)
+              .setAlpha(0).setDepth(91);
+
             this.bossT = 0;
-            if (this.laser) this.laser.destroy();
-            if (this.laserWarn) this.laserWarn.destroy();
-            this.laser = null;
-            this.laserWarn = null;
 
-            // campaign: boss enabled only in world 3
             if (this.mode === "campaign") {
-              const boss = this.wcfg.boss;
-              this.laserEnabled = !!(boss && boss.enabled);
-              this.laserWarnOnly = false;
-              if (!this.laserEnabled) return;
+              // campaign: only world 3 has horizontal laser. Vertical stays off.
+              this.hLaserMode = (this.world === 2) ? "active" : "off";
+              this.vLaserMode = "off";
+            } else {
+              // endless: time-based modes
+              this.hLaserMode = "off";
+              this.vLaserMode = "off";
+            }
+          }
 
-              this.laserWarn = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.warnThickness, 0xffffff)
-                .setAlpha(0).setDepth(20);
-              this.laser = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.thickness, 0xff4d7d)
-                .setAlpha(0).setDepth(21);
+          applyEndlessBlend(blend){
+            // blend visuals towards W2/W3
+            const w1 = WORLDS[0], w2 = WORLDS[1], w3 = WORLDS[2];
+
+            const bg12 = mixColor(w1.bg, w2.bg, blend.a2);
+            const bg = mixColor(bg12, w3.bg, blend.a3);
+            const border12 = mixColor(w1.border, w2.border, blend.a2);
+            const border = mixColor(border12, w3.border, blend.a3);
+            const grid12 = mixColor(w1.gridLine, w2.gridLine, blend.a2);
+            const grid = mixColor(grid12, w3.gridLine, blend.a3);
+            const player12 = mixColor(w1.player, w2.player, blend.a2);
+            const player = mixColor(player12, w3.player, blend.a3);
+
+            let gridStyle = "circuit";
+            if (blend.a3 > 0.38) gridStyle = "glitch";
+            else if (blend.a2 > 0.42) gridStyle = "industrial";
+
+            const shapes = [
+              ...w1.obstacleStyle.shapes,
+              ...(blend.a2 > 0.18 ? w2.obstacleStyle.shapes : []),
+              ...(blend.a3 > 0.18 ? w3.obstacleStyle.shapes : [])
+            ];
+
+            this.wcfg = {
+              id: 99,
+              name: "Endless",
+              subtitle: "",
+              bg, border, gridLine: grid, player,
+              fx: (gridStyle==="glitch") ? "stars" : (gridStyle==="industrial" ? "rain" : "scanlines"),
+              gridStyle,
+              obstacleStyle: {
+                palette: [...w1.obstacleStyle.palette, ...w2.obstacleStyle.palette, ...w3.obstacleStyle.palette],
+                shapes
+              }
+            };
+
+            // update tints
+            this.player.fillColor = player;
+            this.touchDot.fillColor = player;
+
+            // if gridStyle changed, refresh decor
+            if (!this._lastGridStyle) this._lastGridStyle = this.wcfg.gridStyle;
+            if (this._lastGridStyle !== this.wcfg.gridStyle) {
+              this._lastGridStyle = this.wcfg.gridStyle;
+              this.setupDecor();
+            }
+
+            // blackout enabled?
+            this.blackoutEnabled = !!blend.blackout;
+
+            // lasers
+            this.hLaserMode = blend.laserWarn ? (blend.laserActive ? "active" : "warn") : "off";
+            this.vLaserMode = blend.verticalLaser ? (blend.laserActive ? "active" : "warn") : "off";
+          }
+
+          update(_, deltaMs){
+            if (this.paused) return;
+
+            const dt = deltaMs/1000;
+            this.rawTime += dt;
+
+            // During countdown phase, don't advance game time / spawn
+            if (!this.canMove) {
+              this.drawGrid(0.0001);
+              this.updateHud();
               return;
             }
 
-            // endless: created now but may be warn-only or active based on time
-            const boss = WORLDS[2].boss;
-            this.laserEnabled = false;
-            this.laserWarnOnly = false;
-
-            this.laserWarn = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.warnThickness, 0xffffff)
-              .setAlpha(0).setDepth(20);
-            this.laser = this.add.rectangle(GRID_X + GRID_W/2, GRID_Y + GRID_H/2, GRID_W, boss.thickness, 0xff4d7d)
-              .setAlpha(0).setDepth(21);
-          }
-
-          update(_, deltaMs) {
-            if (this.paused) return;
-
-            const dt = deltaMs / 1000;
             this.t += dt;
 
             // combo decay
             this.comboTimer += dt;
-            if (this.comboTimer > COMBO_DECAY_SEC) {
-              this.combo = 1;
+            if (this.comboTimer > COMBO_DECAY_SEC) this.combo = 1;
+
+            // surge window (both modes)
+            const phase = (this.t % SURGE.period);
+            const inSurge = phase < SURGE.active;
+            this.surgeMult = inSurge ? SURGE.mult : 1.0;
+
+            // blackout pulse (endless only, once enabled)
+            if (this.mode === "endless" && this.blackoutEnabled) {
+              const bp = (this.t % BLACKOUT.period);
+              this.blackoutOn = bp < BLACKOUT.active;
+              this.blackout.setAlpha(this.blackoutOn ? BLACKOUT.alpha : 0);
+            } else {
+              this.blackout.setAlpha(0);
             }
 
-            // === Mode pacing ===
+            // pacing
             let timeLeft = 0;
+
             if (this.mode === "campaign") {
               timeLeft = Math.max(0, this.lcfg.seconds - this.t);
 
-              // end level
               if (this.t >= this.lcfg.seconds) {
                 this.clearBonusPts += LEVEL_CLEAR_BONUS;
                 this.score += LEVEL_CLEAR_BONUS;
@@ -1009,35 +1190,35 @@
                 return;
               }
 
-              // campaign curve
-              this.scrollSpeed = this.lcfg.baseScroll + this.t * this.lcfg.scrollRamp;
+              // base scroll speed
+              this.baseScroll = this.lcfg.baseScroll + this.t * this.lcfg.scrollRamp;
+              this.scrollSpeed = this.baseScroll * this.surgeMult;
+
+              // spawn
               const targetSpawn = this.lcfg.spawnStart - this.t * this.lcfg.spawnRamp;
               this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
 
             } else {
-              // endless ramps forever, starts at >= W1 L1
-              const base = ENDLESS.baseScroll0 + (this.t * ENDLESS.scrollBaseGrowth * 60) / 60; // keep simple
+              const blend = getEndlessBlend(this.t);
+              this.applyEndlessBlend(blend);
+
+              const base = ENDLESS.baseScroll0 + (this.t * ENDLESS.scrollBaseGrowth);
               const ramp = ENDLESS.ramp0 + this.t * ENDLESS.scrollRampGrowth;
-              this.scrollSpeed = base + this.t * ramp;
+              this.baseScroll = base + this.t * ramp;
+              this.scrollSpeed = this.baseScroll * this.surgeMult;
 
               const spawnStart = ENDLESS.spawnStart0 - this.t * (ENDLESS.spawnTighten);
               const spawnRamp = ENDLESS.spawnRamp0 + this.t * ENDLESS.spawnRampGrowth;
               const targetSpawn = spawnStart - this.t * spawnRamp;
-
               this.spawnEvery = clamp(targetSpawn, ENDLESS.spawnMinFloor, ENDLESS.spawnStart0);
-
-              // blend world feel over time
-              const b = getEndlessBlend(this.t);
-              this.applyEndlessBlend(b);
-              timeLeft = 0;
             }
 
-            // === Survival scoring ===
+            // survival score
             const add = SCORE_PPS * dt;
             this.survivalPts += add;
             this.score += add;
 
-            // === Movement ===
+            // movement
             if (!IS_TOUCH) {
               let kvx = 0, kvy = 0;
               const left = this.cursors.left.isDown || this.keys.A.isDown;
@@ -1061,10 +1242,10 @@
                 const dist = Math.hypot(dx, dy);
 
                 if (dist > FOLLOW_RADIUS) {
-                  const nx = this.player.x + dx * this.settings.followLerp;
-                  const ny = this.player.y + dy * this.settings.followLerp;
+                  const nx = this.player.x + dx * FOLLOW_LERP;
+                  const ny = this.player.y + dy * FOLLOW_LERP;
 
-                  const maxStep = PLAYER_SPEED * this.settings.followMaxMult * dt;
+                  const maxStep = PLAYER_SPEED * FOLLOW_MAX_SPEED_MULT * dt;
                   const stepDist = Math.hypot(nx - this.player.x, ny - this.player.y);
 
                   if (stepDist > maxStep) {
@@ -1094,26 +1275,26 @@
               this.player.body.reset(px, py);
             }
 
-            // decor updates (glitch)
+            // decor (glitch)
             if (this.wcfg.gridStyle === "glitch") {
               for (const b of this.decor) {
                 b.y += b._vy * dt;
                 if (b.y > H + 20) { b.y = -20; b.x = Phaser.Math.Between(0, W); }
               }
               if (Math.random() < 0.012) {
-                this.glitchFlash.setAlpha(0.06);
-                this.tweens.add({ targets: this.glitchFlash, alpha: 0, duration: 120, ease: "Linear" });
+                this.flash.setAlpha(0.04);
+                this.tweens.add({ targets: this.flash, alpha: 0, duration: 120, ease: "Linear" });
               }
             }
 
-            // spawn obstacles
+            // spawn
             this.spawnTimer += deltaMs;
             while (this.spawnTimer >= this.spawnEvery) {
               this.spawnTimer -= this.spawnEvery;
               this.spawnObstacle();
             }
 
-            // move obstacles + near-miss scoring
+            // move obstacles + near misses
             this.obstacles.children.iterate((o) => {
               if (!o) return;
               o.y += this.scrollSpeed * dt;
@@ -1121,81 +1302,34 @@
               this.checkNearMiss(o);
             });
 
-            // boss laser update
-            this.updateBoss(dt);
+            // lasers
+            this.updateLasers(dt);
 
-            // draw grid
+            // draw grid + HUD
             this.drawGrid(dt);
-
-            // HUD
             this.updateHud(timeLeft);
           }
 
-          applyEndlessBlend(blend) {
-            // Blend visuals toward W2/W3 over time
-            const w1 = WORLDS[0], w2 = WORLDS[1], w3 = WORLDS[2];
+          updateHud(timeLeft){
+            const modeLabel = this.mode === "campaign"
+              ? `Campaign • ${this.wcfg.name} L${this.level+1}`
+              : "Endless";
 
-            // background / border / grid line / player tint blend
-            const bg12 = mixColor(w1.bg, w2.bg, blend.a2);
-            const bg = mixColor(bg12, w3.bg, blend.a3);
-            const border12 = mixColor(w1.border, w2.border, blend.a2);
-            const border = mixColor(border12, w3.border, blend.a3);
-            const grid12 = mixColor(w1.gridLine, w2.gridLine, blend.a2);
-            const grid = mixColor(grid12, w3.gridLine, blend.a3);
-            const player12 = mixColor(w1.player, w2.player, blend.a2);
-            const player = mixColor(player12, w3.player, blend.a3);
+            const tLabel = this.mode === "campaign"
+              ? `Time: ${Math.ceil(timeLeft)}s`
+              : `Time: ${formatTime(this.t)}`;
 
-            // choose dominant style for grid style + fx
-            let gridStyle = "circuit";
-            if (blend.a3 > 0.40) gridStyle = "glitch";
-            else if (blend.a2 > 0.45) gridStyle = "industrial";
+            const surgeLabel = (this.surgeMult > 1.01) ? " • SURGE" : "";
+            const blackoutLabel = (this.blackoutOn) ? " • BLACKOUT" : "";
 
-            this.wcfg = {
-              id: 99,
-              name: "Endless",
-              subtitle: "",
-              bg, border, gridLine: grid, player,
-              fx: (gridStyle==="glitch") ? "stars" : (gridStyle==="industrial" ? "rain" : "scanlines"),
-              gridStyle,
-              obstacleStyle: {
-                palette: [...w1.obstacleStyle.palette, ...w2.obstacleStyle.palette, ...w3.obstacleStyle.palette],
-                shapes: [
-                  ...w1.obstacleStyle.shapes,
-                  ...(blend.a2>0.2 ? w2.obstacleStyle.shapes : []),
-                  ...(blend.a3>0.2 ? w3.obstacleStyle.shapes : [])
-                ]
-              },
-              boss: WORLDS[2].boss
-            };
-
-            // Update player color
-            this.player.fillColor = player;
-            this.touchDot.fillColor = player;
-
-            // Laser unlocks
-            this.laserWarnOnly = blend.laserWarn && !blend.laserActive;
-            this.laserEnabled = blend.laserActive;
-
-            // Adjust decor style when crossing thresholds (cheap approach)
-            // If we just switched into industrial/glitch, re-init decor occasionally
-            if (!this._lastGridStyle) this._lastGridStyle = this.wcfg.gridStyle;
-            if (this._lastGridStyle !== this.wcfg.gridStyle) {
-              this._lastGridStyle = this.wcfg.gridStyle;
-              this.setupDecor();
-            }
-          }
-
-          updateHud(timeLeft) {
-            const modeLabel = this.mode === "campaign" ? `Campaign • ${this.wcfg.name} L${this.level+1}` : "Endless";
-            const tLabel = this.mode === "campaign" ? `Time: ${Math.ceil(timeLeft)}s` : `Time: ${formatTime(this.t)}`;
-
-            this.uiTop.setText(`${modeLabel} • Score: ${Math.floor(this.score)}`);
+            this.uiTop.setText(`${modeLabel} • Score: ${Math.floor(this.score)}${surgeLabel}${blackoutLabel}`);
             this.uiSub.setText(`${tLabel} • Near: ${Math.floor(this.nearPts)} • PPS: ${SCORE_PPS}`);
+
             const cm = Math.min(COMBO_MAX, this.combo);
             this.uiCombo.setText(cm > 1.01 ? `x${cm.toFixed(2)}` : "");
           }
 
-          drawGrid(dt) {
+          drawGrid(dt){
             this.gridOffset = (this.gridOffset + this.scrollSpeed * dt) % TILE;
             const g = this.gridGraphics;
             g.clear();
@@ -1279,7 +1413,7 @@
             }
           }
 
-          spawnObstacle() {
+          spawnObstacle(){
             const col = Phaser.Math.Between(0, GRID_COLS - 1);
             const x = GRID_X + col * TILE + TILE / 2;
             const y = GRID_Y - 70;
@@ -1291,13 +1425,12 @@
             const palette = style.palette;
             const color = palette[Phaser.Math.Between(0, palette.length - 1)];
 
-            // size depends on campaign level, or slowly shrinks in endless
+            // size
             let smin = 20, smax = 32;
             if (this.mode === "campaign") {
               const [a,b] = this.lcfg.size;
               smin = a; smax = b;
             } else {
-              // very gentle shrink over time (readability preserved)
               smin = clamp(22 - Math.floor(this.t/120), 16, 22);
               smax = clamp(34 - Math.floor(this.t/140), 22, 34);
             }
@@ -1320,13 +1453,10 @@
             s.body.setAllowGravity(false);
             s.body.setImmovable(true);
             s.body.setSize(w * 0.88, h * 0.88, true);
-
-            // mark for near-miss scoring
             s._nearAwarded = false;
-
             this.obstacles.add(s);
 
-            // extra piece chance increases later / harder worlds; in endless increases slowly with time
+            // extra piece chance
             let chance = 0.06;
             if (this.mode === "campaign") {
               const worldBonus = this.world * 0.02;
@@ -1361,18 +1491,13 @@
             }
           }
 
-          checkNearMiss(o) {
+          checkNearMiss(o){
             if (!o || o._nearAwarded) return;
-
-            // Only score near miss when obstacle is near player's y-band (passes by)
             const dy = Math.abs(o.y - this.player.y);
             if (dy > 28) return;
-
             const dx = Math.abs(o.x - this.player.x);
             const dist = Math.hypot(dx, dy);
-
             if (dist <= NEAR_DIST) {
-              // award once
               o._nearAwarded = true;
 
               this.comboTimer = 0;
@@ -1382,92 +1507,83 @@
               const award = NEAR_POINTS * this.combo;
               this.nearPts += award;
               this.score += award;
-
-              if (this.settings.shake) this.cameras.main.shake(60, 0.002);
             }
           }
 
-          updateBoss(dt) {
-            // campaign: only in W3. endless: unlocked by time stages.
+          updateLasers(dt){
             const boss = WORLDS[2].boss;
-            if (!boss || !this.laser || !this.laserWarn) return;
-
-            // If campaign and boss not enabled, keep hidden
-            if (this.mode === "campaign") {
-              if (!this.laserEnabled) { this.laserWarn.setAlpha(0); this.laser.setAlpha(0); return; }
-            }
-
-            // endless: show warn or active depending on unlock
-            if (this.mode === "endless") {
-              if (!this.laserEnabled && !this.laserWarnOnly) { this.laserWarn.setAlpha(0); this.laser.setAlpha(0); return; }
-            }
-
             this.bossT += dt;
+
+            // Horizontal sweep uses boss cycle timing
             const cycle = boss.cycleSeconds;
             const t = this.bossT % cycle;
 
-            const drift = (this.bossT * 0.22) % 1;
-            const yPos = GRID_Y + 20 + (GRID_H - 40) * ((t / cycle + drift) % 1);
-
-            this.laserWarn.setPosition(GRID_X + GRID_W/2, yPos);
-            this.laser.setPosition(GRID_X + GRID_W/2, yPos);
-
+            // Warning/active windows
             const warnOn = t < boss.warnSeconds;
             const activeOn = (t >= boss.warnSeconds) && (t < boss.warnSeconds + boss.activeSeconds);
 
-            // endless warn-only stage: show warning, no active beam
-            if (this.mode === "endless" && this.laserWarnOnly) {
-              this.laserWarn.setAlpha(warnOn ? 0.35 : 0);
-              this.laser.setAlpha(0);
-              return;
-            }
+            // ---- Horizontal laser position (sweeps Y) ----
+            const driftY = (this.bossT * 0.22) % 1;
+            const yPos = GRID_Y + 20 + (GRID_H - 40) * ((t / cycle + driftY) % 1);
+            this.hLaserWarn.setPosition(GRID_X + GRID_W/2, yPos);
+            this.hLaser.setPosition(GRID_X + GRID_W/2, yPos);
 
-            // active stage (campaign W3 OR endless active)
-            this.laserWarn.setAlpha(warnOn ? 0.35 : 0);
-            this.laser.setAlpha(activeOn ? 0.85 : 0);
+            // ---- Vertical laser position (sweeps X) ----
+            // Use a different phase so it doesn’t always align with horizontal
+            const driftX = (this.bossT * 0.19 + 0.37) % 1;
+            const xPos = GRID_X + 20 + (GRID_W - 40) * ((t / cycle + driftX) % 1);
+            this.vLaserWarn.setPosition(xPos, GRID_Y + GRID_H/2);
+            this.vLaser.setPosition(xPos, GRID_Y + GRID_H/2);
 
+            // Apply modes
+            const applyBeam = (mode, warnRect, activeRect) => {
+              if (mode === "off") { warnRect.setAlpha(0); activeRect.setAlpha(0); return; }
+              if (mode === "warn") { warnRect.setAlpha(warnOn ? 0.30 : 0); activeRect.setAlpha(0); return; }
+              // active
+              warnRect.setAlpha(warnOn ? 0.30 : 0);
+              activeRect.setAlpha(activeOn ? 0.85 : 0);
+            };
+
+            applyBeam(this.hLaserMode, this.hLaserWarn, this.hLaser);
+            applyBeam(this.vLaserMode, this.vLaserWarn, this.vLaser);
+
+            // Collision checks only during ACTIVE windows
             if (activeOn) {
               const pr = this.player.getBounds();
-              const lr = this.laser.getBounds();
-              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, lr)) {
-                this.endRun({ reason: "LASER" });
+
+              if (this.hLaserMode === "active") {
+                const lr = this.hLaser.getBounds();
+                if (Phaser.Geom.Intersects.RectangleToRectangle(pr, lr)) this.endRun({ reason: "H-LASER" });
+              }
+              if (this.vLaserMode === "active") {
+                const vr = this.vLaser.getBounds();
+                if (Phaser.Geom.Intersects.RectangleToRectangle(pr, vr)) this.endRun({ reason: "V-LASER" });
               }
             }
           }
 
-          levelComplete() {
-            // update per-level best, campaign total leaderboard, unlock next
+          levelComplete(){
             const p = loadProgress();
             const id = levelId(this.world, this.level);
             const thisScore = Math.floor(this.score);
             const prevBest = p.levelBest[id] || 0;
 
             let pbLevel = false;
-            if (thisScore > prevBest) {
-              p.levelBest[id] = thisScore;
-              pbLevel = true;
-            }
+            if (thisScore > prevBest) { p.levelBest[id] = thisScore; pbLevel = true; }
 
-            // unlock logic
+            // unlock next
             let nextWorld = this.world;
             let nextLevel = this.level + 1;
-            let worldClear = false;
 
-            if (nextLevel >= LEVELS_PER_WORLD) {
-              worldClear = true;
-              nextLevel = 0;
-              nextWorld = this.world + 1;
-            }
+            if (nextLevel >= LEVELS_PER_WORLD) { nextLevel = 0; nextWorld = this.world + 1; }
 
-            if (worldClear) {
-              p.unlockedWorld = Math.max(p.unlockedWorld, Math.min(WORLDS_COUNT-1, this.world + 1));
+            if (nextWorld > p.unlockedWorld) {
+              p.unlockedWorld = Math.min(WORLDS_COUNT-1, nextWorld);
               p.unlockedLevel = 0;
-            } else {
-              if (p.unlockedWorld < this.world) p.unlockedWorld = this.world;
-              if (p.unlockedWorld === this.world) p.unlockedLevel = Math.max(p.unlockedLevel, this.level + 1);
+            } else if (nextWorld === p.unlockedWorld) {
+              p.unlockedLevel = Math.max(p.unlockedLevel, nextLevel);
             }
 
-            // set current selection
             if (nextWorld >= WORLDS.length) {
               p.currentWorld = WORLDS.length - 1;
               p.currentLevel = LEVELS_PER_WORLD - 1;
@@ -1478,7 +1594,7 @@
 
             saveProgress(p);
 
-            // update campaign leaderboard with TOTAL (separate from endless)
+            // update campaign leaderboard with TOTAL
             const total = campaignTotalScore(p);
             const lb = loadLeaderboards();
             lb.campaignTop = maybeInsertTop(lb.campaignTop, { score: total, meta: "Total" });
@@ -1497,7 +1613,7 @@
             });
           }
 
-          getBreakdown() {
+          getBreakdown(){
             return {
               survival: Math.floor(this.survivalPts),
               near: Math.floor(this.nearPts),
@@ -1506,17 +1622,17 @@
             };
           }
 
-          endRun({ reason }) {
+          endRun({reason}){
             const thisScore = Math.floor(this.score);
 
-            if (this.settings.shake) this.cameras.main.shake(120, 0.006);
-            this.glitchFlash.setAlpha(0.10);
-            this.tweens.add({ targets: this.glitchFlash, alpha: 0, duration: 150, ease: "Linear" });
+            this.flash.setAlpha(0.10);
+            this.tweens.add({ targets: this.flash, alpha: 0, duration: 170, ease: "Linear" });
 
             if (this.mode === "endless") {
               const lb = loadLeaderboards();
               const prevBest = lb.endlessTop[0]?.score || 0;
               const pb = thisScore > prevBest;
+
               lb.endlessTop = maybeInsertTop(lb.endlessTop, { score: thisScore, meta: formatTime(this.t) });
               saveLeaderboards(lb);
 
@@ -1532,7 +1648,7 @@
               return;
             }
 
-            // campaign death: no level best update (only on clear), keep it simple
+            // campaign fail: best only updates on clear
             const p = loadProgress();
             const id = levelId(this.world, this.level);
             const prevBest = p.levelBest[id] || 0;
@@ -1583,7 +1699,6 @@
               fontFamily: uiFont, fontSize:"14px", color: pb ? "#6ef3ff" : "#b7b7ff"
             }).setOrigin(0.5).setAlpha(0.95);
 
-            // breakdown
             const lines = [
               `Survival: ${breakdown.survival}`,
               `Near-miss: ${breakdown.near}`,
@@ -1599,10 +1714,10 @@
                 fontFamily: uiFont, fontSize:"14px", color:"#ffffff"
               }).setOrigin(0.5).setAlpha(0.85);
 
-              makeButton(this, "RETRY", W/2, H*0.76, () => this.scene.start("Play", { mode:"campaign", world:data.world, level:data.level }));
+              makeButton(this, "RETRY", W/2, H*0.76, () => this.scene.start("Play", { mode:"campaign", world:data.world, level:data.level }), "#6ef3ff");
               makeGhostButton(this, "CAMPAIGN MAP", W/2, H*0.85, () => this.scene.start("WorldMap"));
             } else {
-              makeButton(this, "RETRY ENDLESS", W/2, H*0.76, () => this.scene.start("Play", { mode:"endless" }));
+              makeButton(this, "RETRY ENDLESS", W/2, H*0.76, () => this.scene.start("Play", { mode:"endless" }), "#7cffd2");
               makeGhostButton(this, "LEADERBOARDS", W/2, H*0.85, () => this.scene.start("Leaderboards"));
             }
 
@@ -1618,7 +1733,6 @@
           physics: { default: "arcade", arcade: { debug: false } },
           scene: [
             MenuScene,
-            SettingsScene,
             LeaderboardsScene,
             WorldMapScene,
             WorldIntroScene,

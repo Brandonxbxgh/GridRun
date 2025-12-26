@@ -241,6 +241,102 @@
     /***********************
      * MENUS
      ***********************/
+// ===== LOGIN / ACCOUNT (LOCAL) =====
+const PROFILE_KEY = "gridrun_profile_v1";
+let profile = loadProfile();
+
+function defaultProfile(){
+  return { loggedIn:false, displayName:"Runner" };
+}
+function loadProfile(){
+  try{
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return defaultProfile();
+    const p = { ...defaultProfile(), ...JSON.parse(raw) };
+    p.loggedIn = !!p.loggedIn;
+    p.displayName = String(p.displayName || "Runner").slice(0,16);
+    return p;
+  }catch{
+    return defaultProfile();
+  }
+}
+function saveProfile(p){
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
+}
+
+function loadLogin(){
+  startMenuMusic();
+  profile = loadProfile();
+  if (profile.loggedIn){ loadAccount(); return; }
+
+  const container = document.getElementById("game-container");
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Login</h1>
+      <p class="small-note">Pick a display name (used for leaderboards later).</p>
+
+      <input id="loginName"
+        placeholder="Display Name"
+        maxlength="16"
+        style="width:100%;max-width:360px;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.18);background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;text-align:center;"
+      />
+
+      <button onclick="confirmLogin()">Continue</button>
+      <button onclick="loadMainMenu()">Back</button>
+    </div>
+  `;
+}
+
+function confirmLogin(){
+  const el = document.getElementById("loginName");
+  let name = String(el?.value || "").trim().replace(/\s+/g," ").slice(0,16);
+  if (name.length < 3){ alert("Display Name must be at least 3 characters."); return; }
+
+  profile = loadProfile();
+  if (profile.loggedIn){ loadAccount(); return; }
+
+  profile.loggedIn = true;
+  profile.displayName = name;
+  saveProfile(profile);
+  loadMainMenu();
+}
+
+function loadAccount(){
+  startMenuMusic();
+  profile = loadProfile();
+  const container = document.getElementById("game-container");
+
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Account</h1>
+      <p><strong>Signed in as:</strong> ${profile.displayName}</p>
+
+      <p class="small-note">For now this is local-only. Later we’ll connect this to cross-device login.</p>
+
+      <button onclick="changeDisplayName()">Change Display Name</button>
+      <button onclick="logout()">Logout</button>
+      <button onclick="loadMainMenu()">Back</button>
+    </div>
+  `;
+}
+
+function changeDisplayName(){
+  profile = loadProfile();
+  const next = prompt("New Display Name (3-16 chars):", profile.displayName || "Runner");
+  if (next === null) return;
+  const name = String(next).trim().replace(/\s+/g," ").slice(0,16);
+  if (name.length < 3){ alert("Display Name must be at least 3 characters."); return; }
+  profile.displayName = name;
+  saveProfile(profile);
+  loadAccount();
+}
+
+function logout(){
+  profile = loadProfile();
+  profile.loggedIn = false;
+  saveProfile(profile);
+  loadMainMenu();
+}
     function loadModeSelect() {
       startMenuMusic();
       const container = document.getElementById("game-container");

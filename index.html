@@ -1,3 +1,4 @@
+<!-- PART 1 / 3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -103,13 +104,12 @@
     ];
 
     /***********************
-     * LEVEL DATA (now per world+level)
+     * LEVEL DATA (per world+level)
      * - time increases through campaign
-     * - tier scores are computed (not tiny)
+     * - tier scores computed and balanced
      ***********************/
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-    // Time ramps up across worlds/levels (W3 ends ~1.75 min max? you can tune)
     const levelTimes = [
       [30, 40, 50, 60, 70],    // World 1
       [45, 60, 75, 90, 100],   // World 2
@@ -117,14 +117,16 @@
     ];
 
     // Scoring model baseline assumptions to generate tier targets
-    // (Targets are intentionally harder than your previous ones.)
+    // Includes: survival + streak + dodge + (some) near + clear bonus
     const TIER_MODEL = {
-      pps: 7,                 // same as gameplay SCORE_PPS
-      streakEvery: 12,        // seconds
-      streakBonus: 55,        // points
-      expectedNearPer10s: [0.6, 0.9, 1.15], // expected near-miss count per 10s by world
-      expectedNearPoints: 18, // base near-miss points (before combo)
-      expectedAvgCombo: [1.20, 1.35, 1.55], // rough average combo multiplier by world
+      pps: 7,                 // matches gameplay SCORE_PPS
+      streakEvery: 12,
+      streakBonus: 55,
+      expectedNearPer10s: [0.45, 0.70, 0.90],     // lower expectation so tiers don't demand risky near-miss
+      expectedNearPoints: 18,
+      expectedAvgCombo: [1.18, 1.30, 1.45],
+      expectedDodgePer10s: [1.10, 1.35, 1.60],    // safer, consistent bonus path
+      expectedDodgePoints: 9,
       clearBonusBase: 220
     };
 
@@ -139,15 +141,19 @@
       const expectedNear = Math.floor((t/10) * TIER_MODEL.expectedNearPer10s[worldIdx]);
       const nearScore = expectedNear * TIER_MODEL.expectedNearPoints * TIER_MODEL.expectedAvgCombo[worldIdx];
 
+      const expectedDodge = Math.floor((t/10) * TIER_MODEL.expectedDodgePer10s[worldIdx]);
+      const dodgeScore = expectedDodge * TIER_MODEL.expectedDodgePoints;
+
       const clearBonus = TIER_MODEL.clearBonusBase + worldIdx*60 + levelIdx*35;
 
-      const expected = survival + streakScore + nearScore + clearBonus;
+      const expected = survival + streakScore + dodgeScore + nearScore + clearBonus;
 
-      // Make gold actually mean “played well”, not just “finished”.
-      // Bronze: finish + some basics, Silver: solid, Gold: strong run.
-      const bronze = Math.floor(expected * (0.72 + 0.02*levelIdx));
-      const silver = Math.floor(expected * (0.92 + 0.02*levelIdx));
-      const gold   = Math.floor(expected * (1.12 + 0.03*levelIdx));
+      // Bronze: clear + basics
+      // Silver: solid run
+      // Gold: strong run (requires consistent dodges + some near-miss OR very clean play)
+      const bronze = Math.floor(expected * (0.78 + 0.015*levelIdx));
+      const silver = Math.floor(expected * (0.98 + 0.02*levelIdx));
+      const gold   = Math.floor(expected * (1.18 + 0.03*levelIdx));
 
       return { time: t, scores: { bronze, silver, gold } };
     }
@@ -306,7 +312,6 @@
         saveProgress(p);
       },
 
-      // used by results scene
       getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,
 
       backToLevelSelect: (worldIdx) => { showMenus(); loadWorld(worldIdx + 1); },
@@ -389,14 +394,16 @@
           obstacleStyle:{ palette:[0xb45cff,0x38ffb8,0xff4d7d,0xffd166], shapes:["hex","tri","bar","frame","plus","rect"] },
           boss:{ enabled:true, cycleSeconds:5.7, warnSeconds:1.20, activeSeconds:1.12, thickness:16, warnThickness:6 }
         }
-      ];
-
-      // Difficulty generator (stronger ramp W1L1 -> W3L5)
+      ];<!-- PART 2 / 3 -->
+      // Difficulty generator (scaled back speed; difficulty via spawns/hazards/behaviors)
       function mkLevelsForWorld(worldIndex){
         const base = [
-          { baseScroll0: 92, baseScrollStep: 22, ramp0: 9.0, rampStep: 3.2, spawnStart0: 900, spawnStep: 120, spawnRamp0: 12.0, spawnRampStep: 3.3, spawnMin0: 470, spawnMinStep: 55, spawnMinFloor: 260, sizeMin0: 21, sizeMinStep: 1, sizeMax0: 33, sizeMaxStep: 1 },
-          { baseScroll0: 108, baseScrollStep: 26, ramp0: 10.0, rampStep: 3.6, spawnStart0: 820, spawnStep: 130, spawnRamp0: 13.5, spawnRampStep: 3.7, spawnMin0: 430, spawnMinStep: 60, spawnMinFloor: 240, sizeMin0: 20, sizeMinStep: 1, sizeMax0: 32, sizeMaxStep: 1 },
-          { baseScroll0: 122, baseScrollStep: 30, ramp0: 11.2, rampStep: 4.1, spawnStart0: 760, spawnStep: 140, spawnRamp0: 15.2, spawnRampStep: 4.1, spawnMin0: 400, spawnMinStep: 65, spawnMinFloor: 220, sizeMin0: 19, sizeMinStep: 1, sizeMax0: 31, sizeMaxStep: 1 },
+          // World 1 (slower than before)
+          { baseScroll0: 78, baseScrollStep: 16, ramp0: 6.4, rampStep: 2.4, spawnStart0: 920, spawnStep: 120, spawnRamp0: 12.0, spawnRampStep: 3.1, spawnMin0: 480, spawnMinStep: 55, spawnMinFloor: 280, sizeMin0: 21, sizeMinStep: 1, sizeMax0: 33, sizeMaxStep: 1 },
+          // World 2 (harder than W1L5, but still playable)
+          { baseScroll0: 88, baseScrollStep: 18, ramp0: 7.2, rampStep: 2.7, spawnStart0: 860, spawnStep: 130, spawnRamp0: 13.2, spawnRampStep: 3.4, spawnMin0: 445, spawnMinStep: 60, spawnMinFloor: 260, sizeMin0: 20, sizeMinStep: 1, sizeMax0: 32, sizeMaxStep: 1 },
+          // World 3 (not insane speed; hazards/behaviors carry difficulty)
+          { baseScroll0: 96, baseScrollStep: 20, ramp0: 8.0, rampStep: 3.0, spawnStart0: 800, spawnStep: 140, spawnRamp0: 14.8, spawnRampStep: 3.9, spawnMin0: 415, spawnMinStep: 65, spawnMinFloor: 240, sizeMin0: 19, sizeMinStep: 1, sizeMax0: 31, sizeMaxStep: 1 },
         ][worldIndex];
 
         return Array.from({length:5}, (_,i) => ({
@@ -408,8 +415,8 @@
           spawnMin: Math.max(base.spawnMinFloor, base.spawnMin0 - base.spawnMinStep * i),
           size: [base.sizeMin0 - base.sizeMinStep*i, base.sizeMax0 - base.sizeMaxStep*i],
           // behavior unlocks
-          driftChance: clamp(0.06 + worldIndex*0.08 + i*0.05, 0, 0.55),
-          chaseChance: (worldIndex >= 2) ? clamp(0.03 + i*0.03, 0, 0.18) : 0
+          driftChance: clamp(0.07 + worldIndex*0.09 + i*0.05, 0, 0.60),
+          chaseChance: (worldIndex >= 1) ? clamp(0.02 + worldIndex*0.02 + i*0.03, 0, 0.22) : 0
         }));
       }
 
@@ -518,19 +525,26 @@
       }
       const shapeToTex = { rect:"obs_rect", frame:"obs_frame", tri:"obs_tri", hex:"obs_hex", bar:"obs_bar", plus:"obs_plus" };
 
-      // SCORING (rebalance so tiers aren’t trivial)
-      const SCORE_PPS = 7;         // lowered vs old “felt too high” versions
-      const NEAR_DIST = 36;        // still fair
+      // SCORING (updated + safer bonus path)
+      const SCORE_PPS = 7;
+      const NEAR_DIST = 36;
       const NEAR_POINTS = 18;
       const COMBO_DECAY_SEC = 1.30;
       const COMBO_STEP = 0.11;
       const COMBO_MAX = 3.10;
 
+      // Safer bonus: "DODGE" (medium distance)
+      const DODGE_DIST = 74;
+      const DODGE_POINTS = 9;
+
+      // Streak bonus (clean survival)
       const STREAK_EVERY = 12;
       const STREAK_BONUS = 55;
 
-      // Clear bonus scales with difficulty (so score also rises through campaign)
       const CLEAR_BONUS_BASE = 220;
+
+      // Hard cap speed to avoid "insane" ramps
+      const MAX_SCROLL_SPEED = 360;
 
       function formatTime(sec){
         const m=Math.floor(sec/60), s=Math.floor(sec%60);
@@ -540,22 +554,55 @@
       // Endless: ramp to W3L5 by 120s then plateau
       const ENDLESS = {
         rampSeconds: 120,
-        // hazard staging (in seconds)
         t_blackout: 50,
         t_laserWarn: 70,
         t_laserActive: 90,
         t_verticalLaser: 110
       };
 
-      // Utility: interpolate between difficulty presets
       function lerpObj(a,b,t){
         const o = {};
         for (const k of Object.keys(a)) o[k] = a[k] + (b[k]-a[k])*t;
         return o;
       }
 
-      // Laser modifiers
       const BLACKOUT = { period: 10.5, active: 0.65, alpha: 0.35 };
+
+      // World-style pill buttons (Phaser)
+      function makePillButton(scene, label, y, onClick, accentColor, glowColor){
+        const container = scene.add.container(W/2, y).setDepth(210);
+        const g = scene.add.graphics();
+        const w = 250, h = 46, r = 23;
+
+        const draw = (hover=false) => {
+          g.clear();
+          // outer glow
+          g.fillStyle(glowColor, hover ? 0.22 : 0.16);
+          g.fillRoundedRect(-w/2 - 4, -h/2 - 3, w+8, h+6, r+4);
+          // main body
+          g.fillStyle(accentColor, hover ? 0.95 : 0.88);
+          g.fillRoundedRect(-w/2, -h/2, w, h, r);
+          // shine
+          g.fillStyle(0xffffff, hover ? 0.12 : 0.09);
+          g.fillRoundedRect(-w/2+10, -h/2+6, w-20, 14, 12);
+        };
+
+        draw(false);
+
+        const t = scene.add.text(0, 0, label, {
+          fontFamily: uiFont,
+          fontSize: "16px",
+          color: "#ffffff"
+        }).setOrigin(0.5);
+
+        const hit = scene.add.rectangle(0,0,w,h,0xffffff,0.001).setInteractive({useHandCursor:true});
+        hit.on("pointerdown", onClick);
+        hit.on("pointerover", ()=>draw(true));
+        hit.on("pointerout", ()=>draw(false));
+
+        container.add([g, t, hit]);
+        return container;
+      }
 
       class PlayScene extends Phaser.Scene {
         constructor(){
@@ -566,7 +613,7 @@
           this.t=0; this.score=0; this.paused=false;
           this.canMove=false; this.spawnTimer=0;
           this.combo=1; this.comboTimer=0; this.maxCombo=1;
-          this.survivalPts=0; this.nearPts=0; this._lastStreakTick=0;
+          this.survivalPts=0; this.nearPts=0; this.dodgePts=0; this._lastStreakTick=0;
           this.scrollSpeed=0; this.baseScroll=0; this.spawnEvery=900;
 
           this.gridGraphics=null; this.gridOffset=0;
@@ -582,7 +629,7 @@
           this.bossT=0; this.hLaserMode="off"; this.vLaserMode="off";
 
           this.decor=[];
-          this._lastGridStyle=null;
+          this.hudBg=null;
         }
 
         init(data){
@@ -593,7 +640,6 @@
             this.wcfg = WORLDS[this.world];
             this.lcfg = this.wcfg.levels[this.level];
           } else {
-            // endless starts at W1L1 difficulty
             this.world=0; this.level=0;
             this.wcfg=WORLDS[0];
             this.lcfg=WORLDS[0].levels[0];
@@ -616,24 +662,23 @@
           this.physics.add.existing(this.player);
           this.player.body.setAllowGravity(false);
 
-          // collision
           this.physics.add.overlap(this.player, this.obstacles, ()=>this.endRun({reason:"OBSTACLE"}));
 
-          // feedback overlays
           this.flash = this.add.rectangle(W/2,H/2,W,H,0xffffff).setAlpha(0).setDepth(200);
           this.blackoutRect = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0).setDepth(180);
 
-          // touch
           this.touchDot = this.add.circle(0,0,6,this.wcfg.glowB).setAlpha(0).setDepth(60);
 
-          // HUD (allowed)
-          this.uiTop = this.add.text(14,10,"",{fontFamily:uiFont,fontSize:"14px",color:"#ffffff"}).setDepth(70).setAlpha(0.95);
-          this.uiSub = this.add.text(14,30,"",{fontFamily:uiFont,fontSize:"12px",color:"#b7b7ff"}).setDepth(70).setAlpha(0.95);
-          this.uiCombo = this.add.text(W-14,10,"",{fontFamily:uiFont,fontSize:"12px",color:"#ffffff"}).setOrigin(1,0).setDepth(70).setAlpha(0.85);
+          // HUD readability fix: backdrop panel + outline (updates with theme)
+          this.hudBg = this.add.graphics().setDepth(65);
+          this.uiTop = this.add.text(18,12,"",{fontFamily:uiFont,fontSize:"14px",color:"#ffffff"}).setDepth(70).setAlpha(0.98);
+          this.uiSub = this.add.text(18,32,"",{fontFamily:uiFont,fontSize:"12px",color:"#eaeaff"}).setDepth(70).setAlpha(0.95);
+          this.uiCombo = this.add.text(W-18,12,"",{fontFamily:uiFont,fontSize:"12px",color:"#ffffff"}).setOrigin(1,0).setDepth(70).setAlpha(0.90);
 
-          this.pauseBtn = this.add.text(W-14,30,"PAUSE",{
+          // Pause button in HUD (kept)
+          this.pauseBtn = this.add.text(W-18,34,"PAUSE",{
             fontFamily:uiFont,fontSize:"12px",color:"#ffffff",
-            backgroundColor:"rgba(255,255,255,0.16)", padding:{left:10,right:10,top:6,bottom:6}
+            backgroundColor:"rgba(0,0,0,0.35)", padding:{left:10,right:10,top:6,bottom:6}
           }).setOrigin(1,0).setDepth(9999).setInteractive({useHandCursor:true});
 
           this.input.topOnly = true;
@@ -641,7 +686,7 @@
           this.pauseBtn.input.hitArea.setTo(pb.x-24,pb.y-16,pb.width+38,pb.height+28);
           this.pauseBtn.on("pointerdown",(p)=>{ p.event?.stopPropagation?.(); this.togglePause(!this.paused); });
 
-          this.uiNoTouchZone = { x: W-200, y: 0, w: 200, h: 100 };
+          this.uiNoTouchZone = { x: W-220, y: 0, w: 220, h: 110 };
 
           this.input.on("pointerdown",(p)=>{
             if (this.paused){ this.togglePause(false); return; }
@@ -679,12 +724,11 @@
           this.t=0; this.score=0; this.paused=false; this.canMove=false;
           this.spawnTimer=0;
           this.combo=1; this.comboTimer=0; this.maxCombo=1;
-          this.survivalPts=0; this.nearPts=0; this._lastStreakTick=0;
+          this.survivalPts=0; this.nearPts=0; this.dodgePts=0; this._lastStreakTick=0;
           this.blackoutOn=false; this.blackoutEnabled=false;
 
           this.obstacles.children.iterate(o=>{ if(o) o.destroy(); });
 
-          // initial difficulty
           if (this.mode==="campaign"){
             this.baseScroll=this.lcfg.baseScroll;
             this.scrollSpeed=this.lcfg.baseScroll;
@@ -749,7 +793,6 @@
         setupDecor(){
           for (const d of this.decor) d.destroy();
           this.decor=[];
-          // subtle edge glow bars
           for (let i=0;i<6;i++){
             const r = this.add.rectangle(
               Phaser.Math.Between(30,W-30),
@@ -766,7 +809,6 @@
         setupLasers(){
           const boss = WORLDS[2].boss;
           if (!boss){
-            // still create to avoid null checks; kept hidden
             this.hLaserWarn = this.add.rectangle(0,0,0,0,0xffffff).setAlpha(0);
             this.hLaser = this.add.rectangle(0,0,0,0,0xff4d7d).setAlpha(0);
             this.vLaserWarn = this.add.rectangle(0,0,0,0,0xffffff).setAlpha(0);
@@ -810,7 +852,6 @@
             this.tweens.add({targets:this.flash,alpha:0,duration:120,ease:"Linear"});
           }
 
-          // difficulty + theme selection
           let timeLeft = 0;
 
           if (this.mode==="campaign"){
@@ -823,16 +864,14 @@
             }
 
             this.baseScroll = this.lcfg.baseScroll + this.t * this.lcfg.scrollRamp;
-            this.scrollSpeed = this.baseScroll;
+            this.scrollSpeed = Math.min(MAX_SCROLL_SPEED, this.baseScroll);
 
             const targetSpawn = this.lcfg.spawnStart - this.t * this.lcfg.spawnRamp;
             this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
 
-            // lasers only in world 3
             if (this.world===2){ this.hLaserMode="active"; this.vLaserMode="off"; }
 
           } else {
-            // endless ramps to W3L5 and then stays there
             const tNorm = clamp(this.t / ENDLESS.rampSeconds, 0, 1);
             const a = WORLDS[0].levels[0];
             const b = WORLDS[2].levels[4];
@@ -843,15 +882,13 @@
             );
 
             this.baseScroll = d.baseScroll + this.t * d.scrollRamp;
-            this.scrollSpeed = this.baseScroll;
+            this.scrollSpeed = Math.min(MAX_SCROLL_SPEED, this.baseScroll);
 
             const targetSpawn = d.spawnStart - this.t * d.spawnRamp;
             this.spawnEvery = clamp(targetSpawn, d.spawnMin, d.spawnStart);
 
-            // endless theme blends across worlds while ramping
             this.applyEndlessThemeBlend(tNorm);
 
-            // hazards stage in, then stay enabled
             this.blackoutEnabled = this.t >= ENDLESS.t_blackout;
             if (this.blackoutEnabled){
               const bp = (this.t % BLACKOUT.period);
@@ -917,12 +954,12 @@
             this.spawnObstacle();
           }
 
-          // move obstacles
+          // move obstacles + bonuses
           this.obstacles.children.iterate((o)=>{
             if (!o) return;
+
             o.y += this.scrollSpeed * dt;
 
-            // optional drift / chase behaviors (more later worlds/levels)
             if (o._drift){
               o.x += o._drift * dt;
               const laneMin = GRID_X + 10;
@@ -931,7 +968,6 @@
               o.body.reset(o.x,o.y);
             }
             if (o._chase){
-              // gentle follow toward player x
               const dx = this.player.x - o.x;
               o.x += clamp(dx, -70, 70) * 0.35 * dt;
               const laneMin = GRID_X + 10;
@@ -941,25 +977,23 @@
             }
 
             if (o.y > GRID_Y + GRID_H + 140){ o.destroy(); return; }
+
             this.checkNearMiss(o);
+            this.checkDodgeBonus(o);
           });
 
-          // lasers
           this.updateLasers(dt);
 
-          // decor
           for (const r of this.decor){
             r.y += r._vy*dt;
             if (r.y > H+30){ r.y=-30; r.x=Phaser.Math.Between(30,W-30); }
           }
 
-          // draw + HUD
           this.drawGrid(dt);
           this.updateHud(timeLeft);
         }
 
         applyEndlessThemeBlend(tNorm){
-          // blend colors across worlds for endless visuals
           const w1=WORLDS[0], w2=WORLDS[1], w3=WORLDS[2];
           const mid = clamp((tNorm-0.33)/0.33, 0, 1);
           const end = clamp((tNorm-0.66)/0.34, 0, 1);
@@ -974,7 +1008,6 @@
           let base = w1;
           let next = w2;
           let t = mid;
-
           if (tNorm >= 0.66){ base=w2; next=w3; t=end; }
 
           this.wcfg = {
@@ -996,11 +1029,23 @@
         }
 
         updateHud(timeLeft){
+          // HUD panel redraw (readability fix)
+          const panelX = 10, panelY = 8, panelW = W - 20, panelH = 64;
+          this.hudBg.clear();
+          this.hudBg.fillStyle(0x000000, 0.38);
+          this.hudBg.fillRoundedRect(panelX, panelY, panelW, panelH, 14);
+          this.hudBg.lineStyle(2, this.wcfg.border, 0.65);
+          this.hudBg.strokeRoundedRect(panelX, panelY, panelW, panelH, 14);
+          this.hudBg.lineStyle(1, this.wcfg.glowB, 0.28);
+          this.hudBg.strokeRoundedRect(panelX+4, panelY+4, panelW-8, panelH-8, 12);
+
           const modeLabel = this.mode==="campaign" ? `Campaign • ${this.wcfg.name} L${this.level+1}` : "Endless";
           const tLabel = this.mode==="campaign" ? `Time Left: ${Math.ceil(timeLeft)}s` : `Time: ${formatTime(this.t)}`;
           const blackoutLabel = (this.blackoutOn) ? " • BLACKOUT" : "";
+
           this.uiTop.setText(`${modeLabel} • Score: ${Math.floor(this.score)}${blackoutLabel}`);
-          this.uiSub.setText(`${tLabel} • Near: ${Math.floor(this.nearPts)} • +${STREAK_BONUS}/${STREAK_EVERY}s`);
+          this.uiSub.setText(`${tLabel} • Dodge: ${Math.floor(this.dodgePts)} • Near: ${Math.floor(this.nearPts)} • +${STREAK_BONUS}/${STREAK_EVERY}s`);
+
           const cm = Math.min(COMBO_MAX, this.combo);
           this.uiCombo.setText(cm > 1.01 ? `x${cm.toFixed(2)}` : "");
         }
@@ -1009,13 +1054,11 @@
           this.gridOffset = (this.gridOffset + this.scrollSpeed*dt) % TILE;
           const g=this.gridGraphics; g.clear();
 
-          // outer frame glow
           g.lineStyle(4, this.wcfg.border, 0.55);
           g.strokeRoundedRect(GRID_X-7, GRID_Y-7, GRID_W+14, GRID_H+14, 16);
           g.lineStyle(2, this.wcfg.border, 0.95);
           g.strokeRoundedRect(GRID_X-6, GRID_Y-6, GRID_W+12, GRID_H+12, 14);
 
-          // inner grid
           g.lineStyle(1, this.wcfg.gridLine, 0.95);
           for (let c=0;c<=GRID_COLS;c++){
             const x=GRID_X+c*TILE;
@@ -1026,7 +1069,6 @@
             g.beginPath(); g.moveTo(GRID_X,y); g.lineTo(GRID_X+GRID_W,y); g.strokePath();
           }
 
-          // glow dots
           g.fillStyle(this.wcfg.glowB, 0.12);
           for (let c=0;c<=GRID_COLS;c++){
             for (let r=0;r<=GRID_ROWS;r++){
@@ -1048,12 +1090,10 @@
           const palette=style.palette;
           const color=palette[Phaser.Math.Between(0,palette.length-1)];
 
-          // per-level size range
           let smin=20,smax=32;
           if (this.mode==="campaign"){
             const [a,b]=this.lcfg.size; smin=a; smax=b;
           } else {
-            // endless: reach W3L5 and stop shrinking further
             const tNorm = clamp(this.t/ENDLESS.rampSeconds,0,1);
             smin = clamp(21 - Math.floor(tNorm*4), 16, 21);
             smax = clamp(32 - Math.floor(tNorm*5), 22, 32);
@@ -1075,16 +1115,16 @@
           o.body.setSize(w*0.88,h*0.88,true);
 
           o._nearAwarded=false;
+          o._dodgeAwarded=false;
 
-          // behaviors (campaign based on level config; endless based on ramp)
           let driftChance=0, chaseChance=0;
           if (this.mode==="campaign"){
             driftChance=this.lcfg.driftChance;
             chaseChance=this.lcfg.chaseChance;
           } else {
             const tNorm=clamp(this.t/ENDLESS.rampSeconds,0,1);
-            driftChance = 0.10 + 0.35*tNorm;
-            chaseChance = 0.00 + 0.12*tNorm;
+            driftChance = 0.12 + 0.35*tNorm;
+            chaseChance = 0.01 + 0.12*tNorm;
           }
 
           if (Math.random() < driftChance){
@@ -1096,13 +1136,12 @@
 
           this.obstacles.add(o);
 
-          // overlapping spawns (later levels/worlds)
           let overlapChance=0;
           if (this.mode==="campaign"){
-            overlapChance = clamp(0.05 + this.world*0.07 + this.level*0.06, 0, 0.42);
+            overlapChance = clamp(0.06 + this.world*0.07 + this.level*0.06, 0, 0.44);
           } else {
             const tNorm=clamp(this.t/ENDLESS.rampSeconds,0,1);
-            overlapChance = 0.08 + 0.30*tNorm;
+            overlapChance = 0.10 + 0.30*tNorm;
           }
 
           if (Math.random() < overlapChance && this.t > 6){
@@ -1124,8 +1163,8 @@
             o2.body.setSize(o2.displayWidth*0.88,o2.displayHeight*0.88,true);
 
             o2._nearAwarded=false;
+            o2._dodgeAwarded=false;
 
-            // also allow behaviors
             if (Math.random() < driftChance*0.7) o2._drift = Phaser.Math.FloatBetween(-35, 35);
             if (Math.random() < chaseChance*0.7 && this.t>14) o2._chase = true;
 
@@ -1141,6 +1180,7 @@
           const dist=Math.hypot(dx,dy);
           if (dist <= NEAR_DIST){
             o._nearAwarded=true;
+
             this.comboTimer=0;
             this.combo = Math.min(COMBO_MAX, this.combo + COMBO_STEP);
             this.maxCombo = Math.max(this.maxCombo, this.combo);
@@ -1151,11 +1191,28 @@
           }
         }
 
+        // Safer bonus so tiers aren't "near-miss or nothing"
+        checkDodgeBonus(o){
+          if (!o || o._dodgeAwarded || o._nearAwarded) return;
+
+          const dy=Math.abs(o.y-this.player.y);
+          if (dy>30) return;
+
+          const dx=Math.abs(o.x-this.player.x);
+          const dist=Math.hypot(dx,dy);
+
+          // only award if it's a "close-ish dodge" but not a near-miss
+          if (dist <= DODGE_DIST && dist > (NEAR_DIST + 3)){
+            o._dodgeAwarded = true;
+            this.dodgePts += DODGE_POINTS;
+            this.score += DODGE_POINTS;
+          }
+        }
+
         updateLasers(dt){
           const boss=WORLDS[2].boss;
           if (!boss) return;
 
-          // if lasers are off, keep invisible
           if (this.hLaserMode==="off" && this.vLaserMode==="off"){
             this.hLaserWarn.setAlpha(0); this.hLaser.setAlpha(0);
             this.vLaserWarn.setAlpha(0); this.vLaser.setAlpha(0);
@@ -1224,13 +1281,19 @@
       class ResultsScene extends Phaser.Scene {
         constructor(){ super("Results"); }
         create(data){
-          this.cameras.main.setBackgroundColor(0x070710);
-
           const mode=data?.mode||"campaign";
           const score=data?.score||0;
           const reason=data?.reason||"";
 
-          const title = this.add.text(W/2,H*0.18, mode==="endless"?"ENDLESS RESULT":"LEVEL RESULT",{
+          // Theme colors for buttons
+          const theme = (mode==="campaign") ? WORLDS[data.world] : WORLDS[2];
+          const bg = theme.bg;
+          const accent = theme.glowB;
+          const glow = theme.border;
+
+          this.cameras.main.setBackgroundColor(bg);
+
+          this.add.text(W/2,H*0.18, mode==="endless"?"ENDLESS RESULT":"LEVEL RESULT",{
             fontFamily:uiFont,fontSize:"30px",color:"#ffffff"
           }).setOrigin(0.5);
 
@@ -1247,7 +1310,9 @@
 
           this.add.text(W/2,H*0.38,`Score: ${score}`,{
             fontFamily:uiFont,fontSize:"26px",color:"#ffffff"
-          }).setOrigin(0.5).setAlpha(0.95);
+          }).setOrigin(0.5).setAlpha(0.98);
+
+          const cleared = (mode==="campaign" && reason==="CLEAR");
 
           if (mode==="campaign"){
             const tiers = window.GRIDRUN.getTierTargets(data.world, data.level);
@@ -1261,28 +1326,38 @@
             }).setOrigin(0.5).setAlpha(0.95);
 
             this.add.text(W/2,H*0.52,`Bronze ${tiers.bronze}  •  Silver ${tiers.silver}  •  Gold ${tiers.gold}`,{
-              fontFamily:uiFont,fontSize:"12px",color:"rgba(255,255,255,0.75)",align:"center"
+              fontFamily:uiFont,fontSize:"12px",color:"rgba(255,255,255,0.80)",align:"center"
             }).setOrigin(0.5);
           }
 
-          const btn=(label,y,onClick,accent="rgba(255,255,255,0.16)")=>{
-            const t=this.add.text(W/2,y,label,{
-              fontFamily:uiFont,fontSize:"16px",color:"#ffffff",
-              backgroundColor:accent, padding:{left:18,right:18,top:10,bottom:10}
-            }).setOrigin(0.5).setInteractive({useHandCursor:true});
-            t.on("pointerover",()=>t.setAlpha(0.88));
-            t.on("pointerout",()=>t.setAlpha(1));
-            t.on("pointerdown",onClick);
-            return t;
+          // Next Level logic (only when cleared)
+          const nextFor = (w,l) => {
+            let nw=w, nl=l+1;
+            if (nl>=5){ nl=0; nw=w+1; }
+            if (nw>=3) return null;
+            return { world:nw, level:nl };
           };
 
+          const y0 = H*0.62;
+
           if (mode==="campaign"){
-            btn("RETRY",H*0.62,()=>this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}),"rgba(85,247,255,0.75)");
-            btn("BACK TO LEVELS",H*0.72,()=>window.GRIDRUN.backToLevelSelect(data.world),"rgba(255,255,255,0.14)");
-            btn("MAIN MENU",H*0.82,()=>window.GRIDRUN.backToMainMenu(),"rgba(255,255,255,0.14)");
+            // Primary: RETRY
+            makePillButton(this, "RETRY", y0, () => this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}), accent, glow);
+
+            // Next level (only if cleared and exists)
+            const nxt = cleared ? nextFor(data.world, data.level) : null;
+            if (nxt){
+              makePillButton(this, "NEXT LEVEL", y0 + 62, () => this.scene.start("Play",{mode:"campaign",world:nxt.world,level:nxt.level}), theme.glowA, glow);
+              makePillButton(this, "BACK TO LEVELS", y0 + 124, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
+              makePillButton(this, "MAIN MENU", y0 + 186, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+            } else {
+              // If not cleared or no next, keep classic layout
+              makePillButton(this, "BACK TO LEVELS", y0 + 62, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
+              makePillButton(this, "MAIN MENU", y0 + 124, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+            }
           } else {
-            btn("RETRY ENDLESS",H*0.62,()=>this.scene.start("Play",{mode:"endless"}),"rgba(56,255,184,0.75)");
-            btn("MAIN MENU",H*0.74,()=>window.GRIDRUN.backToMainMenu(),"rgba(255,255,255,0.14)");
+            makePillButton(this, "RETRY ENDLESS", y0, () => this.scene.start("Play",{mode:"endless"}), accent, glow);
+            makePillButton(this, "MAIN MENU", y0 + 72, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
           }
         }
       }

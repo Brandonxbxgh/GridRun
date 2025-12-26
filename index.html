@@ -376,7 +376,78 @@
         </div>
       `;
     }
+function loadHowTo(){
+  startMenuMusic();
+  const container = document.getElementById("game-container");
 
+  container.innerHTML = `
+    <div class="menu-screen howto-shell">
+      <h1>How To Play</h1>
+
+      <div class="howto-panel howto-scroll">
+
+        <div class="howto-card">
+          <div class="howto-title">Objective</div>
+          <div class="howto-body">
+            Survive the level by avoiding incoming hazards.
+            Your score increases over time and through skilled movement.
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title world-w1">World 1 — Neon Bliss</div>
+          <div class="howto-body">
+            Introduction to GRIDRUN’s flow.<br>
+            • Moderate speed<br>
+            • Fewer hazards<br>
+            • Learn spacing and timing
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title world-w2">World 2 — Techno Abyss</div>
+          <div class="howto-body">
+            Increased pressure and density.<br>
+            • Faster patterns<br>
+            • EMP disruptions<br>
+            • Requires precision control
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title world-w3">World 3 — Astral Surge</div>
+          <div class="howto-body">
+            Maximum intensity.<br>
+            • Lasers & blackout hazards<br>
+            • Complex patterns<br>
+            • Survival mastery required
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title">Scoring & Tiers</div>
+          <div class="howto-body">
+            • Score increases every second you survive<br>
+            • Bonus points for clean dodges & near passes<br>
+            • Bronze / Silver / Gold tiers are balanced per level
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title">Endless Mode</div>
+          <div class="howto-body">
+            Difficulty ramps from World 1 Level 1 to World 3 Level 5
+            and then stabilizes.<br>
+            Compete against your personal best.
+          </div>
+        </div>
+
+      </div>
+
+      <button onclick="loadMainMenu()">Back</button>
+    </div>
+  `;
+}
     function toggleSetting(key){
       settings = loadSettingsState();
       settings[key] = !settings[key];

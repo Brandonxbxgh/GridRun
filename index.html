@@ -1838,6 +1838,9 @@ function loadMainMenu() {
         scene: [PlayScene, ResultsScene]
       });
     }
+    window.addEventListener("load", () => {
+  loadMainMenu();
+});
   </script>
 </body>
 </html>

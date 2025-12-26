@@ -565,7 +565,10 @@ function loadMainMenu() {
 
       <button onclick="loadModeSelect()">PLAY</button>
       <button onclick="loadHowTo()">HOW TO PLAY</button>
-      <button onclick="alert('Login Placeholder')">LOGIN</button>
+      ${(loadProfile().loggedIn)
+  ? `<button onclick="loadAccount()">ACCOUNT</button>`
+  : `<button onclick="loadLogin()">LOGIN</button>`
+}
       <button onclick="loadSettings()">SETTINGS</button>
     </div>
   `;

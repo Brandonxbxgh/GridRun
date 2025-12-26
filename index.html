@@ -460,18 +460,20 @@ function loadHowTo(){
       loadSettings();
     }
 
-    function loadMainMenu() {
-      startMenuMusic();
-      const container = document.getElementById("game-container");
-      container.innerHTML = `
-        <div class="menu-screen" id="main-menu">
-          <h1>GRIDRUN</h1>
-          <button onclick="loadModeSelect()">PLAY</button>
-          <button onclick="alert('Login Placeholder')">LOGIN</button>
-          <button onclick="loadSettings()">SETTINGS</button>
-        </div>
-      `;
-    }<!-- PART 2 / 3 -->
+function loadMainMenu() {
+  startMenuMusic();
+  const container = document.getElementById("game-container");
+  container.innerHTML = `
+    <div class="menu-screen" id="main-menu">
+      <h1>GRIDRUN</h1>
+
+      <button onclick="loadModeSelect()">PLAY</button>
+      <button onclick="loadHowTo()">HOW TO PLAY</button>
+      <button onclick="alert('Login Placeholder')">LOGIN</button>
+      <button onclick="loadSettings()">SETTINGS</button>
+    </div>
+  `;
+} PART 2 / 3 -->
     function playLevel(worldNumber, levelNumber) {
       startGameplay({ mode:"campaign", world: worldNumber-1, level: levelNumber-1 });
     }

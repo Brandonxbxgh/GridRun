@@ -34,6 +34,19 @@
       display:flex;flex-direction:column;align-items:center;gap:10px;
       padding:20px;max-width:520px;
     }
+    .toggle-row{
+      width:100%;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:10px 12px;
+      border-radius:14px;
+      background:rgba(0,0,0,0.22);
+      border:1px solid rgba(255,255,255,0.12);
+    }
+    .toggle-row span{font-size:14px;opacity:0.95}
+    .small-note{font-size:12px;opacity:0.75;max-width:420px;line-height:1.35}
   </style>
 </head>
 <body>
@@ -42,7 +55,7 @@
       <h1>GRIDRUN</h1>
       <button onclick="loadModeSelect()">PLAY</button>
       <button onclick="alert('Login Placeholder')">LOGIN</button>
-      <button onclick="alert('Coming Soon!')">SETTINGS</button>
+      <button onclick="loadSettings()">SETTINGS</button>
     </div>
   </div>
 
@@ -52,9 +65,10 @@
 
   <script>
     /***********************
-     * LOCAL SAVE (menus)
+     * SAVE (progress + settings)
      ***********************/
     const SAVE_KEY = "gridrun_dom_progress_v2";
+    const SETTINGS_KEY = "gridrun_audio_settings_v1";
 
     function defaultProgress() {
       return {
@@ -94,6 +108,74 @@
     function saveProgress(p) { localStorage.setItem(SAVE_KEY, JSON.stringify(p)); }
     let progress = loadProgress();
 
+    function defaultSettings(){
+      return {
+        menuMusic: true,
+        gameplayMusic: true,
+        sfx: true,
+        volumeMusic: 0.75,
+        volumeSfx: 0.85
+      };
+    }
+
+    function loadSettingsState(){
+      try{
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (!raw) return defaultSettings();
+        const s = { ...defaultSettings(), ...JSON.parse(raw) };
+        s.menuMusic = !!s.menuMusic;
+        s.gameplayMusic = !!s.gameplayMusic;
+        s.sfx = !!s.sfx;
+        s.volumeMusic = Math.max(0, Math.min(1, Number(s.volumeMusic ?? 0.75)));
+        s.volumeSfx = Math.max(0, Math.min(1, Number(s.volumeSfx ?? 0.85)));
+        return s;
+      }catch{
+        return defaultSettings();
+      }
+    }
+
+    function saveSettingsState(s){
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    }
+
+    let settings = loadSettingsState();
+
+    /***********************
+     * SIMPLE MENU AUDIO (HTMLAudioElement)
+     * - plays on menus without needing Phaser running
+     ***********************/
+    const MENU_MUSIC_SRC = "audio/menu.mp3"; // put file at /audio/menu.mp3
+    let menuMusic = null;
+
+    function ensureMenuMusic(){
+      if (!menuMusic){
+        menuMusic = new Audio(MENU_MUSIC_SRC);
+        menuMusic.loop = true;
+        menuMusic.volume = settings.volumeMusic;
+      }
+    }
+
+    function startMenuMusic(){
+      ensureMenuMusic();
+      if (!settings.menuMusic) return;
+      // iOS requires user gesture; calling this after button clicks is fine
+      menuMusic.volume = settings.volumeMusic;
+      menuMusic.play().catch(()=>{});
+    }
+
+    function stopMenuMusic(){
+      if (!menuMusic) return;
+      menuMusic.pause();
+      menuMusic.currentTime = 0;
+    }
+
+    function updateMenuMusicState(){
+      ensureMenuMusic();
+      menuMusic.volume = settings.volumeMusic;
+      if (settings.menuMusic) startMenuMusic();
+      else stopMenuMusic();
+    }
+
     /***********************
      * WORLD THEMES (menus)
      ***********************/
@@ -103,38 +185,32 @@
       { name: "Astral Surge", description: "Cosmic chaos. Hazards online." },
     ];
 
-    /***********************
-     * LEVEL DATA (per world+level)
-     * - time increases through campaign
-     * - tier scores computed and balanced
-     ***********************/
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+    /***********************
+     * LEVEL TIMES + TIER TARGETS
+     ***********************/
     const levelTimes = [
       [30, 40, 50, 60, 70],    // World 1
       [45, 60, 75, 90, 100],   // World 2
       [60, 80, 95, 105, 115],  // World 3
     ];
 
-    // Scoring model baseline assumptions to generate tier targets
-    // Includes: survival + streak + dodge + (some) near + clear bonus
     const TIER_MODEL = {
-      pps: 7,                 // matches gameplay SCORE_PPS
+      pps: 7,
       streakEvery: 12,
       streakBonus: 55,
-      expectedNearPer10s: [0.45, 0.70, 0.90],     // lower expectation so tiers don't demand risky near-miss
+      expectedNearPer10s: [0.45, 0.70, 0.90],
       expectedNearPoints: 18,
       expectedAvgCombo: [1.18, 1.30, 1.45],
-      expectedDodgePer10s: [1.10, 1.35, 1.60],    // safer, consistent bonus path
+      expectedDodgePer10s: [1.10, 1.35, 1.60],
       expectedDodgePoints: 9,
       clearBonusBase: 220
     };
 
     function computeTierTargets(worldIdx, levelIdx){
       const t = levelTimes[worldIdx][levelIdx];
-
       const survival = t * TIER_MODEL.pps;
-
       const streaks = Math.floor(t / TIER_MODEL.streakEvery);
       const streakScore = streaks * TIER_MODEL.streakBonus;
 
@@ -145,27 +221,20 @@
       const dodgeScore = expectedDodge * TIER_MODEL.expectedDodgePoints;
 
       const clearBonus = TIER_MODEL.clearBonusBase + worldIdx*60 + levelIdx*35;
-
       const expected = survival + streakScore + dodgeScore + nearScore + clearBonus;
 
-      // Bronze: clear + basics
-      // Silver: solid run
-      // Gold: strong run (requires consistent dodges + some near-miss OR very clean play)
       const bronze = Math.floor(expected * (0.78 + 0.015*levelIdx));
       const silver = Math.floor(expected * (0.98 + 0.02*levelIdx));
       const gold   = Math.floor(expected * (1.18 + 0.03*levelIdx));
-
       return { time: t, scores: { bronze, silver, gold } };
     }
-
-    function levelData(worldIdx, levelIdx){
-      return computeTierTargets(worldIdx, levelIdx);
-    }
+    function levelData(worldIdx, levelIdx){ return computeTierTargets(worldIdx, levelIdx); }
 
     /***********************
-     * MENU NAV
+     * MENUS
      ***********************/
     function loadModeSelect() {
+      startMenuMusic();
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
@@ -178,6 +247,7 @@
     }
 
     function loadCampaignMode() {
+      startMenuMusic();
       progress = loadProgress();
       const container = document.getElementById("game-container");
       const worldButtons = worlds.map((world, i) => `
@@ -197,6 +267,7 @@
     }
 
     function loadWorld(worldNumber) {
+      startMenuMusic();
       progress = loadProgress();
       const container = document.getElementById("game-container");
       const worldIdx = worldNumber - 1;
@@ -224,6 +295,7 @@
     }
 
     function loadLevelIntro(worldNumber, levelNumber) {
+      startMenuMusic();
       progress = loadProgress();
       const container = document.getElementById("game-container");
       const w = worldNumber - 1;
@@ -249,6 +321,7 @@
     }
 
     function loadEndlessIntro(){
+      startMenuMusic();
       progress = loadProgress();
       const container = document.getElementById("game-container");
       container.innerHTML = `
@@ -262,18 +335,64 @@
       `;
     }
 
+    function loadSettings(){
+      startMenuMusic();
+      settings = loadSettingsState();
+      const container = document.getElementById("game-container");
+
+      const onOff = (v)=> v ? "ON" : "OFF";
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Settings</h1>
+
+          <div class="toggle-row">
+            <span>Menu Music</span>
+            <button onclick="toggleSetting('menuMusic')">${onOff(settings.menuMusic)}</button>
+          </div>
+
+          <div class="toggle-row">
+            <span>Gameplay Music</span>
+            <button onclick="toggleSetting('gameplayMusic')">${onOff(settings.gameplayMusic)}</button>
+          </div>
+
+          <div class="toggle-row">
+            <span>Sound Effects (SFX)</span>
+            <button onclick="toggleSetting('sfx')">${onOff(settings.sfx)}</button>
+          </div>
+
+          <p class="small-note">
+            Audio files are loaded from <strong>/audio/</strong>. If you don't add files, the game still runs (silently).
+          </p>
+
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+
+    function toggleSetting(key){
+      settings = loadSettingsState();
+      settings[key] = !settings[key];
+      saveSettingsState(settings);
+      updateMenuMusicState();
+      // also update Phaser volumes if running
+      if (window.GRIDRUN_AUDIO && typeof window.GRIDRUN_AUDIO.applySettings === "function"){
+        window.GRIDRUN_AUDIO.applySettings(settings);
+      }
+      loadSettings();
+    }
+
     function loadMainMenu() {
+      startMenuMusic();
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen" id="main-menu">
           <h1>GRIDRUN</h1>
           <button onclick="loadModeSelect()">PLAY</button>
           <button onclick="alert('Login Placeholder')">LOGIN</button>
-          <button onclick="alert('Coming Soon!')">SETTINGS</button>
+          <button onclick="loadSettings()">SETTINGS</button>
         </div>
       `;
-    }
-
+    }<!-- PART 2 / 3 -->
     function playLevel(worldNumber, levelNumber) {
       startGameplay({ mode:"campaign", world: worldNumber-1, level: levelNumber-1 });
     }
@@ -281,28 +400,27 @@
     function showMenus(){
       document.getElementById("phaser-container").style.display = "none";
       document.getElementById("game-container").style.display = "flex";
+      startMenuMusic();
     }
     function showGameplay(){
       document.getElementById("game-container").style.display = "none";
       document.getElementById("phaser-container").style.display = "flex";
+      stopMenuMusic();
     }
 
     window.GRIDRUN = {
       completeCampaignLevel: (worldIdx, levelIdx, score) => {
         const p = loadProgress();
-
         p.bestScores[worldIdx][levelIdx] = Math.max(p.bestScores[worldIdx][levelIdx] || 0, score);
 
         const currentUnlocked = p.levelsUnlocked[worldIdx] || 0;
         if (currentUnlocked === (levelIdx + 1)) {
           p.levelsUnlocked[worldIdx] = Math.min(5, currentUnlocked + 1);
-
           if (levelIdx === 4 && worldIdx < 2) {
             p.worldsUnlocked = Math.max(p.worldsUnlocked, worldIdx + 2);
             p.levelsUnlocked[worldIdx + 1] = Math.max(p.levelsUnlocked[worldIdx + 1] || 0, 1);
           }
         }
-
         saveProgress(p);
       },
 
@@ -346,10 +464,12 @@
       const FOLLOW_RADIUS = 7;
       const FOLLOW_LERP = 0.40;
       const FOLLOW_MAX_SPEED_MULT = 3.0;
-
       const lerp = (a,b,t)=>a+(b-a)*t;
 
-      // ===== Vibrant World Themes =====
+      // ===== World Themes + AUDIO per world (same track for all 5 levels in the world) =====
+      // Put files here:
+      // audio/world1.mp3, audio/world2.mp3, audio/world3.mp3
+      // audio/sfx_hit.mp3, audio/sfx_bonus.mp3, audio/sfx_clear.mp3, audio/sfx_click.mp3 (optional)
       const WORLDS = [
         {
           id:0,
@@ -363,7 +483,10 @@
           player: 0xffffff,
           fx:"sparkle",
           gridStyle:"glow",
-          obstacleStyle:{ palette:[0xff2fd6,0x55f7ff,0xfff06a], shapes:["tri","hex","frame","rect"] }
+          musicKey:"music_w1",
+          obstacleStyle:{ palette:[0xff2fd6,0x55f7ff,0xfff06a], shapes:["tri","hex","frame","rect"] },
+          // Hazard W1: Hot Column (warning -> one column becomes dangerous briefly)
+          hazardHotColumn:{ enabled:true, startAt:10, every:11.5, warn:0.9, active:1.1, alphaWarn:0.22, alphaActive:0.58 }
         },
         {
           id:1,
@@ -377,7 +500,10 @@
           player: 0xe9fbff,
           fx:"pulse",
           gridStyle:"pulse",
-          obstacleStyle:{ palette:[0xa8e9ff,0x44a3ff,0xffffff,0x7cffd2], shapes:["bar","plus","rect","frame","hex"] }
+          musicKey:"music_w2",
+          obstacleStyle:{ palette:[0xa8e9ff,0x44a3ff,0xffffff,0x7cffd2], shapes:["bar","plus","rect","frame","hex"] },
+          // Hazard W2: EMP Jam (warning -> brief movement jam)
+          hazardEmp:{ enabled:true, startAt:14, every:12.5, warn:0.9, jam:0.55 }
         },
         {
           id:2,
@@ -391,18 +517,17 @@
           player: 0xf1e8ff,
           fx:"astral",
           gridStyle:"astral",
+          musicKey:"music_w3",
           obstacleStyle:{ palette:[0xb45cff,0x38ffb8,0xff4d7d,0xffd166], shapes:["hex","tri","bar","frame","plus","rect"] },
           boss:{ enabled:true, cycleSeconds:5.7, warnSeconds:1.20, activeSeconds:1.12, thickness:16, warnThickness:6 }
         }
-      ];<!-- PART 2 / 3 -->
-      // Difficulty generator (scaled back speed; difficulty via spawns/hazards/behaviors)
+      ];
+
+      // Difficulty generator (scaled-back speed; difficulty via spawns/hazards/behaviors)
       function mkLevelsForWorld(worldIndex){
         const base = [
-          // World 1 (slower than before)
           { baseScroll0: 78, baseScrollStep: 16, ramp0: 6.4, rampStep: 2.4, spawnStart0: 920, spawnStep: 120, spawnRamp0: 12.0, spawnRampStep: 3.1, spawnMin0: 480, spawnMinStep: 55, spawnMinFloor: 280, sizeMin0: 21, sizeMinStep: 1, sizeMax0: 33, sizeMaxStep: 1 },
-          // World 2 (harder than W1L5, but still playable)
           { baseScroll0: 88, baseScrollStep: 18, ramp0: 7.2, rampStep: 2.7, spawnStart0: 860, spawnStep: 130, spawnRamp0: 13.2, spawnRampStep: 3.4, spawnMin0: 445, spawnMinStep: 60, spawnMinFloor: 260, sizeMin0: 20, sizeMinStep: 1, sizeMax0: 32, sizeMaxStep: 1 },
-          // World 3 (not insane speed; hazards/behaviors carry difficulty)
           { baseScroll0: 96, baseScrollStep: 20, ramp0: 8.0, rampStep: 3.0, spawnStart0: 800, spawnStep: 140, spawnRamp0: 14.8, spawnRampStep: 3.9, spawnMin0: 415, spawnMinStep: 65, spawnMinFloor: 240, sizeMin0: 19, sizeMinStep: 1, sizeMax0: 31, sizeMaxStep: 1 },
         ][worldIndex];
 
@@ -414,7 +539,6 @@
           spawnRamp: base.spawnRamp0 + base.spawnRampStep * i,
           spawnMin: Math.max(base.spawnMinFloor, base.spawnMin0 - base.spawnMinStep * i),
           size: [base.sizeMin0 - base.sizeMinStep*i, base.sizeMax0 - base.sizeMaxStep*i],
-          // behavior unlocks
           driftChance: clamp(0.07 + worldIndex*0.09 + i*0.05, 0, 0.60),
           chaseChance: (worldIndex >= 1) ? clamp(0.02 + worldIndex*0.02 + i*0.03, 0, 0.22) : 0
         }));
@@ -424,7 +548,6 @@
       WORLDS[1].levels = mkLevelsForWorld(1);
       WORLDS[2].levels = mkLevelsForWorld(2);
 
-      // FX / Backdrops (vibrant)
       function buildBackdrop(scene, fxType, cA, cB) {
         const items = [];
         if (fxType === "sparkle") {
@@ -447,7 +570,6 @@
           });
           items.push(...dots);
         }
-
         if (fxType === "pulse") {
           const waves = [];
           for (let i=0;i<6;i++){
@@ -465,7 +587,6 @@
           });
           items.push(...waves);
         }
-
         if (fxType === "astral") {
           const stars = [];
           for (let i=0;i<80;i++){
@@ -486,7 +607,6 @@
         return items;
       }
 
-      // Obstacle textures
       function ensureObstacleTextures(scene) {
         const makeTex = (key, drawFn) => {
           if (scene.textures.exists(key)) return;
@@ -525,7 +645,7 @@
       }
       const shapeToTex = { rect:"obs_rect", frame:"obs_frame", tri:"obs_tri", hex:"obs_hex", bar:"obs_bar", plus:"obs_plus" };
 
-      // SCORING (updated + safer bonus path)
+      // SCORING
       const SCORE_PPS = 7;
       const NEAR_DIST = 36;
       const NEAR_POINTS = 18;
@@ -533,17 +653,13 @@
       const COMBO_STEP = 0.11;
       const COMBO_MAX = 3.10;
 
-      // Safer bonus: "DODGE" (medium distance)
       const DODGE_DIST = 74;
       const DODGE_POINTS = 9;
 
-      // Streak bonus (clean survival)
       const STREAK_EVERY = 12;
       const STREAK_BONUS = 55;
-
       const CLEAR_BONUS_BASE = 220;
 
-      // Hard cap speed to avoid "insane" ramps
       const MAX_SCROLL_SPEED = 360;
 
       function formatTime(sec){
@@ -565,10 +681,9 @@
         for (const k of Object.keys(a)) o[k] = a[k] + (b[k]-a[k])*t;
         return o;
       }
-
       const BLACKOUT = { period: 10.5, active: 0.65, alpha: 0.35 };
 
-      // World-style pill buttons (Phaser)
+      // World-style pill buttons (Results)
       function makePillButton(scene, label, y, onClick, accentColor, glowColor){
         const container = scene.add.container(W/2, y).setDepth(210);
         const g = scene.add.graphics();
@@ -576,17 +691,13 @@
 
         const draw = (hover=false) => {
           g.clear();
-          // outer glow
           g.fillStyle(glowColor, hover ? 0.22 : 0.16);
           g.fillRoundedRect(-w/2 - 4, -h/2 - 3, w+8, h+6, r+4);
-          // main body
           g.fillStyle(accentColor, hover ? 0.95 : 0.88);
           g.fillRoundedRect(-w/2, -h/2, w, h, r);
-          // shine
           g.fillStyle(0xffffff, hover ? 0.12 : 0.09);
           g.fillRoundedRect(-w/2+10, -h/2+6, w-20, 14, 12);
         };
-
         draw(false);
 
         const t = scene.add.text(0, 0, label, {
@@ -603,6 +714,16 @@
         container.add([g, t, hit]);
         return container;
       }
+
+      // AUDIO REGISTRY (Phaser)
+      window.GRIDRUN_AUDIO = {
+        applySettings: (s) => {
+          // called from Settings toggles if Phaser is already running
+          const g = phaserGame;
+          if (!g) return;
+          g.sound.volume = s.volumeSfx; // affects SFX
+        }
+      };
 
       class PlayScene extends Phaser.Scene {
         constructor(){
@@ -628,8 +749,19 @@
           this.hLaser=null; this.hLaserWarn=null; this.vLaser=null; this.vLaserWarn=null;
           this.bossT=0; this.hLaserMode="off"; this.vLaserMode="off";
 
+          // W1/W2 hazards
+          this.hotCol = { col:0, mode:"off", t:0 }; // W1
+          this.hotColWarnRect = null;
+          this.hotColActiveRect = null;
+
+          this.emp = { mode:"off", t:0, jamLeft:0 }; // W2
+          this.empText = null;
+
           this.decor=[];
           this.hudBg=null;
+
+          // Audio
+          this.music=null;
         }
 
         init(data){
@@ -646,11 +778,37 @@
           }
         }
 
-        create(){
-          ensureObstacleTextures(this);
+        preload(){
+          // MUSIC
+          if (!this.cache.audio.exists("music_w1")) this.load.audio("music_w1", ["audio/world1.mp3"]);
+          if (!this.cache.audio.exists("music_w2")) this.load.audio("music_w2", ["audio/world2.mp3"]);
+          if (!this.cache.audio.exists("music_w3")) this.load.audio("music_w3", ["audio/world3.mp3"]);
 
+          // SFX (optional files; if missing, Phaser will warn but game still runs)
+          if (!this.cache.audio.exists("sfx_hit")) this.load.audio("sfx_hit", ["audio/sfx_hit.mp3"]);
+          if (!this.cache.audio.exists("sfx_bonus")) this.load.audio("sfx_bonus", ["audio/sfx_bonus.mp3"]);
+          if (!this.cache.audio.exists("sfx_clear")) this.load.audio("sfx_clear", ["audio/sfx_clear.mp3"]);
+          if (!this.cache.audio.exists("sfx_click")) this.load.audio("sfx_click", ["audio/sfx_click.mp3"]);
+        }
+
+        create(){
+          settings = loadSettingsState();
+
+          ensureObstacleTextures(this);
           this.cameras.main.setBackgroundColor(this.wcfg.bg);
           buildBackdrop(this, this.wcfg.fx, this.wcfg.glowA, this.wcfg.glowB);
+
+          // Gameplay music (per world, same for all levels in that world)
+          this.stopMusic();
+          if (settings.gameplayMusic){
+            try{
+              this.music = this.sound.add(this.wcfg.musicKey, { loop:true, volume: settings.volumeMusic });
+              this.music.play();
+            }catch(e){}
+          }
+
+          // SFX volume
+          this.sound.volume = settings.volumeSfx;
 
           this.gridGraphics = this.add.graphics();
           this.obstacles = this.physics.add.group({ immovable:true, allowGravity:false });
@@ -669,13 +827,13 @@
 
           this.touchDot = this.add.circle(0,0,6,this.wcfg.glowB).setAlpha(0).setDepth(60);
 
-          // HUD readability fix: backdrop panel + outline (updates with theme)
+          // HUD readability panel
           this.hudBg = this.add.graphics().setDepth(65);
           this.uiTop = this.add.text(18,12,"",{fontFamily:uiFont,fontSize:"14px",color:"#ffffff"}).setDepth(70).setAlpha(0.98);
           this.uiSub = this.add.text(18,32,"",{fontFamily:uiFont,fontSize:"12px",color:"#eaeaff"}).setDepth(70).setAlpha(0.95);
           this.uiCombo = this.add.text(W-18,12,"",{fontFamily:uiFont,fontSize:"12px",color:"#ffffff"}).setOrigin(1,0).setDepth(70).setAlpha(0.90);
 
-          // Pause button in HUD (kept)
+          // Pause button
           this.pauseBtn = this.add.text(W-18,34,"PAUSE",{
             fontFamily:uiFont,fontSize:"12px",color:"#ffffff",
             backgroundColor:"rgba(0,0,0,0.35)", padding:{left:10,right:10,top:6,bottom:6}
@@ -708,11 +866,33 @@
           this.keys = this.input.keyboard.addKeys("W,A,S,D,ESC");
           this.input.keyboard.on("keydown-ESC", ()=>this.togglePause(!this.paused));
 
+          // W1 hot column visuals
+          this.hotColWarnRect = this.add.rectangle(GRID_X, GRID_Y, TILE, GRID_H, this.wcfg.glowB).setOrigin(0,0).setAlpha(0).setDepth(95);
+          this.hotColActiveRect = this.add.rectangle(GRID_X, GRID_Y, TILE, GRID_H, 0xff3b30).setOrigin(0,0).setAlpha(0).setDepth(96);
+
+          // W2 EMP text
+          this.empText = this.add.text(W/2, H*0.58, "", { fontFamily:uiFont, fontSize:"18px", color:"#ffffff" })
+            .setOrigin(0.5).setAlpha(0).setDepth(170);
+
           this.setupLasers();
           this.setupDecor();
 
           this.resetRun();
           this.startCountdown(3);
+        }
+
+        stopMusic(){
+          try{
+            if (this.music){
+              this.music.stop();
+              this.music.destroy();
+              this.music = null;
+            }
+          }catch(e){}
+        }
+
+        shutdown(){
+          this.stopMusic();
         }
 
         isInNoTouchZone(x,y){
@@ -727,6 +907,9 @@
           this.survivalPts=0; this.nearPts=0; this.dodgePts=0; this._lastStreakTick=0;
           this.blackoutOn=false; this.blackoutEnabled=false;
 
+          this.hotCol = { col: Phaser.Math.Between(0, GRID_COLS-1), mode:"off", t:0 };
+          this.emp = { mode:"off", t:0, jamLeft:0 };
+
           this.obstacles.children.iterate(o=>{ if(o) o.destroy(); });
 
           if (this.mode==="campaign"){
@@ -739,8 +922,7 @@
             this.scrollSpeed=w1l1.baseScroll;
             this.spawnEvery=w1l1.spawnStart;
           }
-        }
-
+        }<!-- PART 3 / 3 -->
         startCountdown(n){
           this.countdown=n;
           this.countText = this.add.text(W/2,H*0.42,"",{fontFamily:uiFont,fontSize:"54px",color:"#ffffff"})
@@ -827,6 +1009,100 @@
           this.vLaserMode = "off";
         }
 
+        playSfx(key){
+          settings = loadSettingsState();
+          if (!settings.sfx) return;
+          try{
+            this.sound.play(key, { volume: settings.volumeSfx });
+          }catch(e){}
+        }
+
+        // W1 hazard: Hot Column (warn -> active)
+        updateHotColumn(dt){
+          const hz = this.wcfg.hazardHotColumn;
+          if (!hz?.enabled) {
+            this.hotColWarnRect.setAlpha(0);
+            this.hotColActiveRect.setAlpha(0);
+            return false;
+          }
+          if (this.t < hz.startAt){
+            this.hotColWarnRect.setAlpha(0);
+            this.hotColActiveRect.setAlpha(0);
+            return false;
+          }
+
+          this.hotCol.t += dt;
+          const cycle = hz.every;
+          const phase = this.hotCol.t % cycle;
+
+          const warnOn = phase < hz.warn;
+          const activeOn = phase >= hz.warn && phase < (hz.warn + hz.active);
+
+          // pick new column at cycle start
+          if (phase < dt){
+            this.hotCol.col = Phaser.Math.Between(0, GRID_COLS-1);
+          }
+
+          const x = GRID_X + this.hotCol.col * TILE;
+          this.hotColWarnRect.setPosition(x, GRID_Y);
+          this.hotColWarnRect.width = TILE;
+          this.hotColWarnRect.height = GRID_H;
+
+          this.hotColActiveRect.setPosition(x, GRID_Y);
+          this.hotColActiveRect.width = TILE;
+          this.hotColActiveRect.height = GRID_H;
+
+          this.hotColWarnRect.setAlpha(warnOn ? hz.alphaWarn : 0);
+          this.hotColActiveRect.setAlpha(activeOn ? hz.alphaActive : 0);
+
+          // collision if active and player inside that column
+          if (activeOn){
+            const colMin = x;
+            const colMax = x + TILE;
+            if (this.player.x >= colMin && this.player.x <= colMax){
+              this.playSfx("sfx_hit");
+              this.endRun({reason:"HOT COLUMN"});
+              return true;
+            }
+          }
+          return false;
+        }
+
+        // W2 hazard: EMP Jam (warn -> movement jam)
+        updateEmp(dt){
+          const hz = this.wcfg.hazardEmp;
+          if (!hz?.enabled) {
+            this.empText.setAlpha(0);
+            return;
+          }
+          if (this.t < hz.startAt) {
+            this.empText.setAlpha(0);
+            return;
+          }
+
+          this.emp.t += dt;
+          const cycle = hz.every;
+          const phase = this.emp.t % cycle;
+
+          const warnOn = phase < hz.warn;
+          const jamOn = phase >= hz.warn && phase < (hz.warn + hz.jam);
+
+          if (warnOn){
+            this.empText.setText("EMP INCOMING");
+            this.empText.setAlpha(0.85);
+          } else if (jamOn){
+            this.empText.setText("EMP JAM");
+            this.empText.setAlpha(0.95);
+            this.emp.jamLeft = Math.max(this.emp.jamLeft, hz.jam);
+          } else {
+            this.empText.setAlpha(0);
+          }
+
+          if (this.emp.jamLeft > 0){
+            this.emp.jamLeft -= dt;
+          }
+        }
+
         update(_, deltaMs){
           if (this.paused) return;
           const dt = deltaMs/1000;
@@ -854,11 +1130,28 @@
 
           let timeLeft = 0;
 
+          // W1/W2 hazards (campaign only; endless uses existing blackout/lasers ramp)
+          if (this.mode==="campaign"){
+            if (this.world === 0) {
+              if (this.updateHotColumn(dt)) return;
+            } else {
+              this.hotColWarnRect.setAlpha(0);
+              this.hotColActiveRect.setAlpha(0);
+            }
+            if (this.world === 1) {
+              this.updateEmp(dt);
+            } else {
+              this.empText.setAlpha(0);
+              this.emp.jamLeft = 0;
+            }
+          }
+
           if (this.mode==="campaign"){
             timeLeft = Math.max(0, this.lcfg.seconds - this.t);
             if (this.t >= this.lcfg.seconds){
               const clearBonus = CLEAR_BONUS_BASE + this.world*70 + this.level*40;
               this.score += clearBonus;
+              this.playSfx("sfx_clear");
               this.levelComplete();
               return;
             }
@@ -872,6 +1165,7 @@
             if (this.world===2){ this.hLaserMode="active"; this.vLaserMode="off"; }
 
           } else {
+            // endless ramps to W3L5 and then stays there
             const tNorm = clamp(this.t / ENDLESS.rampSeconds, 0, 1);
             const a = WORLDS[0].levels[0];
             const b = WORLDS[2].levels[4];
@@ -889,6 +1183,7 @@
 
             this.applyEndlessThemeBlend(tNorm);
 
+            // hazards stage in
             this.blackoutEnabled = this.t >= ENDLESS.t_blackout;
             if (this.blackoutEnabled){
               const bp = (this.t % BLACKOUT.period);
@@ -907,19 +1202,23 @@
           this.survivalPts += add;
           this.score += add;
 
-          // movement
+          // movement (EMP jam blocks movement briefly)
+          const jammed = (this.mode==="campaign" && this.world===1 && this.emp.jamLeft > 0);
+
           if (!IS_TOUCH){
             let vx=0, vy=0;
-            const left=this.cursors.left.isDown||this.keys.A.isDown;
-            const right=this.cursors.right.isDown||this.keys.D.isDown;
-            const up=this.cursors.up.isDown||this.keys.W.isDown;
-            const down=this.cursors.down.isDown||this.keys.S.isDown;
-            if (left) vx-=1; if (right) vx+=1; if (up) vy-=1; if (down) vy+=1;
-            const mag=Math.hypot(vx,vy);
-            if (mag>1){ vx/=mag; vy/=mag; }
+            if (!jammed){
+              const left=this.cursors.left.isDown||this.keys.A.isDown;
+              const right=this.cursors.right.isDown||this.keys.D.isDown;
+              const up=this.cursors.up.isDown||this.keys.W.isDown;
+              const down=this.cursors.down.isDown||this.keys.S.isDown;
+              if (left) vx-=1; if (right) vx+=1; if (up) vy-=1; if (down) vy+=1;
+              const mag=Math.hypot(vx,vy);
+              if (mag>1){ vx/=mag; vy/=mag; }
+            }
             this.player.body.setVelocity(vx*PLAYER_SPEED, vy*PLAYER_SPEED);
           } else {
-            if (this.touchTarget){
+            if (this.touchTarget && !jammed){
               const tx=clamp(this.touchTarget.x, GRID_X+14, GRID_X+GRID_W-14);
               const ty=clamp(this.touchTarget.y, GRID_Y+14, GRID_Y+GRID_H-14);
               const dx=tx-this.player.x, dy=ty-this.player.y;
@@ -938,7 +1237,9 @@
               } else {
                 this.player.body.setVelocity(0,0);
               }
-            } else this.player.body.setVelocity(0,0);
+            } else {
+              this.player.body.setVelocity(0,0);
+            }
           }
 
           // clamp to grid
@@ -1029,7 +1330,6 @@
         }
 
         updateHud(timeLeft){
-          // HUD panel redraw (readability fix)
           const panelX = 10, panelY = 8, panelW = W - 20, panelH = 64;
           this.hudBg.clear();
           this.hudBg.fillStyle(0x000000, 0.38);
@@ -1127,12 +1427,8 @@
             chaseChance = 0.01 + 0.12*tNorm;
           }
 
-          if (Math.random() < driftChance){
-            o._drift = Phaser.Math.FloatBetween(-40, 40);
-          }
-          if (Math.random() < chaseChance && this.t > 12){
-            o._chase = true;
-          }
+          if (Math.random() < driftChance) o._drift = Phaser.Math.FloatBetween(-40, 40);
+          if (Math.random() < chaseChance && this.t > 12) o._chase = true;
 
           this.obstacles.add(o);
 
@@ -1180,7 +1476,6 @@
           const dist=Math.hypot(dx,dy);
           if (dist <= NEAR_DIST){
             o._nearAwarded=true;
-
             this.comboTimer=0;
             this.combo = Math.min(COMBO_MAX, this.combo + COMBO_STEP);
             this.maxCombo = Math.max(this.maxCombo, this.combo);
@@ -1188,24 +1483,21 @@
             const award = NEAR_POINTS * this.combo;
             this.nearPts += award;
             this.score += award;
+            this.playSfx("sfx_bonus");
           }
         }
 
-        // Safer bonus so tiers aren't "near-miss or nothing"
         checkDodgeBonus(o){
           if (!o || o._dodgeAwarded || o._nearAwarded) return;
-
           const dy=Math.abs(o.y-this.player.y);
           if (dy>30) return;
-
           const dx=Math.abs(o.x-this.player.x);
           const dist=Math.hypot(dx,dy);
-
-          // only award if it's a "close-ish dodge" but not a near-miss
           if (dist <= DODGE_DIST && dist > (NEAR_DIST + 3)){
             o._dodgeAwarded = true;
             this.dodgePts += DODGE_POINTS;
             this.score += DODGE_POINTS;
+            this.playSfx("sfx_bonus");
           }
         }
 
@@ -1249,10 +1541,10 @@
           if (activeOn){
             const pr=this.player.getBounds();
             if (this.hLaserMode==="active"){
-              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, this.hLaser.getBounds())) this.endRun({reason:"H-LASER"});
+              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, this.hLaser.getBounds())) { this.playSfx("sfx_hit"); this.endRun({reason:"H-LASER"}); }
             }
             if (this.vLaserMode==="active"){
-              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, this.vLaser.getBounds())) this.endRun({reason:"V-LASER"});
+              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, this.vLaser.getBounds())) { this.playSfx("sfx_hit"); this.endRun({reason:"V-LASER"}); }
             }
           }
         }
@@ -1267,13 +1559,13 @@
           const score=Math.floor(this.score);
           this.flash.setAlpha(0.10);
           this.tweens.add({targets:this.flash,alpha:0,duration:170,ease:"Linear"});
+          this.stopMusic();
 
           if (this.mode==="endless"){
             window.GRIDRUN.setEndlessBest(score);
             this.scene.start("Results",{mode:"endless",score,reason});
             return;
           }
-
           this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason});
         }
       }
@@ -1285,7 +1577,6 @@
           const score=data?.score||0;
           const reason=data?.reason||"";
 
-          // Theme colors for buttons
           const theme = (mode==="campaign") ? WORLDS[data.world] : WORLDS[2];
           const bg = theme.bg;
           const accent = theme.glowB;
@@ -1330,7 +1621,6 @@
             }).setOrigin(0.5);
           }
 
-          // Next Level logic (only when cleared)
           const nextFor = (w,l) => {
             let nw=w, nl=l+1;
             if (nl>=5){ nl=0; nw=w+1; }
@@ -1341,17 +1631,14 @@
           const y0 = H*0.62;
 
           if (mode==="campaign"){
-            // Primary: RETRY
             makePillButton(this, "RETRY", y0, () => this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}), accent, glow);
 
-            // Next level (only if cleared and exists)
             const nxt = cleared ? nextFor(data.world, data.level) : null;
             if (nxt){
               makePillButton(this, "NEXT LEVEL", y0 + 62, () => this.scene.start("Play",{mode:"campaign",world:nxt.world,level:nxt.level}), theme.glowA, glow);
               makePillButton(this, "BACK TO LEVELS", y0 + 124, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
               makePillButton(this, "MAIN MENU", y0 + 186, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
             } else {
-              // If not cleared or no next, keep classic layout
               makePillButton(this, "BACK TO LEVELS", y0 + 62, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
               makePillButton(this, "MAIN MENU", y0 + 124, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
             }

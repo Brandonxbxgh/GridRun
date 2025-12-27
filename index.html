@@ -213,6 +213,7 @@
     /* Smooth scroll on iOS */
     .lbWrap{ -webkit-overflow-scrolling: touch; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div id="game-container">
@@ -232,20 +233,50 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
   <script>
+// ===============================
+// SUPABASE INIT
+// ===============================
+const SUPABASE_URL = "https://YOUR_PROJECT_ID.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR_PUBLIC_ANON_KEY";
+
+const supabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
+
     /***********************
      * AUTH (local, username-only)
      * - safe now, upgradeable later
      ***********************/
     const AUTH_KEY = "gridrun_auth_v1"; // { username: "Name" } or null
+      async function submitScore({ mode, score, world = null }) {
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) return; // not logged in
 
-    function getActiveUser(){
+  const username = getActiveUser()?.username || "Anonymous";
+        
+  const { error } = await supabase.from("Scores").insert([
+    {
+      user_id: user.data.user.id,
+      username,
+      mode,
+      score,
+      world
+    }
+  ]);
+
+  if (error) {
+    console.error("Score submit failed:", error);
+  }
+}
+function getActiveUser() {
       try{
         const raw = localStorage.getItem(AUTH_KEY);
         if (!raw) return null;
         const a = JSON.parse(raw);
         const u = String(a?.username || "").trim();
         if (!u) return null;
-        return u;
+        return { username: u };
       }catch{ return null; }
     }
 

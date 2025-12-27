@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1,user-scalable=no" />
   <title>GRIDRUN</title>
@@ -1176,6 +1177,148 @@
     }
 
     async function loadLeaderboards(){
+      /***********************
+ * SUPABASE (GLOBAL LEADERBOARDS)
+ ***********************/
+const SUPABASE_URL = "https://pgoeyzhnrafupqvfrdnn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnb2V5emhucmFmdXBxdmZyZG5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3OTQzNTMsImV4cCI6MjA4MjM3MDM1M30.Nh7Q3VKna6eQcaqRozccFKEaSHIG0t18h6Pw37hQ4i8";
+
+let sb = null;
+function globalEnabled(){
+  return !!SUPABASE_URL && !!SUPABASE_ANON_KEY && window.supabase;
+}
+
+function getSupabase(){
+  if (!sb && globalEnabled()){
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return sb;
+}
+
+async function getAuthUser(){
+  if (!globalEnabled()) return null;
+  const { data, error } = await getSupabase().auth.getUser();
+  if (error) return null;
+  return data?.user || null;
+}
+
+/**
+ * 1) submitBestScore(mode, score)
+ * - writes to public.scores
+ * - one row per user per mode (UNIQUE(user_id, mode))
+ * - only updates if new score is higher
+ */
+async function submitBestScore(mode, score){
+  if (!globalEnabled()) return false;
+
+  const user = await getAuthUser();
+  if (!user) return false;
+
+  const s = Math.max(0, Math.floor(score || 0));
+  if (!s) return false;
+
+  // read existing
+  const { data: existing, error: readErr } = await getSupabase()
+    .from("scores")
+    .select("score")
+    .eq("user_id", user.id)
+    .eq("mode", mode)
+    .maybeSingle();
+
+  if (readErr) console.warn("submitBestScore readErr", readErr);
+
+  const prev = Math.max(0, Math.floor(existing?.score || 0));
+  if (s <= prev) return false;
+
+  // upsert best
+  const { error: upsertErr } = await getSupabase()
+    .from("scores")
+    .upsert(
+      {
+        user_id: user.id,
+        mode,
+        score: s,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,mode" }
+    );
+
+  if (upsertErr){
+    console.warn("submitBestScore upsertErr", upsertErr);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 2) fetchGlobalTop25(mode)
+ * Returns: [{ username, score }]
+ * (Uses profiles for username. Scores are tied to user_id so nobody can fake names.)
+ */
+async function fetchGlobalTop25(mode){
+  if (!globalEnabled()) return [];
+
+  const { data, error } = await getSupabase()
+    .from("scores")
+    .select("score, user_id, profiles:profiles(username)")
+    .eq("mode", mode)
+    .order("score", { ascending: false })
+    .order("updated_at", { ascending: false })
+    .limit(25);
+
+  if (error){
+    console.warn("fetchGlobalTop25 error", error);
+    return [];
+  }
+
+  return (data || []).map(r => ({
+    username: r?.profiles?.username || "—",
+    score: Math.max(0, Math.floor(r?.score || 0)),
+    user_id: r?.user_id
+  }));
+}
+
+/**
+ * 3) fetchGlobalMyRank(mode)
+ * Returns: { rank, score } even if you are not in top 25
+ */
+async function fetchGlobalMyRank(mode){
+  if (!globalEnabled()) return null;
+
+  const user = await getAuthUser();
+  if (!user) return null;
+
+  // my score
+  const { data: me, error: meErr } = await getSupabase()
+    .from("scores")
+    .select("score")
+    .eq("user_id", user.id)
+    .eq("mode", mode)
+    .maybeSingle();
+
+  if (meErr){
+    console.warn("fetchGlobalMyRank meErr", meErr);
+    return null;
+  }
+
+  const myScore = Math.max(0, Math.floor(me?.score || 0));
+  if (!myScore) return null;
+
+  // rank = count of people strictly above me + 1
+  const { count, error: countErr } = await getSupabase()
+    .from("scores")
+    .select("id", { count: "exact", head: true })
+    .eq("mode", mode)
+    .gt("score", myScore);
+
+  if (countErr){
+    console.warn("fetchGlobalMyRank countErr", countErr);
+    return { rank: null, score: myScore };
+  }
+
+  return { rank: (count || 0) + 1, score: myScore };
+}
+
       startMenuMusic();
       updateLeaderboardsFromProgress(); // refresh snapshot for current user (+ pushes global bests async)
       const container = document.getElementById("game-container");

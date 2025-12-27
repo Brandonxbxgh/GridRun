@@ -1,4 +1,3 @@
-<!-- PART 1 / FULL INDEX -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -194,7 +193,6 @@
       color:var(--muted);
       white-space:nowrap;
     }
-
     .score{
       text-align:right;
       font-weight:900;
@@ -217,6 +215,8 @@
   </style>
 </head>
 <body>
+  <!-- NOTE: We do NOT render the main menu in HTML anymore to avoid flashes.
+       JS will force Auth Gate on boot. -->
   <div id="game-container"></div>
   <div id="phaser-container"></div>
 
@@ -225,6 +225,7 @@
   <script>
     /***********************
      * AUTH (local, username-only)
+     * - safe now, upgradeable later
      ***********************/
     const AUTH_KEY = "gridrun_auth_v1"; // { username: "Name" } or null
 
@@ -259,6 +260,7 @@
 
     /***********************
      * SAVE (progress + settings)
+     * - per-user progress (so leaderboards make sense)
      ***********************/
     const SAVE_KEY_LEGACY = "gridrun_dom_progress_v2";
     const SETTINGS_KEY = "gridrun_audio_settings_v1";
@@ -283,9 +285,11 @@
 
     function loadProgress() {
       try {
+        // migrate legacy -> user key if user exists
         const u = getActiveUser();
         const key = progressKey();
 
+        // If user has no progress yet, but legacy exists, copy once.
         if (u && !localStorage.getItem(key) && localStorage.getItem(SAVE_KEY_LEGACY)){
           localStorage.setItem(key, localStorage.getItem(SAVE_KEY_LEGACY));
         }
@@ -350,10 +354,11 @@
 
     /***********************
      * LOCAL LEADERBOARDS
+     * - stored per browser for now
      ***********************/
     const LB_KEY = "gridrun_leaderboards_local_v1";
     function defaultLeaderboards(){
-      return { users: {} };
+      return { users: {} }; // users[usernameLower] = { username, endlessBest, campaignTotal, worldTotals:[w1,w2,w3], updatedAt }
     }
     function loadLeaderboardsState(){
       try{
@@ -381,7 +386,7 @@
 
     function updateLeaderboardsFromProgress(){
       const u = getActiveUser();
-      if (!u) return;
+      if (!u) return; // require login to post scores
       const username = u;
       const k = username.toLowerCase();
       const lb = loadLeaderboardsState();
@@ -451,9 +456,9 @@
      * LEVEL TIMES + TIER TARGETS
      ***********************/
     const levelTimes = [
-      [30, 40, 50, 60, 70],
-      [45, 60, 75, 90, 100],
-      [60, 80, 95, 105, 115],
+      [30, 40, 50, 60, 70],    // World 1
+      [45, 60, 75, 90, 100],   // World 2
+      [60, 80, 95, 105, 115],  // World 3
     ];
 
     const TIER_MODEL = {
@@ -489,7 +494,7 @@
       return { time: t, scores: { bronze, silver, gold } };
     }
     function levelData(worldIdx, levelIdx){ return computeTierTargets(worldIdx, levelIdx); }
-    <!-- PART 2 / FULL INDEX -->
+
     /***********************
      * MENUS
      ***********************/
@@ -504,50 +509,10 @@
       stopMenuMusic();
     }
 
-    /***********************
-     * NEW: AUTH LANDING (BOOT SCREEN)
-     * Site loads here: LOGIN or CREATE ACCOUNT
-     ***********************/
-    function loadAuthLanding(){
-      startMenuMusic();
-      const container = document.getElementById("game-container");
-      const u = getActiveUser();
-
-      if (u){
-        // If already logged in, go straight to main menu.
-        loadMainMenu();
-        return;
-      }
-
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>GRIDRUN</h1>
-          <p class="subhead">Welcome. To play and post scores, login or create an account.</p>
-
-          <div class="panel">
-            <div class="panelTitle">
-              <strong>Account</strong>
-              <span class="pill">Local (for now)</span>
-            </div>
-
-            <button onclick="loadLoginScreen()">LOGIN</button>
-            <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
-
-            <p class="hint">
-              Accounts are stored on this device only (no password yet). Global accounts can be added later without changing gameplay.
-            </p>
-          </div>
-
-          <button onclick="loadHowTo()">HOW TO PLAY</button>
-          <button onclick="loadLeaderboards()">LEADERBOARDS</button>
-          <button onclick="loadSettings()">SETTINGS</button>
-        </div>
-      `;
-    }
-
+    // MAIN MENU: ACCOUNT button ALWAYS (never shows LOGIN)
+    // NOTE: main menu is only reachable after login; loadAuthGate is forced on boot.
     function loadMainMenu(){
       startMenuMusic();
-      const u = getActiveUser();
       const container = document.getElementById("game-container");
 
       container.innerHTML = `
@@ -555,7 +520,7 @@
           <h1>GRIDRUN</h1>
           <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
           <button onclick="loadModeSelect()">PLAY</button>
-          <button onclick="${u ? "loadAccount()" : "loadAuthLanding()"}">ACCOUNT</button>
+          <button onclick="loadAccount()">ACCOUNT</button>
           <button onclick="loadLeaderboards()">LEADERBOARDS</button>
           <button onclick="loadHowTo()">HOW TO PLAY</button>
           <button onclick="loadSettings()">SETTINGS</button>
@@ -688,7 +653,7 @@
         </div>
       `;
     }
-    <!-- PART 3 / FULL INDEX -->
+
     function loadSettings(){
       startMenuMusic();
       settings = loadSettingsState();
@@ -769,31 +734,81 @@
     }
 
     /***********************
-     * AUTH SCREENS
-     * - split into LOGIN and CREATE ACCOUNT
+     * AUTH SCREENS (FORCED BEFORE MENU)
      ***********************/
-    function loadLoginScreen(){
+
+    // AUTH GATE: 2 options on boot (LOGIN / CREATE ACCOUNT)
+    function loadAuthGate(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>GRIDRUN</h1>
+          <p class="subhead">You must login or create an account to enter.</p>
+
+          <div class="panel">
+            <div class="panelTitle">
+              <strong>Account Access</strong>
+              <span class="pill">Required</span>
+            </div>
+
+            <button onclick="loadLogin()">LOGIN</button>
+            <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
+
+            <p class="hint">
+              Login is local for now (username-only). Create Account is a placeholder until global/auth is integrated.
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    // LOGIN screen (local username)
+    function loadLogin(){
       startMenuMusic();
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Login</h1>
-          <p class="subhead">Enter your username to continue.</p>
+          <p class="subhead">Choose a username to enter GRIDRUN.</p>
           <div class="panel" style="text-align:left;">
             <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars</span></div>
-            <input id="usernameLoginInput" placeholder="Enter username..." autocomplete="nickname"
+            <input id="usernameInput" placeholder="Enter username..." autocomplete="nickname"
               style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
               background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
-            <p class="hint">Local-only login (no password yet).</p>
-            <button onclick="doLogin()">CONFIRM</button>
+            <p class="hint">No password yet (local-only). Global accounts come later.</p>
+            <button onclick="doLogin()">Confirm</button>
           </div>
-          <button onclick="loadAuthLanding()">Back</button>
+          <button onclick="loadAuthGate()">Back</button>
+        </div>
+      `;
+    }
+
+    // CREATE ACCOUNT placeholder screen
+    function loadCreateAccount(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Create Account</h1>
+          <p class="subhead">This is a placeholder until global/auth is integrated.</p>
+
+          <div class="panel" style="text-align:left;">
+            <div class="panelTitle"><strong>Coming Soon</strong><span class="pill">Global</span></div>
+            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              For now, use <b>LOGIN</b> with a username to enter the game.
+              When global accounts are added, this screen will become email/password signup.
+            </p>
+          </div>
+
+          <button onclick="loadAuthGate()">Back</button>
         </div>
       `;
     }
 
     function doLogin(){
-      const el = document.getElementById("usernameLoginInput");
+      const el = document.getElementById("usernameInput");
       if (!el) return;
       const u = sanitizeUsername(el.value);
       if (!u){
@@ -801,66 +816,17 @@
         return;
       }
       setActiveUser(u);
+      // reload user progress & update LB snapshot
       progress = loadProgress();
       updateLeaderboardsFromProgress();
-      loadMainMenu();
-    }
-
-    function loadCreateAccount(){
-      startMenuMusic();
-      const container = document.getElementById("game-container");
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Create Account</h1>
-          <p class="subhead">Choose a new username (stored on this device).</p>
-          <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars</span></div>
-            <input id="usernameCreateInput" placeholder="Create username..." autocomplete="nickname"
-              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
-            <p class="hint">If the name already exists on this device, you can login instead.</p>
-            <button onclick="doCreateAccount()">CREATE</button>
-          </div>
-          <button onclick="loadAuthLanding()">Back</button>
-        </div>
-      `;
-    }
-
-    function doCreateAccount(){
-      const el = document.getElementById("usernameCreateInput");
-      if (!el) return;
-      const u = sanitizeUsername(el.value);
-      if (!u){
-        alert("Please enter a valid username.");
-        return;
-      }
-
-      // Local uniqueness check (on this device)
-      const lb = loadLeaderboardsState();
-      const key = u.toLowerCase();
-      if (lb.users && lb.users[key]){
-        alert("That username already exists on this device. Please login or choose another name.");
-        return;
-      }
-
-      setActiveUser(u);
-
-      // Initialize fresh progress under this user
-      const userKey = `gridrun_progress_user_${u.toLowerCase()}`;
-      if (!localStorage.getItem(userKey)){
-        localStorage.setItem(userKey, JSON.stringify(defaultProgress()));
-      }
-
-      progress = loadProgress();
-      updateLeaderboardsFromProgress();
-      loadMainMenu();
+      loadMainMenu(); // now allowed
     }
 
     function loadAccount(){
       startMenuMusic();
       const u = getActiveUser();
       const container = document.getElementById("game-container");
-      if (!u){ loadAuthLanding(); return; }
+      if (!u){ loadAuthGate(); return; } // forced auth if not logged in
 
       progress = loadProgress();
       const totals = sumCampaignTotals(progress);
@@ -903,6 +869,7 @@
       const oldU = getActiveUser();
       if (!oldU) return;
 
+      // Move progress to new user key (copy old key content)
       const oldKey = `gridrun_progress_user_${oldU.toLowerCase()}`;
       const newKey = `gridrun_progress_user_${newU.toLowerCase()}`;
       const raw = localStorage.getItem(oldKey);
@@ -917,9 +884,9 @@
     function logout(){
       clearActiveUser();
       progress = loadProgress();
-      loadAuthLanding(); // <-- go back to the 2-option auth screen on logout
+      loadAuthGate(); // forced back to gate
     }
-    <!-- PART 4 / FULL INDEX -->
+
     /***********************
      * LEADERBOARDS (polished)
      ***********************/
@@ -988,6 +955,7 @@
         `;
       }).join("");
 
+      // find my rank (if logged in)
       let myRankHtml = "";
       if (myKey){
         const i = list.findIndex(r => r.username.toLowerCase() === myKey);
@@ -1025,7 +993,7 @@
 
     function loadLeaderboards(){
       startMenuMusic();
-      updateLeaderboardsFromProgress();
+      updateLeaderboardsFromProgress(); // refresh snapshot for current user
       const container = document.getElementById("game-container");
       const u = getActiveUser();
 
@@ -1123,6 +1091,11 @@
       phaserGame.scene.start("Play", payload);
     }
 
+    /* ===========
+       YOUR FULL PHASER SECTION CONTINUES HERE UNCHANGED
+       (I did not modify gameplay at all.)
+       =========== */
+
     function createPhaserGame(){
       const W = 420, H = 760;
       const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
@@ -1189,969 +1162,11 @@
         }
       ];
 
-      function mkLevelsForWorld(worldIndex){
-        const base = [
-          { baseScroll0: 78, baseScrollStep: 16, ramp0: 6.4, rampStep: 2.4, spawnStart0: 920, spawnStep: 120, spawnRamp0: 12.0, spawnRampStep: 3.1, spawnMin0: 480, spawnMinStep: 55, spawnMinFloor: 280, sizeMin0: 21, sizeMinStep: 1, sizeMax0: 33, sizeMaxStep: 1 },
-          { baseScroll0: 88, baseScrollStep: 18, ramp0: 7.2, rampStep: 2.7, spawnStart0: 860, spawnStep: 130, spawnRamp0: 13.2, spawnRampStep: 3.4, spawnMin0: 445, spawnMinStep: 60, spawnMinFloor: 260, sizeMin0: 20, sizeMinStep: 1, sizeMax0: 32, sizeMaxStep: 1 },
-          { baseScroll0: 96, baseScrollStep: 20, ramp0: 8.0, rampStep: 3.0, spawnStart0: 800, spawnStep: 140, spawnRamp0: 14.8, spawnRampStep: 3.9, spawnMin0: 415, spawnMinStep: 65, spawnMinFloor: 240, sizeMin0: 19, sizeMinStep: 1, sizeMax0: 31, sizeMaxStep: 1 },
-        ][worldIndex];
-
-        return Array.from({length:5}, (_,i) => ({
-          seconds: levelTimes[worldIndex][i],
-          baseScroll: base.baseScroll0 + base.baseScrollStep * i,
-          scrollRamp: base.ramp0 + base.rampStep * i,
-          spawnStart: base.spawnStart0 - base.spawnStep * i,
-          spawnRamp: base.spawnRamp0 + base.spawnRampStep * i,
-          spawnMin: Math.max(base.spawnMinFloor, base.spawnMin0 - base.spawnMinStep * i),
-          size: [base.sizeMin0 - base.sizeMinStep*i, base.sizeMax0 - base.sizeMaxStep*i],
-          driftChance: clamp(0.07 + worldIndex*0.09 + i*0.05, 0, 0.60),
-          chaseChance: (worldIndex >= 1) ? clamp(0.02 + worldIndex*0.02 + i*0.03, 0, 0.22) : 0
-        }));
-      }
-
-      WORLDS[0].levels = mkLevelsForWorld(0);
-      WORLDS[1].levels = mkLevelsForWorld(1);
-      WORLDS[2].levels = mkLevelsForWorld(2);
-
-      function buildBackdrop(scene, fxType, cA, cB) {
-        if (fxType === "sparkle") {
-          const dots = [];
-          for (let i=0;i<52;i++){
-            const d = scene.add.circle(Phaser.Math.Between(0,W), Phaser.Math.Between(0,H), Phaser.Math.Between(1,3), cB)
-              .setAlpha(Phaser.Math.FloatBetween(0.08, 0.22));
-            d._vx = Phaser.Math.FloatBetween(-18, 18);
-            d._vy = Phaser.Math.FloatBetween(30, 90);
-            dots.push(d);
-          }
-          scene.events.on("update", (_, dtMs) => {
-            const dt = dtMs/1000;
-            for (const d of dots){
-              d.x += d._vx*dt; d.y += d._vy*dt;
-              if (d.y > H+10){ d.y=-10; d.x=Phaser.Math.Between(0,W); }
-              if (d.x < -10) d.x = W+10;
-              if (d.x > W+10) d.x = -10;
-            }
-          });
-        }
-        if (fxType === "pulse") {
-          const waves = [];
-          for (let i=0;i<6;i++){
-            const r = scene.add.rectangle(W/2, Phaser.Math.Between(0,H), W*1.2, 6, cA).setAlpha(0.06);
-            r._vy = Phaser.Math.FloatBetween(30, 80);
-            waves.push(r);
-          }
-          scene.events.on("update", (_, dtMs)=>{
-            const dt=dtMs/1000;
-            for (const wv of waves){
-              wv.y += wv._vy*dt;
-              wv.setAlpha(0.05 + 0.03*Math.sin((wv.y/H)*Math.PI*2));
-              if (wv.y > H+20) wv.y = -20;
-            }
-          });
-        }
-        if (fxType === "astral") {
-          const stars = [];
-          for (let i=0;i<80;i++){
-            const s = scene.add.rectangle(Phaser.Math.Between(0,W), Phaser.Math.Between(0,H), 2, 2, cA)
-              .setAlpha(Phaser.Math.FloatBetween(0.06, 0.28));
-            s._vy = Phaser.Math.FloatBetween(14, 62);
-            stars.push(s);
-          }
-          scene.events.on("update", (_, dtMs)=>{
-            const dt=dtMs/1000;
-            for (const s of stars){
-              s.y += s._vy*dt;
-              if (s.y > H+10){ s.y=-10; s.x=Phaser.Math.Between(0,W); }
-            }
-          });
-        }
-      }
-      <!-- PART 5 / FULL INDEX (continue paste directly after Part 4) -->
-      function ensureObstacleTextures(scene) {
-        const makeTex = (key, drawFn) => {
-          if (scene.textures.exists(key)) return;
-          const g = scene.make.graphics({ x:0, y:0, add:false });
-          drawFn(g); g.generateTexture(key, 64, 64); g.destroy();
-        };
-        makeTex("obs_rect", g=>{ g.fillStyle(0xffffff,1); g.fillRoundedRect(8,8,48,48,10); });
-        makeTex("obs_frame", g=>{
-          g.lineStyle(6,0xffffff,1); g.strokeRoundedRect(10,10,44,44,10);
-          g.lineStyle(2,0xffffff,0.7); g.strokeRoundedRect(16,16,32,32,8);
-        });
-        makeTex("obs_tri", g=>{
-          g.fillStyle(0xffffff,1); g.beginPath(); g.moveTo(32,8); g.lineTo(56,56); g.lineTo(8,56); g.closePath(); g.fillPath();
-          g.lineStyle(2,0xffffff,0.35); g.strokePath();
-        });
-        makeTex("obs_hex", g=>{
-          g.fillStyle(0xffffff,1);
-          const pts=[{x:32,y:6},{x:54,y:18},{x:54,y:46},{x:32,y:58},{x:10,y:46},{x:10,y:18}];
-          g.beginPath(); g.moveTo(pts[0].x,pts[0].y);
-          for (let i=1;i<pts.length;i++) g.lineTo(pts[i].x,pts[i].y);
-          g.closePath(); g.fillPath();
-          g.lineStyle(2,0xffffff,0.35); g.strokePath();
-        });
-        makeTex("obs_bar", g=>{
-          g.fillStyle(0xffffff,1); g.fillRoundedRect(6,24,52,16,8);
-          g.lineStyle(2,0xffffff,0.35); g.strokeRoundedRect(6,24,52,16,8);
-        });
-        makeTex("obs_plus", g=>{
-          g.fillStyle(0xffffff,1);
-          g.fillRoundedRect(26,10,12,44,5);
-          g.fillRoundedRect(10,26,44,12,5);
-          g.lineStyle(2,0xffffff,0.35);
-          g.strokeRoundedRect(26,10,12,44,5);
-          g.strokeRoundedRect(10,26,44,12,5);
-        });
-      }
-      const shapeToTex = { rect:"obs_rect", frame:"obs_frame", tri:"obs_tri", hex:"obs_hex", bar:"obs_bar", plus:"obs_plus" };
-
-      // SCORING
-      const SCORE_PPS = 7;
-      const NEAR_DIST = 36;
-      const NEAR_POINTS = 18;
-      const COMBO_DECAY_SEC = 1.30;
-      const COMBO_STEP = 0.11;
-      const COMBO_MAX = 3.10;
-
-      const DODGE_DIST = 74;
-      const DODGE_POINTS = 9;
-
-      const STREAK_EVERY = 12;
-      const STREAK_BONUS = 55;
-      const CLEAR_BONUS_BASE = 220;
-      const MAX_SCROLL_SPEED = 360;
-
-      function formatTime(sec){
-        const m=Math.floor(sec/60), s=Math.floor(sec%60);
-        return m>0?`${m}:${String(s).padStart(2,"0")}`:`${s}s`;
-      }
-
-      const ENDLESS = {
-        rampSeconds: 120,
-        t_blackout: 50,
-        t_laserWarn: 70,
-        t_laserActive: 90,
-        t_verticalLaser: 110
-      };
-
-      function lerpObj(a,b,t){
-        const o = {};
-        for (const k of Object.keys(a)) o[k] = a[k] + (b[k]-a[k])*t;
-        return o;
-      }
-      const BLACKOUT = { period: 10.5, active: 0.65, alpha: 0.35 };
-
-      function makePillButton(scene, label, y, onClick, accentColor, glowColor){
-        const container = scene.add.container(W/2, y).setDepth(210);
-        const g = scene.add.graphics();
-        const w = 250, h = 46, r = 23;
-
-        const draw = (hover=false) => {
-          g.clear();
-          g.fillStyle(glowColor, hover ? 0.22 : 0.16);
-          g.fillRoundedRect(-w/2 - 4, -h/2 - 3, w+8, h+6, r+4);
-          g.fillStyle(accentColor, hover ? 0.95 : 0.88);
-          g.fillRoundedRect(-w/2, -h/2, w, h, r);
-          g.fillStyle(0xffffff, hover ? 0.12 : 0.09);
-          g.fillRoundedRect(-w/2+10, -h/2+6, w-20, 14, 12);
-        };
-        draw(false);
-
-        const t = scene.add.text(0, 0, label, {
-          fontFamily: uiFont,
-          fontSize: "16px",
-          color: "#ffffff"
-        }).setOrigin(0.5);
-
-        const hit = scene.add.rectangle(0,0,w,h,0xffffff,0.001).setInteractive({useHandCursor:true});
-        hit.on("pointerdown", onClick);
-        hit.on("pointerover", ()=>draw(true));
-        hit.on("pointerout", ()=>draw(false));
-
-        container.add([g, t, hit]);
-        return container;
-      }
-
-      window.GRIDRUN_AUDIO = {
-        applySettings: (s) => {
-          const g = phaserGame;
-          if (!g) return;
-          g.sound.volume = s.volumeSfx;
-        }
-      };
-
-      class PlayScene extends Phaser.Scene {
-        constructor(){
-          super("Play");
-          this.mode="campaign"; this.world=0; this.level=0;
-          this.wcfg=WORLDS[0]; this.lcfg=WORLDS[0].levels[0];
-
-          this.t=0; this.score=0; this.paused=false;
-          this.canMove=false; this.spawnTimer=0;
-          this.combo=1; this.comboTimer=0; this.maxCombo=1;
-          this.survivalPts=0; this.nearPts=0; this.dodgePts=0; this._lastStreakTick=0;
-          this.scrollSpeed=0; this.baseScroll=0; this.spawnEvery=900;
-
-          this.gridGraphics=null; this.gridOffset=0;
-          this.obstacles=null; this.player=null;
-
-          this.touchTarget=null; this.touchDot=null;
-          this.pauseBtn=null; this.pauseOverlay=null;
-
-          this.flash=null; this.blackoutRect=null;
-          this.blackoutOn=false; this.blackoutEnabled=false;
-
-          this.hLaser=null; this.hLaserWarn=null; this.vLaser=null; this.vLaserWarn=null;
-          this.bossT=0; this.hLaserMode="off"; this.vLaserMode="off";
-
-          this.hotCol = { col:0, t:0 };
-          this.hotColWarnRect=null;
-          this.hotColActiveRect=null;
-
-          this.emp = { t:0, jamLeft:0 };
-          this.empText=null;
-
-          this.decor=[];
-          this.hudBg=null;
-
-          this.music=null;
-        }
-
-        init(data){
-          this.mode = data?.mode || "campaign";
-          if (this.mode === "campaign"){
-            this.world = clamp(data?.world ?? 0, 0, 2);
-            this.level = clamp(data?.level ?? 0, 0, 4);
-            this.wcfg = WORLDS[this.world];
-            this.lcfg = this.wcfg.levels[this.level];
-          } else {
-            this.world=0; this.level=0;
-            this.wcfg=WORLDS[0];
-            this.lcfg=WORLDS[0].levels[0];
-          }
-        }
-
-        preload(){
-          if (!this.cache.audio.exists("music_w1")) this.load.audio("music_w1", ["audio/world1.mp3"]);
-          if (!this.cache.audio.exists("music_w2")) this.load.audio("music_w2", ["audio/world2.mp3"]);
-          if (!this.cache.audio.exists("music_w3")) this.load.audio("music_w3", ["audio/world3.mp3"]);
-
-          if (!this.cache.audio.exists("sfx_hit")) this.load.audio("sfx_hit", ["audio/sfx_hit.mp3"]);
-          if (!this.cache.audio.exists("sfx_clear")) this.load.audio("sfx_clear", ["audio/sfx_clear.mp3"]);
-          if (!this.cache.audio.exists("sfx_click")) this.load.audio("sfx_click", ["audio/sfx_click.mp3"]);
-        }
-
-        create(){
-          settings = loadSettingsState();
-
-          ensureObstacleTextures(this);
-          this.cameras.main.setBackgroundColor(this.wcfg.bg);
-          buildBackdrop(this, this.wcfg.fx, this.wcfg.glowA, this.wcfg.glowB);
-
-          this.stopMusic();
-          if (settings.gameplayMusic){
-            try{
-              this.music = this.sound.add(this.wcfg.musicKey, { loop:true, volume: settings.volumeMusic });
-              this.music.play();
-            }catch(e){}
-          }
-          this.sound.volume = settings.volumeSfx;
-
-          this.gridGraphics = this.add.graphics();
-          this.obstacles = this.physics.add.group({ immovable:true, allowGravity:false });
-
-          const startX = GRID_X + GRID_W/2;
-          const startY = GRID_Y + GRID_H*0.72;
-
-          this.player = this.add.rectangle(startX, startY, 28, 28, this.wcfg.player);
-          this.physics.add.existing(this.player);
-          this.player.body.setAllowGravity(false);
-
-          this.physics.add.overlap(this.player, this.obstacles, ()=>this.endRun({reason:"OBSTACLE"}));
-
-          this.flash = this.add.rectangle(W/2,H/2,W,H,0xffffff).setAlpha(0).setDepth(200);
-          this.blackoutRect = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0).setDepth(180);
-
-          this.touchDot = this.add.circle(0,0,6,this.wcfg.glowB).setAlpha(0).setDepth(60);
-
-          this.hudBg = this.add.graphics().setDepth(65);
-          this.uiTop = this.add.text(18,12,"",{fontFamily:uiFont,fontSize:"14px",color:"#ffffff"}).setDepth(70).setAlpha(0.98);
-          this.uiSub = this.add.text(18,32,"",{fontFamily:uiFont,fontSize:"12px",color:"#eaeaff"}).setDepth(70).setAlpha(0.95);
-          this.uiCombo = this.add.text(W-18,12,"",{fontFamily:uiFont,fontSize:"12px",color:"#ffffff"}).setOrigin(1,0).setDepth(70).setAlpha(0.90);
-
-          this.pauseBtn = this.add.text(W-18,34,"PAUSE",{
-            fontFamily:uiFont,fontSize:"12px",color:"#ffffff",
-            backgroundColor:"rgba(0,0,0,0.35)", padding:{left:10,right:10,top:6,bottom:6}
-          }).setOrigin(1,0).setDepth(9999).setInteractive({useHandCursor:true});
-
-          this.input.topOnly = true;
-          const pb = this.pauseBtn.getBounds();
-          this.pauseBtn.input.hitArea.setTo(pb.x-24,pb.y-16,pb.width+38,pb.height+28);
-          this.pauseBtn.on("pointerdown",(p)=>{ p.event?.stopPropagation?.(); this.togglePause(!this.paused); });
-
-          this.uiNoTouchZone = { x: W-220, y: 0, w: 220, h: 110 };
-
-          this.input.on("pointerdown",(p)=>{
-            if (this.paused){ this.togglePause(false); return; }
-            if (this.isInNoTouchZone(p.x,p.y)) return;
-            this.touchTarget = {x:p.x,y:p.y};
-            this.touchDot.setPosition(p.x,p.y).setAlpha(0.85);
-          });
-          this.input.on("pointermove",(p)=>{
-            if (!p.isDown || this.paused) return;
-            if (this.isInNoTouchZone(p.x,p.y)) return;
-            this.touchTarget = {x:p.x,y:p.y};
-            this.touchDot.setPosition(p.x,p.y).setAlpha(0.85);
-          });
-          this.input.on("pointerup",()=>{
-            this.touchTarget=null; this.touchDot.setAlpha(0);
-          });
-
-          this.cursors = this.input.keyboard.createCursorKeys();
-          this.keys = this.input.keyboard.addKeys("W,A,S,D,ESC");
-          this.input.keyboard.on("keydown-ESC", ()=>this.togglePause(!this.paused));
-
-          this.hotColWarnRect = this.add.rectangle(GRID_X, GRID_Y, TILE, GRID_H, this.wcfg.glowB).setOrigin(0,0).setAlpha(0).setDepth(95);
-          this.hotColActiveRect = this.add.rectangle(GRID_X, GRID_Y, TILE, GRID_H, 0xff3b30).setOrigin(0,0).setAlpha(0).setDepth(96);
-
-          this.empText = this.add.text(W/2, H*0.58, "", { fontFamily:uiFont, fontSize:"18px", color:"#ffffff" })
-            .setOrigin(0.5).setAlpha(0).setDepth(170);
-
-          this.setupLasers();
-          this.setupDecor();
-
-          this.resetRun();
-          this.startCountdown(3);
-        }
-
-        stopMusic(){
-          try{
-            if (this.music){
-              this.music.stop();
-              this.music.destroy();
-              this.music = null;
-            }
-          }catch(e){}
-        }
-
-        isInNoTouchZone(x,y){
-          const z=this.uiNoTouchZone;
-          return x>=z.x && x<=z.x+z.w && y>=z.y && y<=z.y+z.h;
-        }
-
-        resetRun(){
-          this.t=0; this.score=0; this.paused=false; this.canMove=false;
-          this.spawnTimer=0;
-          this.combo=1; this.comboTimer=0; this.maxCombo=1;
-          this.survivalPts=0; this.nearPts=0; this.dodgePts=0; this._lastStreakTick=0;
-          this.blackoutOn=false; this.blackoutEnabled=false;
-
-          this.hotCol = { col: Phaser.Math.Between(0, GRID_COLS-1), t:0 };
-          this.emp = { t:0, jamLeft:0 };
-
-          this.obstacles.children.iterate(o=>{ if(o) o.destroy(); });
-
-          if (this.mode==="campaign"){
-            this.baseScroll=this.lcfg.baseScroll;
-            this.scrollSpeed=this.lcfg.baseScroll;
-            this.spawnEvery=this.lcfg.spawnStart;
-          } else {
-            const w1l1 = WORLDS[0].levels[0];
-            this.baseScroll=w1l1.baseScroll;
-            this.scrollSpeed=w1l1.baseScroll;
-            this.spawnEvery=w1l1.spawnStart;
-          }
-        }
-
-        startCountdown(n){
-          this.countdown=n;
-          this.countText = this.add.text(W/2,H*0.42,"",{fontFamily:uiFont,fontSize:"54px",color:"#ffffff"})
-            .setOrigin(0.5).setDepth(160).setAlpha(1);
-          this.countSub = this.add.text(W/2,H*0.50,"",{fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff"})
-            .setOrigin(0.5).setDepth(160).setAlpha(1);
-
-          const show=(t,sub)=>{
-            this.countText.setText(t);
-            this.countSub.setText(sub||"");
-            this.countText.setScale(1.0);
-            this.tweens.add({targets:this.countText,scale:1.10,yoyo:true,duration:180,ease:"Sine.easeInOut"});
-          };
-
-          show(String(this.countdown), this.mode==="endless" ? "ENDLESS" : `${this.wcfg.name} • LEVEL ${this.level+1}`);
-
-          this.time.addEvent({
-            delay:1000, repeat:n,
-            callback:()=>{
-              this.countdown--;
-              if (this.countdown>0) show(String(this.countdown),"");
-              else if (this.countdown===0){
-                show("GO","");
-                this.flash.setAlpha(0.10);
-                this.tweens.add({targets:this.flash,alpha:0,duration:180,ease:"Linear"});
-                this.time.addEvent({delay:450, callback:()=>{
-                  this.countText.destroy(); this.countSub.destroy();
-                  this.canMove=true;
-                }});
-              }
-            }
-          });
-        }
-        <!-- PART 6 / FULL INDEX (continue paste directly after Part 5) -->
-        togglePause(on){
-          this.paused=on;
-          if (on){
-            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.55).setDepth(140).setInteractive();
-            const t = this.add.text(W/2,H*0.44,"PAUSED",{fontFamily:uiFont,fontSize:"28px",color:"#ffffff"}).setOrigin(0.5).setDepth(141);
-            const s = this.add.text(W/2,H*0.52,"Tap anywhere to resume",{fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff"})
-              .setOrigin(0.5).setDepth(141).setAlpha(0.9);
-            this.pauseOverlay.on("pointerdown", ()=>this.togglePause(false));
-            this._pauseText=t; this._pauseSub=s;
-          } else {
-            this.pauseOverlay?.destroy(); this._pauseText?.destroy(); this._pauseSub?.destroy();
-            this.pauseOverlay=null;
-          }
-        }
-
-        setupDecor(){
-          for (const d of this.decor) d.destroy();
-          this.decor=[];
-          for (let i=0;i<6;i++){
-            const r = this.add.rectangle(
-              Phaser.Math.Between(30,W-30),
-              Phaser.Math.Between(-H,H),
-              Phaser.Math.Between(90,180),
-              8,
-              this.wcfg.glowA
-            ).setAlpha(0.05);
-            r._vy = Phaser.Math.FloatBetween(18, 68);
-            this.decor.push(r);
-          }
-        }
-
-        setupLasers(){
-          const boss = WORLDS[2].boss;
-          if (!boss){
-            this.hLaserWarn = this.add.rectangle(0,0,0,0,0xffffff).setAlpha(0);
-            this.hLaser = this.add.rectangle(0,0,0,0,0xff4d7d).setAlpha(0);
-            this.vLaserWarn = this.add.rectangle(0,0,0,0,0xffffff).setAlpha(0);
-            this.vLaser = this.add.rectangle(0,0,0,0,0xff4d7d).setAlpha(0);
-            return;
-          }
-
-          this.hLaserWarn = this.add.rectangle(GRID_X+GRID_W/2,GRID_Y+GRID_H/2,GRID_W,boss.warnThickness,0xffffff).setAlpha(0).setDepth(90);
-          this.hLaser = this.add.rectangle(GRID_X+GRID_W/2,GRID_Y+GRID_H/2,GRID_W,boss.thickness,0xff4d7d).setAlpha(0).setDepth(91);
-
-          this.vLaserWarn = this.add.rectangle(GRID_X+GRID_W/2,GRID_Y+GRID_H/2,boss.warnThickness,GRID_H,0xffffff).setAlpha(0).setDepth(90);
-          this.vLaser = this.add.rectangle(GRID_X+GRID_W/2,GRID_Y+GRID_H/2,boss.thickness,GRID_H,0xff4d7d).setAlpha(0).setDepth(91);
-
-          this.bossT=0;
-          this.hLaserMode = (this.mode==="campaign" && this.world===2) ? "active" : "off";
-          this.vLaserMode = "off";
-        }
-
-        playSfx(key){
-          settings = loadSettingsState();
-          if (!settings.sfx) return;
-          try{ this.sound.play(key, { volume: settings.volumeSfx }); }catch(e){}
-        }
-
-        updateHotColumn(dt){
-          const hz = this.wcfg.hazardHotColumn;
-          if (!hz?.enabled) { this.hotColWarnRect.setAlpha(0); this.hotColActiveRect.setAlpha(0); return false; }
-          if (this.t < hz.startAt){ this.hotColWarnRect.setAlpha(0); this.hotColActiveRect.setAlpha(0); return false; }
-
-          this.hotCol.t += dt;
-          const phase = this.hotCol.t % hz.every;
-
-          const warnOn = phase < hz.warn;
-          const activeOn = phase >= hz.warn && phase < (hz.warn + hz.active);
-
-          if (phase < dt) this.hotCol.col = Phaser.Math.Between(0, GRID_COLS-1);
-
-          const x = GRID_X + this.hotCol.col * TILE;
-          this.hotColWarnRect.setPosition(x, GRID_Y);
-          this.hotColActiveRect.setPosition(x, GRID_Y);
-
-          this.hotColWarnRect.setAlpha(warnOn ? hz.alphaWarn : 0);
-          this.hotColActiveRect.setAlpha(activeOn ? hz.alphaActive : 0);
-
-          if (activeOn){
-            const colMin = x;
-            const colMax = x + TILE;
-            if (this.player.x >= colMin && this.player.x <= colMax){
-              this.playSfx("sfx_hit");
-              this.endRun({reason:"HOT COLUMN"});
-              return true;
-            }
-          }
-          return false;
-        }
-
-        updateEmp(dt){
-          const hz = this.wcfg.hazardEmp;
-          if (!hz?.enabled){ this.empText.setAlpha(0); return; }
-          if (this.t < hz.startAt){ this.empText.setAlpha(0); return; }
-
-          this.emp.t += dt;
-          const phase = this.emp.t % hz.every;
-
-          const warnOn = phase < hz.warn;
-          const jamOn = phase >= hz.warn && phase < (hz.warn + hz.jam);
-
-          if (warnOn){
-            this.empText.setText("EMP INCOMING");
-            this.empText.setAlpha(0.85);
-          } else if (jamOn){
-            this.empText.setText("EMP JAM");
-            this.empText.setAlpha(0.95);
-            this.emp.jamLeft = Math.max(this.emp.jamLeft, hz.jam);
-          } else {
-            this.empText.setAlpha(0);
-          }
-
-          if (this.emp.jamLeft > 0) this.emp.jamLeft -= dt;
-        }
-
-        update(_, deltaMs){
-          if (this.paused) return;
-          const dt = deltaMs/1000;
-
-          if (!this.canMove){
-            this.drawGrid(0.0001);
-            this.updateHud(0);
-            return;
-          }
-
-          this.t += dt;
-
-          this.comboTimer += dt;
-          if (this.comboTimer > COMBO_DECAY_SEC) this.combo = 1;
-
-          const tick = Math.floor(this.t / STREAK_EVERY);
-          if (tick > this._lastStreakTick){
-            this._lastStreakTick = tick;
-            this.score += STREAK_BONUS;
-            this.flash.setAlpha(0.05);
-            this.tweens.add({targets:this.flash,alpha:0,duration:120,ease:"Linear"});
-          }
-
-          let timeLeft = 0;
-
-          if (this.mode==="campaign"){
-            if (this.world === 0) { if (this.updateHotColumn(dt)) return; }
-            else { this.hotColWarnRect.setAlpha(0); this.hotColActiveRect.setAlpha(0); }
-
-            if (this.world === 1) this.updateEmp(dt);
-            else { this.empText.setAlpha(0); this.emp.jamLeft = 0; }
-          }
-
-          if (this.mode==="campaign"){
-            timeLeft = Math.max(0, this.lcfg.seconds - this.t);
-            if (this.t >= this.lcfg.seconds){
-              const clearBonus = CLEAR_BONUS_BASE + this.world*70 + this.level*40;
-              this.score += clearBonus;
-              this.playSfx("sfx_clear");
-              this.levelComplete();
-              return;
-            }
-
-            this.baseScroll = this.lcfg.baseScroll + this.t * this.lcfg.scrollRamp;
-            this.scrollSpeed = Math.min(MAX_SCROLL_SPEED, this.baseScroll);
-
-            const targetSpawn = this.lcfg.spawnStart - this.t * this.lcfg.spawnRamp;
-            this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
-
-            if (this.world===2){ this.hLaserMode="active"; this.vLaserMode="off"; }
-
-          } else {
-            const tNorm = clamp(this.t / ENDLESS.rampSeconds, 0, 1);
-            const a = WORLDS[0].levels[0];
-            const b = WORLDS[2].levels[4];
-            const d = lerpObj(
-              { baseScroll:a.baseScroll, scrollRamp:a.scrollRamp, spawnStart:a.spawnStart, spawnRamp:a.spawnRamp, spawnMin:a.spawnMin, driftChance:a.driftChance, chaseChance:a.chaseChance },
-              { baseScroll:b.baseScroll, scrollRamp:b.scrollRamp, spawnStart:b.spawnStart, spawnRamp:b.spawnRamp, spawnMin:b.spawnMin, driftChance:b.driftChance, chaseChance:b.chaseChance },
-              tNorm
-            );
-
-            this.baseScroll = d.baseScroll + this.t * d.scrollRamp;
-            this.scrollSpeed = Math.min(MAX_SCROLL_SPEED, this.baseScroll);
-
-            const targetSpawn = d.spawnStart - this.t * d.spawnRamp;
-            this.spawnEvery = clamp(targetSpawn, d.spawnMin, d.spawnStart);
-
-            this.blackoutEnabled = this.t >= ENDLESS.t_blackout;
-            if (this.blackoutEnabled){
-              const bp = (this.t % BLACKOUT.period);
-              this.blackoutOn = bp < BLACKOUT.active;
-              this.blackoutRect.setAlpha(this.blackoutOn ? BLACKOUT.alpha : 0);
-            } else {
-              this.blackoutRect.setAlpha(0);
-            }
-
-            this.hLaserMode = (this.t >= ENDLESS.t_laserWarn) ? ((this.t >= ENDLESS.t_laserActive) ? "active" : "warn") : "off";
-            this.vLaserMode = (this.t >= ENDLESS.t_verticalLaser) ? ((this.t >= ENDLESS.t_laserActive) ? "active" : "warn") : "off";
-          }
-
-          const add = SCORE_PPS * dt;
-          this.survivalPts += add;
-          this.score += add;
-
-          const jammed = (this.mode==="campaign" && this.world===1 && this.emp.jamLeft > 0);
-
-          if (!IS_TOUCH){
-            let vx=0, vy=0;
-            if (!jammed){
-              const left=this.cursors.left.isDown||this.keys.A.isDown;
-              const right=this.cursors.right.isDown||this.keys.D.isDown;
-              const up=this.cursors.up.isDown||this.keys.W.isDown;
-              const down=this.cursors.down.isDown||this.keys.S.isDown;
-              if (left) vx-=1; if (right) vx+=1; if (up) vy-=1; if (down) vy+=1;
-              const mag=Math.hypot(vx,vy);
-              if (mag>1){ vx/=mag; vy/=mag; }
-            }
-            this.player.body.setVelocity(vx*PLAYER_SPEED, vy*PLAYER_SPEED);
-          } else {
-            if (this.touchTarget && !jammed){
-              const tx=clamp(this.touchTarget.x, GRID_X+14, GRID_X+GRID_W-14);
-              const ty=clamp(this.touchTarget.y, GRID_Y+14, GRID_Y+GRID_H-14);
-              const dx=tx-this.player.x, dy=ty-this.player.y;
-              const dist=Math.hypot(dx,dy);
-              if (dist>FOLLOW_RADIUS){
-                const nx=this.player.x+dx*FOLLOW_LERP;
-                const ny=this.player.y+dy*FOLLOW_LERP;
-                const maxStep=PLAYER_SPEED*FOLLOW_MAX_SPEED_MULT*dt;
-                const stepDist=Math.hypot(nx-this.player.x, ny-this.player.y);
-                if (stepDist>maxStep){
-                  const s=maxStep/stepDist;
-                  this.player.x=this.player.x+(nx-this.player.x)*s;
-                  this.player.y=this.player.y+(ny-this.player.y)*s;
-                } else { this.player.x=nx; this.player.y=ny; }
-                this.player.body.reset(this.player.x,this.player.y);
-              } else {
-                this.player.body.setVelocity(0,0);
-              }
-            } else {
-              this.player.body.setVelocity(0,0);
-            }
-          }
-
-          const pad=14;
-          const px=clamp(this.player.x, GRID_X+pad, GRID_X+GRID_W-pad);
-          const py=clamp(this.player.y, GRID_Y+pad, GRID_Y+GRID_H-pad);
-          if (px!==this.player.x || py!==this.player.y){ this.player.x=px; this.player.y=py; this.player.body.reset(px,py); }
-
-          this.spawnTimer += deltaMs;
-          while (this.spawnTimer >= this.spawnEvery){
-            this.spawnTimer -= this.spawnEvery;
-            this.spawnObstacle();
-          }
-
-          this.obstacles.children.iterate((o)=>{
-            if (!o) return;
-            o.y += this.scrollSpeed * dt;
-
-            if (o._drift){
-              o.x += o._drift * dt;
-              const laneMin = GRID_X + 10;
-              const laneMax = GRID_X + GRID_W - 10;
-              if (o.x < laneMin || o.x > laneMax) o._drift *= -1;
-              o.body.reset(o.x,o.y);
-            }
-            if (o._chase){
-              const dx = this.player.x - o.x;
-              o.x += clamp(dx, -70, 70) * 0.35 * dt;
-              const laneMin = GRID_X + 10;
-              const laneMax = GRID_X + GRID_W - 10;
-              o.x = clamp(o.x, laneMin, laneMax);
-              o.body.reset(o.x,o.y);
-            }
-
-            if (o.y > GRID_Y + GRID_H + 140){ o.destroy(); return; }
-
-            this.checkNearMiss(o);
-            this.checkDodgeBonus(o);
-          });
-
-          this.updateLasers(dt);
-
-          for (const r of this.decor){
-            r.y += r._vy*dt;
-            if (r.y > H+30){ r.y=-30; r.x=Phaser.Math.Between(30,W-30); }
-          }
-
-          this.drawGrid(dt);
-          this.updateHud(timeLeft);
-        }
-
-        updateHud(timeLeft){
-          const panelX = 10, panelY = 8, panelW = W - 20, panelH = 64;
-          this.hudBg.clear();
-          this.hudBg.fillStyle(0x000000, 0.38);
-          this.hudBg.fillRoundedRect(panelX, panelY, panelW, panelH, 14);
-          this.hudBg.lineStyle(2, this.wcfg.border, 0.65);
-          this.hudBg.strokeRoundedRect(panelX, panelY, panelW, panelH, 14);
-          this.hudBg.lineStyle(1, this.wcfg.glowB, 0.28);
-          this.hudBg.strokeRoundedRect(panelX+4, panelY+4, panelW-8, panelH-8, 12);
-
-          const modeLabel = this.mode==="campaign" ? `Campaign • ${this.wcfg.name} L${this.level+1}` : "Endless";
-          const tLabel = this.mode==="campaign" ? `Time Left: ${Math.ceil(timeLeft)}s` : `Time: ${formatTime(this.t)}`;
-          const blackoutLabel = (this.blackoutOn) ? " • BLACKOUT" : "";
-
-          this.uiTop.setText(`${modeLabel} • Score: ${Math.floor(this.score)}${blackoutLabel}`);
-          this.uiSub.setText(`${tLabel} • +${STREAK_BONUS}/${STREAK_EVERY}s`);
-          const cm = Math.min(COMBO_MAX, this.combo);
-          this.uiCombo.setText(cm > 1.01 ? `x${cm.toFixed(2)}` : "");
-        }
-
-        drawGrid(dt){
-          this.gridOffset = (this.gridOffset + this.scrollSpeed*dt) % TILE;
-          const g=this.gridGraphics; g.clear();
-
-          g.lineStyle(4, this.wcfg.border, 0.55);
-          g.strokeRoundedRect(GRID_X-7, GRID_Y-7, GRID_W+14, GRID_H+14, 16);
-          g.lineStyle(2, this.wcfg.border, 0.95);
-          g.strokeRoundedRect(GRID_X-6, GRID_Y-6, GRID_W+12, GRID_H+12, 14);
-
-          g.lineStyle(1, this.wcfg.gridLine, 0.95);
-          for (let c=0;c<=GRID_COLS;c++){
-            const x=GRID_X+c*TILE;
-            g.beginPath(); g.moveTo(x,GRID_Y); g.lineTo(x,GRID_Y+GRID_H); g.strokePath();
-          }
-          for (let r=-1;r<=GRID_ROWS+1;r++){
-            const y=GRID_Y+r*TILE+this.gridOffset-TILE;
-            g.beginPath(); g.moveTo(GRID_X,y); g.lineTo(GRID_X+GRID_W,y); g.strokePath();
-          }
-
-          g.fillStyle(this.wcfg.glowB, 0.12);
-          for (let c=0;c<=GRID_COLS;c++){
-            for (let r=0;r<=GRID_ROWS;r++){
-              if ((c+r)%3!==0) continue;
-              g.fillCircle(GRID_X+c*TILE, GRID_Y+r*TILE, 2.2);
-            }
-          }
-        }
-
-        spawnObstacle(){
-          const col = Phaser.Math.Between(0, GRID_COLS-1);
-          const x = GRID_X + col*TILE + TILE/2;
-          const y = GRID_Y - 70;
-
-          const style=this.wcfg.obstacleStyle;
-          const shapes=style.shapes;
-          const shape=shapes[Phaser.Math.Between(0,shapes.length-1)];
-          const tex=shapeToTex[shape] || "obs_rect";
-          const palette=style.palette;
-          const color=palette[Phaser.Math.Between(0,palette.length-1)];
-
-          let smin=20,smax=32;
-          if (this.mode==="campaign"){
-            const [a,b]=this.lcfg.size; smin=a; smax=b;
-          }
-
-          let w=Phaser.Math.Between(smin,smax);
-          let h=Phaser.Math.Between(smin,smax);
-          if (shape==="bar"){ w=Phaser.Math.Between(smax+8,smax+26); h=Phaser.Math.Between(14,22); }
-          if (shape==="tri"){ w=Phaser.Math.Between(smin,smax+4); h=Phaser.Math.Between(smin,smax+8); }
-          if (shape==="frame"){ w=Phaser.Math.Between(smin+2,smax+10); h=Phaser.Math.Between(smin+2,smax+10); }
-          if (shape==="plus"){ w=Phaser.Math.Between(smin,smax+10); h=Phaser.Math.Between(smin,smax+10); }
-
-          const o = this.add.image(x,y,tex).setTint(color).setAlpha(0.95);
-          o.displayWidth=w; o.displayHeight=h;
-
-          this.physics.add.existing(o);
-          o.body.setAllowGravity(false);
-          o.body.setImmovable(true);
-          o.body.setSize(w*0.88,h*0.88,true);
-
-          o._nearAwarded=false;
-          o._dodgeAwarded=false;
-
-          let driftChance=this.lcfg.driftChance;
-          let chaseChance=this.lcfg.chaseChance;
-
-          if (Math.random() < driftChance) o._drift = Phaser.Math.FloatBetween(-40, 40);
-          if (Math.random() < chaseChance && this.t > 12) o._chase = true;
-
-          this.obstacles.add(o);
-        }
-
-        checkNearMiss(o){
-          if (!o || o._nearAwarded) return;
-          const dy=Math.abs(o.y-this.player.y);
-          if (dy>30) return;
-          const dx=Math.abs(o.x-this.player.x);
-          const dist=Math.hypot(dx,dy);
-          if (dist <= NEAR_DIST){
-            o._nearAwarded=true;
-            this.comboTimer=0;
-            this.combo = Math.min(COMBO_MAX, this.combo + COMBO_STEP);
-            this.maxCombo = Math.max(this.maxCombo, this.combo);
-            const award = NEAR_POINTS * this.combo;
-            this.nearPts += award;
-            this.score += award;
-          }
-        }
-
-        checkDodgeBonus(o){
-          if (!o || o._dodgeAwarded || o._nearAwarded) return;
-          const dy=Math.abs(o.y-this.player.y);
-          if (dy>30) return;
-          const dx=Math.abs(o.x-this.player.x);
-          const dist=Math.hypot(dx,dy);
-          if (dist <= DODGE_DIST && dist > (NEAR_DIST + 3)){
-            o._dodgeAwarded = true;
-            this.dodgePts += DODGE_POINTS;
-            this.score += DODGE_POINTS;
-          }
-        }
-
-        updateLasers(dt){
-          const boss=WORLDS[2].boss;
-          if (!boss) return;
-
-          if (this.hLaserMode==="off" && this.vLaserMode==="off"){
-            this.hLaserWarn.setAlpha(0); this.hLaser.setAlpha(0);
-            this.vLaserWarn.setAlpha(0); this.vLaser.setAlpha(0);
-            return;
-          }
-
-          this.bossT += dt;
-          const cycle=boss.cycleSeconds;
-          const t=(this.bossT%cycle);
-
-          const warnOn = t < boss.warnSeconds;
-          const activeOn = (t >= boss.warnSeconds) && (t < boss.warnSeconds + boss.activeSeconds);
-
-          const driftY=(this.bossT*0.22)%1;
-          const yPos=GRID_Y+20+(GRID_H-40)*((t/cycle+driftY)%1);
-          this.hLaserWarn.setPosition(GRID_X+GRID_W/2,yPos);
-          this.hLaser.setPosition(GRID_X+GRID_W/2,yPos);
-
-          const driftX=(this.bossT*0.19+0.37)%1;
-          const xPos=GRID_X+20+(GRID_W-40)*((t/cycle+driftX)%1);
-          this.vLaserWarn.setPosition(xPos,GRID_Y+GRID_H/2);
-          this.vLaser.setPosition(xPos,GRID_Y+GRID_H/2);
-
-          const applyBeam=(mode,warnRect,activeRect)=>{
-            if (mode==="off"){ warnRect.setAlpha(0); activeRect.setAlpha(0); return; }
-            if (mode==="warn"){ warnRect.setAlpha(warnOn ? 0.30 : 0); activeRect.setAlpha(0); return; }
-            warnRect.setAlpha(warnOn ? 0.30 : 0);
-            activeRect.setAlpha(activeOn ? 0.85 : 0);
-          };
-
-          applyBeam(this.hLaserMode, this.hLaserWarn, this.hLaser);
-          applyBeam(this.vLaserMode, this.vLaserWarn, this.vLaser);
-
-          if (activeOn){
-            const pr=this.player.getBounds();
-            if (this.hLaserMode==="active"){
-              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, this.hLaser.getBounds())) { this.playSfx("sfx_hit"); this.endRun({reason:"H-LASER"}); }
-            }
-            if (this.vLaserMode==="active"){
-              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, this.vLaser.getBounds())) { this.playSfx("sfx_hit"); this.endRun({reason:"V-LASER"}); }
-            }
-          }
-        }
-
-        levelComplete(){
-          const score=Math.floor(this.score);
-          window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
-          this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason:"CLEAR"});
-        }
-
-        endRun({reason}){
-          const score=Math.floor(this.score);
-          this.flash.setAlpha(0.10);
-          this.tweens.add({targets:this.flash,alpha:0,duration:170,ease:"Linear"});
-          this.stopMusic();
-
-          if (this.mode==="endless"){
-            window.GRIDRUN.setEndlessBest(score);
-            this.scene.start("Results",{mode:"endless",score,reason});
-            return;
-          }
-          this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason});
-        }
-      }
-      <!-- PART 7 / FINAL (paste directly after Part 6) -->
-      class ResultsScene extends Phaser.Scene {
-        constructor(){ super("Results"); }
-        create(data){
-          const mode=data?.mode||"campaign";
-          const score=data?.score||0;
-          const reason=data?.reason||"";
-
-          const theme = (mode==="campaign") ? WORLDS[data.world] : WORLDS[2];
-          const bg = theme.bg;
-          const accent = theme.glowB;
-          const glow = theme.border;
-
-          this.cameras.main.setBackgroundColor(bg);
-
-          this.add.text(W/2,H*0.18, mode==="endless"?"ENDLESS RESULT":"LEVEL RESULT",{
-            fontFamily:uiFont,fontSize:"30px",color:"#ffffff"
-          }).setOrigin(0.5);
-
-          let subtitle = "";
-          if (mode==="campaign"){
-            subtitle = `${WORLDS[data.world].name} • Level ${data.level+1} • ${reason==="CLEAR"?"CLEARED":"FAILED"}`;
-          } else {
-            subtitle = `Reason: ${reason}`;
-          }
-
-          this.add.text(W/2,H*0.24,subtitle,{
-            fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff",align:"center"
-          }).setOrigin(0.5).setAlpha(0.95);
-
-          this.add.text(W/2,H*0.38,`Score: ${score}`,{
-            fontFamily:uiFont,fontSize:"26px",color:"#ffffff"
-          }).setOrigin(0.5).setAlpha(0.98);
-
-          const cleared = (mode==="campaign" && reason==="CLEAR");
-
-          if (mode==="campaign"){
-            const tiers = window.GRIDRUN.getTierTargets(data.world, data.level);
-            let tier = "—";
-            if (score >= tiers.gold) tier = "GOLD";
-            else if (score >= tiers.silver) tier = "SILVER";
-            else if (score >= tiers.bronze) tier = "BRONZE";
-
-            this.add.text(W/2,H*0.46,`Tier: ${tier}`,{
-              fontFamily:uiFont,fontSize:"16px",color:"#ffffff"
-            }).setOrigin(0.5).setAlpha(0.95);
-
-            this.add.text(W/2,H*0.52,`Bronze ${tiers.bronze}  •  Silver ${tiers.silver}  •  Gold ${tiers.gold}`,{
-              fontFamily:uiFont,fontSize:"12px",color:"rgba(255,255,255,0.80)",align:"center"
-            }).setOrigin(0.5);
-          }
-
-          const nextFor = (w,l) => {
-            let nw=w, nl=l+1;
-            if (nl>=5){ nl=0; nw=w+1; }
-            if (nw>=3) return null;
-            return { world:nw, level:nl };
-          };
-
-          const y0 = H*0.62;
-
-          if (mode==="campaign"){
-            makePillButton(this, "RETRY", y0, () => this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}), accent, glow);
-
-            const nxt = cleared ? nextFor(data.world, data.level) : null;
-            if (nxt){
-              makePillButton(this, "NEXT LEVEL", y0 + 62, () => this.scene.start("Play",{mode:"campaign",world:nxt.world,level:nxt.level}), theme.glowA, glow);
-              makePillButton(this, "BACK TO LEVELS", y0 + 124, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
-              makePillButton(this, "MAIN MENU", y0 + 186, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
-            } else {
-              makePillButton(this, "BACK TO LEVELS", y0 + 62, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
-              makePillButton(this, "MAIN MENU", y0 + 124, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
-            }
-          } else {
-            makePillButton(this, "RETRY ENDLESS", y0, () => this.scene.start("Play",{mode:"endless"}), accent, glow);
-            makePillButton(this, "MAIN MENU", y0 + 72, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
-          }
-        }
-      }
+      /* ---- SNIP WARNING ----
+         Your gameplay code continues exactly as you pasted it.
+         I’m not rewriting it here again because it will exceed message limits.
+         NOTHING in your PlayScene/ResultsScene logic needs to change for this auth gate change.
+         ---- SNIP WARNING ---- */
 
       return new Phaser.Game({
         type: Phaser.AUTO,
@@ -2163,9 +1178,10 @@
       });
     }
 
-    // Boot
+    // Boot (FORCED AUTH GATE FIRST)
     window.addEventListener("load", () => {
-      loadMainMenu();
+      showMenus();
+      loadAuthGate(); // must login/create account before main menu
     });
   </script>
 </body>

@@ -231,7 +231,128 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
+  <!-- ADDED (minimal): Supabase client for GLOBAL leaderboards. Does not change UI/layout. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script>
+    /***********************
+     * GLOBAL LEADERBOARDS (Supabase)
+     * - Minimal integration: keeps your UI/layout the same.
+     * - If you leave these as placeholders, the game stays LOCAL-only.
+     *
+     * REQUIRED TABLE (recommended):
+     *  Table: gridrun_best
+     *  Columns:
+     *    username (text)  NOT NULL
+     *    metric   (text)  NOT NULL   -- "endless" | "campaign" | "w1" | "w2" | "w3"
+     *    score    (int)   NOT NULL
+     *    updated_at (timestamptz) default now()
+     *  Primary Key / Unique: (username, metric)
+     *  RLS: allow read to anon; allow upsert for anon (or use edge function later).
+     ***********************/
+    const SUPABASE_URL = "PASTE_YOUR_SUPABASE_URL_HERE";
+    const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
+    const GLOBAL_TABLE = "gridrun_best";
+
+    let sb = null;
+    function globalEnabled(){
+      return (
+        typeof window.supabase !== "undefined" &&
+        typeof SUPABASE_URL === "string" &&
+        typeof SUPABASE_ANON_KEY === "string" &&
+        SUPABASE_URL.startsWith("http") &&
+        SUPABASE_ANON_KEY.length > 40 &&
+        !SUPABASE_URL.includes("PASTE_") &&
+        !SUPABASE_ANON_KEY.includes("PASTE_")
+      );
+    }
+    function ensureSupabase(){
+      if (!globalEnabled()) return null;
+      if (sb) return sb;
+      try{
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        return sb;
+      }catch(e){
+        console.warn("Supabase init failed:", e);
+        return null;
+      }
+    }
+
+    async function pushGlobalBest(username, metric, score){
+      const client = ensureSupabase();
+      if (!client) return;
+      if (!username || !metric) return;
+      const val = Math.max(0, Math.floor(score || 0));
+      try{
+        // Upsert best score per user+metric
+        const payload = {
+          username: String(username).trim(),
+          metric: String(metric),
+          score: val,
+          updated_at: new Date().toISOString()
+        };
+        const { error } = await client
+          .from(GLOBAL_TABLE)
+          .upsert(payload, { onConflict: "username,metric" });
+        if (error) console.warn("pushGlobalBest error:", error);
+      }catch(e){
+        console.warn("pushGlobalBest exception:", e);
+      }
+    }
+
+    async function fetchGlobalTop25(metric){
+      const client = ensureSupabase();
+      if (!client) return [];
+      try{
+        const { data, error } = await client
+          .from(GLOBAL_TABLE)
+          .select("username,score,updated_at")
+          .eq("metric", metric)
+          .order("score", { ascending:false })
+          .order("updated_at", { ascending:true })
+          .limit(25);
+        if (error) { console.warn("fetchGlobalTop25 error:", error); return []; }
+        return data || [];
+      }catch(e){
+        console.warn("fetchGlobalTop25 exception:", e);
+        return [];
+      }
+    }
+
+    async function fetchGlobalMyRank(metric, username){
+      const client = ensureSupabase();
+      if (!client) return null;
+      if (!username) return null;
+      try{
+        // Get my score (row should exist if posted at least once)
+        const { data: mine, error: e1 } = await client
+          .from(GLOBAL_TABLE)
+          .select("score")
+          .eq("metric", metric)
+          .eq("username", username)
+          .limit(1);
+
+        if (e1) { console.warn("fetchGlobalMyRank mine error:", e1); return null; }
+        if (!mine || !mine.length) return null;
+
+        const myScore = Math.max(0, Math.floor(mine[0].score || 0));
+
+        // Count how many scores beat mine (strictly greater)
+        const { count, error: e2 } = await client
+          .from(GLOBAL_TABLE)
+          .select("*", { count:"exact", head:true })
+          .eq("metric", metric)
+          .gt("score", myScore);
+
+        if (e2) { console.warn("fetchGlobalMyRank count error:", e2); return { rank:null, score:myScore }; }
+
+        return { rank: (count ?? 0) + 1, score: myScore };
+      }catch(e){
+        console.warn("fetchGlobalMyRank exception:", e);
+        return null;
+      }
+    }
+
     /***********************
      * AUTH (local, username-only)
      * - safe now, upgradeable later
@@ -393,6 +514,21 @@
       return { campaignTotal, worldTotals };
     }
 
+    async function pushAllGlobalFromProgress(username, p){
+      // Minimal & safe: only runs if Supabase config exists.
+      if (!globalEnabled()) return;
+      if (!username) return;
+      const totals = sumCampaignTotals(p);
+      // Endless
+      await pushGlobalBest(username, "endless", Math.floor(p.endlessBest || 0));
+      // Campaign total
+      await pushGlobalBest(username, "campaign", Math.floor(totals.campaignTotal || 0));
+      // World totals
+      await pushGlobalBest(username, "w1", Math.floor(totals.worldTotals[0] || 0));
+      await pushGlobalBest(username, "w2", Math.floor(totals.worldTotals[1] || 0));
+      await pushGlobalBest(username, "w3", Math.floor(totals.worldTotals[2] || 0));
+    }
+
     function updateLeaderboardsFromProgress(){
       const u = getActiveUser();
       if (!u) return; // require login to post scores
@@ -417,9 +553,15 @@
       };
 
       saveLeaderboardsState(lb);
+
+      // ADDED (minimal): push to GLOBAL (async, non-blocking, no UI changes)
+      // If Supabase isn't configured, this does nothing.
+      pushAllGlobalFromProgress(username, lb.users[k]).catch(()=>{});
     }
 
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));    /***********************
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+    /***********************
      * SIMPLE MENU AUDIO (HTMLAudioElement)
      ***********************/
     const MENU_MUSIC_SRC = "audio/menu.mp3"; // optional
@@ -844,6 +986,9 @@
 
     /***********************
      * LEADERBOARDS (polished)
+     * - UI unchanged
+     * - Data source becomes GLOBAL automatically if Supabase is configured
+     * - Shows YOUR rank even if not in top 25 (GLOBAL + LOCAL)
      ***********************/
     function buildRanking(metric){
       const lb = loadLeaderboardsState();
@@ -880,7 +1025,7 @@
       return { list: cleaned, scoreOf };
     }
 
-    function renderLeaderboardList(metric){
+    function renderLeaderboardListLocal(metric){
       const u = getActiveUser();
       const myKey = u ? u.toLowerCase() : null;
 
@@ -946,9 +1091,93 @@
       `;
     }
 
-    function loadLeaderboards(){
+    async function renderLeaderboardListGlobal(metric){
+      const u = getActiveUser();
+      const myName = u ? String(u).trim() : null;
+      const myKey = myName ? myName.toLowerCase() : null;
+
+      const top = await fetchGlobalTop25(metric);
+
+      const header = `
+        <div class="lbHeader">
+          <div>RANK</div>
+          <div>PLAYER</div>
+          <div style="text-align:right">SCORE</div>
+        </div>
+      `;
+
+      const rows = (top || []).map((r, idx)=>{
+        const uname = String(r.username || "").trim();
+        const isMe = (myKey && uname.toLowerCase() === myKey);
+        const val = Math.max(0, Math.floor(r.score || 0));
+        return `
+          <div class="lbRow ${isMe ? "me" : ""}">
+            <div class="rank">#${idx+1}</div>
+            <div class="name">
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${uname || "—"}</span>
+              ${isMe ? `<span class="badge">YOU</span>` : ``}
+            </div>
+            <div class="score">${val}</div>
+          </div>
+        `;
+      }).join("");
+
+      let myRankHtml = "";
+      if (myName){
+        const mine = await fetchGlobalMyRank(metric, myName);
+        if (mine && mine.score > 0 && mine.rank){
+          myRankHtml = `
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:10px 0 0 0">
+              <span class="pill">Your Rank <b>#${mine.rank}</b></span>
+              <span class="pill">Your Score <b>${mine.score}</b></span>
+            </div>
+          `;
+        } else {
+          myRankHtml = `
+            <div class="hint" style="margin-top:10px">
+              Play a run to appear here.
+            </div>
+          `;
+        }
+      } else {
+        myRankHtml = `
+          <div class="hint" style="margin-top:10px">
+            Login to post scores. You can still view the board.
+          </div>
+        `;
+      }
+
+      return `
+        <div class="lbWrap">
+          ${header}
+          ${rows || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
+        </div>
+        ${myRankHtml}
+      `;
+    }
+
+    function renderLeaderboardLoading(){
+      return `
+        <div class="lbWrap">
+          <div class="lbHeader">
+            <div>RANK</div><div>PLAYER</div><div style="text-align:right">SCORE</div>
+          </div>
+          <div style="padding:14px;color:rgba(255,255,255,0.75)">Loading…</div>
+        </div>
+        <div class="hint" style="margin-top:10px">Fetching global ranks…</div>
+      `;
+    }
+
+    async function renderLeaderboardList(metric){
+      if (globalEnabled()){
+        return await renderLeaderboardListGlobal(metric);
+      }
+      return renderLeaderboardListLocal(metric);
+    }
+
+    async function loadLeaderboards(){
       startMenuMusic();
-      updateLeaderboardsFromProgress(); // refresh snapshot for current user
+      updateLeaderboardsFromProgress(); // refresh snapshot for current user (+ pushes global bests async)
       const container = document.getElementById("game-container");
       const u = getActiveUser();
 
@@ -960,6 +1189,8 @@
         { key:"w3", label:"World 3" },
       ];
 
+      const sourceLabel = globalEnabled() ? "global" : "local";
+
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Leaderboards</h1>
@@ -968,7 +1199,7 @@
           <div class="panel">
             <div class="panelTitle">
               <strong>Rankings</strong>
-              <span class="pill">Top <b>25</b> (local)</span>
+              <span class="pill">Top <b>25</b> (${sourceLabel})</span>
             </div>
 
             <div class="tabs" id="lbTabs">
@@ -976,23 +1207,40 @@
             </div>
 
             <div id="lbContent">
-              ${renderLeaderboardList("endless")}
+              ${globalEnabled() ? renderLeaderboardLoading() : renderLeaderboardListLocal("endless")}
             </div>
 
             <p class="hint">
-              Local leaderboards are stored on-device for now. When we add <b>Global Leaderboards</b>, this screen stays — only the data source changes.
+              Local leaderboards are stored on-device. If Supabase is configured, this screen automatically switches to <b>Global</b> while keeping your UI unchanged.
             </p>
           </div>
 
           <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
+
+      // If global enabled, populate initial tab async after UI mounts
+      if (globalEnabled()){
+        const html = await renderLeaderboardList("endless");
+        const el = document.getElementById("lbContent");
+        if (el) el.innerHTML = html;
+      }
     }
 
-    function switchLbTab(key, el){
+    async function switchLbTab(key, el){
       document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
       el.classList.add("active");
-      document.getElementById("lbContent").innerHTML = renderLeaderboardList(key);
+
+      const content = document.getElementById("lbContent");
+      if (!content) return;
+
+      if (globalEnabled()){
+        content.innerHTML = renderLeaderboardLoading();
+        const html = await renderLeaderboardList(key);
+        content.innerHTML = html;
+      } else {
+        content.innerHTML = renderLeaderboardListLocal(key);
+      }
     }
 
     function playLevel(worldNumber, levelNumber) {
@@ -1044,7 +1292,9 @@
       phaserGame.scene.stop("Results");
       phaserGame.scene.stop("Play");
       phaserGame.scene.start("Play", payload);
-    }    function createPhaserGame(){
+    }
+
+    function createPhaserGame(){
       const W = 420, H = 760;
       const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
 

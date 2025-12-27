@@ -1,3 +1,4 @@
+<!-- PART 1 / 3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,97 +6,34 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1,user-scalable=no" />
   <title>GRIDRUN</title>
   <style>
-    :root{
-      --bgA:#1a1c30;
-      --bgB:#292942;
-      --accentA:#ff5733;
-      --accentB:#ff8b3d;
-      --glass:rgba(0,0,0,0.22);
-      --glass2:rgba(0,0,0,0.30);
-      --stroke:rgba(255,255,255,0.12);
-      --stroke2:rgba(255,255,255,0.18);
-      --text:rgba(255,255,255,0.92);
-      --muted:rgba(255,255,255,0.72);
-      --muted2:rgba(255,255,255,0.58);
-    }
-
     body{
       margin:0;padding:0;
       font-family:Verdana,sans-serif;
-      background:linear-gradient(135deg,var(--bgA),var(--bgB),var(--bgA));
+      background:linear-gradient(135deg,#1a1c30,#292942,#1a1c30);
       animation:backgroundMove 10s infinite alternate;
       height:100vh; overflow:hidden; color:white;
     }
     @keyframes backgroundMove {0%{background-position:0% 50%}100%{background-position:100% 50%}}
-
     #game-container{display:flex;justify-content:center;align-items:center;height:100%;text-align:center;}
     #phaser-container{display:none;width:100%;height:100%;justify-content:center;align-items:center;}
     canvas{display:block;margin:0 auto;}
 
-    h1{font-size:3rem;font-weight:bold;color:#fff;text-shadow:0 0 20px var(--accentA),0 0 30px var(--accentA); margin:0 0 8px 0;}
+    h1{font-size:3rem;font-weight:bold;color:#fff;text-shadow:0 0 20px #ff5733,0 0 30px #ff5733;}
     p{font-size:18px;margin:10px 0;}
     button{
       margin:8px;padding:15px 30px;font-size:1rem;font-weight:bold;color:white;
-      background:linear-gradient(45deg,var(--accentA),var(--accentB));
+      background:linear-gradient(45deg,#ff5733,#ff8b3d);
       border:none;border-radius:50px;cursor:pointer;
       box-shadow:0 4px 10px rgba(0,0,0,.4),0 0 15px rgba(255,87,51,.7);
-      transition:transform .2s,box-shadow .3s,opacity .2s;
+      transition:transform .2s,box-shadow .3s;
     }
     button:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 25px rgba(255,110,60,1)}
     button:active{transform:translateY(2px);box-shadow:0 2px 5px rgba(0,0,0,.3),0 0 10px rgba(255,79,40,.9)}
     button:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.25);box-shadow:none;transform:none}
-
     .menu-screen{
       display:flex;flex-direction:column;align-items:center;gap:10px;
-      padding:20px;max-width:560px;width:100%;
+      padding:20px;max-width:520px;
     }
-
-    .subhead{
-      font-size:14px;
-      color:var(--muted);
-      margin:0 0 14px 0;
-      line-height:1.4;
-      max-width:520px;
-    }
-
-    .panel{
-      width:100%;
-      background:var(--glass);
-      border:1px solid var(--stroke);
-      border-radius:18px;
-      padding:14px;
-      box-shadow:0 10px 26px rgba(0,0,0,0.28);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-    }
-
-    .panelTitle{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:10px;
-      margin-bottom:10px;
-    }
-    .panelTitle strong{
-      font-size:14px;
-      color:var(--text);
-      letter-spacing:0.3px;
-    }
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 12px;
-      border-radius:999px;
-      background:rgba(0,0,0,0.25);
-      border:1px solid var(--stroke);
-      color:var(--muted);
-      font-size:12px;
-      user-select:none;
-      white-space:nowrap;
-    }
-    .pill b{color:#fff; font-weight:700;}
-
     .toggle-row{
       width:100%;
       display:flex;
@@ -108,122 +46,23 @@
       border:1px solid rgba(255,255,255,0.12);
     }
     .toggle-row span{font-size:14px;opacity:0.95}
-    .small-note{font-size:12px;opacity:0.75;max-width:520px;line-height:1.35}
-
-    /* Leaderboards UI */
-    .tabs{
-      display:flex;
-      gap:8px;
-      justify-content:center;
-      flex-wrap:wrap;
-      margin:10px 0 12px 0;
-    }
-    .tab{
-      padding:10px 14px;
-      border-radius:999px;
-      background:rgba(0,0,0,0.28);
-      border:1px solid var(--stroke);
-      color:var(--muted);
-      font-size:12px;
-      font-weight:700;
-      cursor:pointer;
-      transition:transform .15s, border-color .2s, background .2s, color .2s;
-      user-select:none;
-    }
-    .tab:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,0.22); }
-    .tab.active{
-      background:linear-gradient(45deg,rgba(255,87,51,0.35),rgba(255,139,61,0.28));
-      border-color:rgba(255,140,80,0.55);
-      color:#fff;
-      box-shadow:0 0 20px rgba(255,110,60,0.25);
-    }
-
-    .lbWrap{
-      width:100%;
-      max-height:52vh;
-      overflow:auto;
-      border-radius:14px;
-      border:1px solid var(--stroke);
-      background:rgba(0,0,0,0.22);
-    }
-    .lbHeader, .lbRow{
-      display:grid;
-      grid-template-columns: 70px 1fr 110px;
-      gap:10px;
-      align-items:center;
-      padding:12px 12px;
-    }
-    .lbHeader{
-      position:sticky;
-      top:0;
-      z-index:2;
-      background:rgba(0,0,0,0.45);
-      border-bottom:1px solid rgba(255,255,255,0.10);
-      font-size:12px;
-      color:var(--muted);
-      letter-spacing:0.3px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-    .lbRow{
-      border-bottom:1px solid rgba(255,255,255,0.08);
-      font-size:14px;
-      color:var(--text);
-    }
-    .lbRow:last-child{border-bottom:none;}
-    .rank{
-      font-weight:900;
-      color:#fff;
-      opacity:0.92;
-    }
-    .name{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-    }
-    .badge{
-      font-size:11px;
-      padding:6px 10px;
-      border-radius:999px;
-      background:rgba(255,255,255,0.08);
-      border:1px solid rgba(255,255,255,0.10);
-      color:var(--muted);
-      white-space:nowrap;
-    }
-    .score{
-      text-align:right;
-      font-weight:900;
-      color:#fff;
-      letter-spacing:0.3px;
-    }
-    .me{
-      background:linear-gradient(90deg,rgba(255,87,51,0.16),rgba(0,0,0,0));
-      border-left:3px solid rgba(255,87,51,0.65);
-    }
-    .hint{
-      font-size:12px;
-      color:var(--muted2);
-      line-height:1.4;
-      margin-top:10px;
-    }
-
-    /* Smooth scroll on iOS */
-    .lbWrap{ -webkit-overflow-scrolling: touch; }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    .small-note{font-size:12px;opacity:0.75;max-width:420px;line-height:1.35}
+ /* ===== HOW TO / FAQ ===== */
+.howto-shell{max-width:560px;width:100%;display:flex;flex-direction:column;gap:12px;align-items:center}
+.howto-panel{width:100%;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:14px}
+.howto-scroll{max-height:62vh;overflow-y:auto}
+.howto-card{background:rgba(0,0,0,.20);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:12px;margin-bottom:12px;text-align:left}
+.howto-title{font-weight:800;font-size:14px;margin-bottom:6px}
+.howto-body{font-size:13px;opacity:.93;line-height:1.4}
+.world-w1{color:#ff5fe0}.world-w2{color:#7bd8ff}.world-w3{color:#53ffbf}
+   </style>
 </head>
 <body>
   <div id="game-container">
     <div class="menu-screen" id="main-menu">
       <h1>GRIDRUN</h1>
-      <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
       <button onclick="loadModeSelect()">PLAY</button>
-      <button onclick="loadAuthGate()">LOGIN</button>
-      <button onclick="loadLeaderboards()">LEADERBOARDS</button>
-      <button onclick="loadHowTo()">HOW TO PLAY</button>
+      <button onclick="alert('Login Placeholder')">LOGIN</button>
       <button onclick="loadSettings()">SETTINGS</button>
     </div>
   </div>
@@ -233,82 +72,11 @@
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
   <script>
-// ===============================
-// SUPABASE INIT
-// ===============================
-const SUPABASE_URL = "https://fhfydlzwputpwfrulpvz.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoZnlkbHp3cHV0cHdmcnVscHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3OTEwNzUsImV4cCI6MjA4MjM2NzA3NX0.UTCvYdjD8BFuektzSqdkkoQfN6bGxS2qnbCRFMXYIQ0";
-
-const supabase = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
-
-    /***********************
-     * AUTH (local, username-only)
-     * - safe now, upgradeable later
-     ***********************/
-    const AUTH_KEY = "gridrun_auth_v1"; // { username: "Name" } or null
-      async function submitScore({ mode, score, world = null }) {
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) return; // not logged in
-
-  const username = getActiveUser()?.username || "Anonymous";
-        
-  const { error } = await supabase.from("Scores").insert([
-    {
-      user_id: user.data.user.id,
-      username,
-      mode,
-      score,
-      world
-    }
-  ]);
-
-  if (error) {
-    console.error("Score submit failed:", error);
-  }
-}
-function getActiveUser() {
-      try{
-        const raw = localStorage.getItem(AUTH_KEY);
-        if (!raw) return null;
-        const a = JSON.parse(raw);
-        const u = String(a?.username || "").trim();
-        if (!u) return null;
-        return { username: u };
-      }catch{ return null; }
-    }
-
-    function setActiveUser(username){
-      const u = String(username || "").trim();
-      if (!u) return;
-      localStorage.setItem(AUTH_KEY, JSON.stringify({ username: u }));
-    }
-
-    function clearActiveUser(){
-      localStorage.removeItem(AUTH_KEY);
-    }
-
-    function sanitizeUsername(u){
-      u = String(u || "").trim();
-      u = u.replace(/\s+/g," ");
-      u = u.replace(/[^\w\s\-\.]/g,""); // keep letters/numbers/_/-/.
-      u = u.slice(0, 18);
-      return u;
-    }
-
     /***********************
      * SAVE (progress + settings)
-     * - per-user progress (so leaderboards make sense)
      ***********************/
-    const SAVE_KEY_LEGACY = "gridrun_dom_progress_v2";
+    const SAVE_KEY = "gridrun_dom_progress_v2";
     const SETTINGS_KEY = "gridrun_audio_settings_v1";
-
-    function progressKey(){
-      const u = getActiveUser();
-      return u ? `gridrun_progress_user_${u.toLowerCase()}` : SAVE_KEY_LEGACY;
-    }
 
     function defaultProgress() {
       return {
@@ -325,29 +93,17 @@ function getActiveUser() {
 
     function loadProgress() {
       try {
-        // migrate legacy -> user key if user exists
-        const u = getActiveUser();
-        const key = progressKey();
-
-        // If user has no progress yet, but legacy exists, copy once.
-        if (u && !localStorage.getItem(key) && localStorage.getItem(SAVE_KEY_LEGACY)){
-          localStorage.setItem(key, localStorage.getItem(SAVE_KEY_LEGACY));
-        }
-
-        const raw = localStorage.getItem(key);
+        const raw = localStorage.getItem(SAVE_KEY);
         if (!raw) return defaultProgress();
         const p = JSON.parse(raw);
         const d = defaultProgress();
         const out = { ...d, ...p };
-
         if (!Array.isArray(out.levelsUnlocked) || out.levelsUnlocked.length !== 3) out.levelsUnlocked = d.levelsUnlocked.slice();
         if (!Array.isArray(out.bestScores) || out.bestScores.length !== 3) out.bestScores = d.bestScores.map(r=>r.slice());
-
         for (let w=0; w<3; w++){
           if (!Array.isArray(out.bestScores[w]) || out.bestScores[w].length !== 5) out.bestScores[w] = [0,0,0,0,0];
           for (let l=0; l<5; l++) out.bestScores[w][l] = Math.max(0, Math.floor(out.bestScores[w][l] || 0));
         }
-
         out.worldsUnlocked = Math.max(1, Math.min(3, Math.floor(out.worldsUnlocked || 1)));
         out.levelsUnlocked = out.levelsUnlocked.map((x)=>Math.max(0, Math.min(5, Math.floor(x || 0))));
         out.endlessBest = Math.max(0, Math.floor(out.endlessBest || 0));
@@ -357,7 +113,7 @@ function getActiveUser() {
       }
     }
 
-    function saveProgress(p) { localStorage.setItem(progressKey(), JSON.stringify(p)); }
+    function saveProgress(p) { localStorage.setItem(SAVE_KEY, JSON.stringify(p)); }
     let progress = loadProgress();
 
     function defaultSettings(){
@@ -393,68 +149,10 @@ function getActiveUser() {
     let settings = loadSettingsState();
 
     /***********************
-     * LOCAL LEADERBOARDS
-     * - stored per browser for now
-     ***********************/
-    const LB_KEY = "gridrun_leaderboards_local_v1";
-    function defaultLeaderboards(){
-      return { users: {} }; // users[usernameLower] = { username, endlessBest, campaignTotal, worldTotals:[w1,w2,w3], updatedAt }
-    }
-    function loadLeaderboardsState(){
-      try{
-        const raw = localStorage.getItem(LB_KEY);
-        if (!raw) return defaultLeaderboards();
-        const s = { ...defaultLeaderboards(), ...JSON.parse(raw) };
-        if (!s.users || typeof s.users !== "object") s.users = {};
-        return s;
-      }catch{ return defaultLeaderboards(); }
-    }
-    function saveLeaderboardsState(s){
-      localStorage.setItem(LB_KEY, JSON.stringify(s));
-    }
-
-    function sumCampaignTotals(p){
-      const worldTotals = [0,0,0];
-      for (let w=0; w<3; w++){
-        let t=0;
-        for (let l=0; l<5; l++) t += Math.max(0, Math.floor(p.bestScores?.[w]?.[l] || 0));
-        worldTotals[w]=t;
-      }
-      const campaignTotal = worldTotals[0] + worldTotals[1] + worldTotals[2];
-      return { campaignTotal, worldTotals };
-    }
-
-    function updateLeaderboardsFromProgress(){
-      const u = getActiveUser();
-      if (!u) return; // require login to post scores
-      const username = u;
-      const k = username.toLowerCase();
-      const lb = loadLeaderboardsState();
-      const p = loadProgress();
-      const totals = sumCampaignTotals(p);
-
-      const prev = lb.users[k] || { username, endlessBest:0, campaignTotal:0, worldTotals:[0,0,0], updatedAt:0 };
-
-      lb.users[k] = {
-        username,
-        endlessBest: Math.max(prev.endlessBest || 0, Math.floor(p.endlessBest || 0)),
-        campaignTotal: Math.max(prev.campaignTotal || 0, Math.floor(totals.campaignTotal || 0)),
-        worldTotals: [
-          Math.max(prev.worldTotals?.[0] || 0, totals.worldTotals[0]),
-          Math.max(prev.worldTotals?.[1] || 0, totals.worldTotals[1]),
-          Math.max(prev.worldTotals?.[2] || 0, totals.worldTotals[2]),
-        ],
-        updatedAt: Date.now()
-      };
-
-      saveLeaderboardsState(lb);
-    }
-
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-        /***********************
      * SIMPLE MENU AUDIO (HTMLAudioElement)
+     * - plays on menus without needing Phaser running
      ***********************/
-    const MENU_MUSIC_SRC = "audio/menu.mp3"; // optional
+    const MENU_MUSIC_SRC = "audio/menu.mp3"; // put file at /audio/menu.mp3
     let menuMusic = null;
 
     function ensureMenuMusic(){
@@ -464,17 +162,21 @@ function getActiveUser() {
         menuMusic.volume = settings.volumeMusic;
       }
     }
+
     function startMenuMusic(){
       ensureMenuMusic();
       if (!settings.menuMusic) return;
+      // iOS requires user gesture; calling this after button clicks is fine
       menuMusic.volume = settings.volumeMusic;
       menuMusic.play().catch(()=>{});
     }
+
     function stopMenuMusic(){
       if (!menuMusic) return;
       menuMusic.pause();
       menuMusic.currentTime = 0;
     }
+
     function updateMenuMusicState(){
       ensureMenuMusic();
       menuMusic.volume = settings.volumeMusic;
@@ -490,6 +192,8 @@ function getActiveUser() {
       { name: "Techno Abyss", description: "Icy pulses. Faster and denser." },
       { name: "Astral Surge", description: "Cosmic chaos. Hazards online." },
     ];
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
     /***********************
      * LEVEL TIMES + TIER TARGETS
@@ -537,49 +241,110 @@ function getActiveUser() {
     /***********************
      * MENUS
      ***********************/
-    function showMenus(){
-      document.getElementById("phaser-container").style.display = "none";
-      document.getElementById("game-container").style.display = "flex";
-      startMenuMusic();
-    }
-    function showGameplay(){
-      document.getElementById("game-container").style.display = "none";
-      document.getElementById("phaser-container").style.display = "flex";
-      stopMenuMusic();
-    }
+// ===== LOGIN / ACCOUNT (LOCAL) =====
+const PROFILE_KEY = "gridrun_profile_v1";
+let profile = loadProfile();
 
-    function loadMainMenu(){
-      startMenuMusic();
-      const u = getActiveUser();
-      const container = document.getElementById("game-container");
+function defaultProfile(){
+  return { loggedIn:false, displayName:"Runner" };
+}
+function loadProfile(){
+  try{
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return defaultProfile();
+    const p = { ...defaultProfile(), ...JSON.parse(raw) };
+    p.loggedIn = !!p.loggedIn;
+    p.displayName = String(p.displayName || "Runner").slice(0,16);
+    return p;
+  }catch{
+    return defaultProfile();
+  }
+}
+function saveProfile(p){
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
+}
 
-      container.innerHTML = `
-        <div class="menu-screen" id="main-menu">
-          <h1>GRIDRUN</h1>
-          <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
-          <button onclick="loadModeSelect()">PLAY</button>
-          <button onclick="${u ? "loadAccount()" : "loadAuthGate()"}">${u ? "ACCOUNT" : "LOGIN"}</button>
-          <button onclick="loadLeaderboards()">LEADERBOARDS</button>
-          <button onclick="loadHowTo()">HOW TO PLAY</button>
-          <button onclick="loadSettings()">SETTINGS</button>
-        </div>
-      `;
-    }
+function loadLogin(){
+  startMenuMusic();
+  profile = loadProfile();
+  if (profile.loggedIn){ loadAccount(); return; }
 
+  const container = document.getElementById("game-container");
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Login</h1>
+      <p class="small-note">Pick a display name (used for leaderboards later).</p>
+
+      <input id="loginName"
+        placeholder="Display Name"
+        maxlength="16"
+        style="width:100%;max-width:360px;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.18);background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;text-align:center;"
+      />
+
+      <button onclick="confirmLogin()">Continue</button>
+      <button onclick="loadMainMenu()">Back</button>
+    </div>
+  `;
+}
+
+function confirmLogin(){
+  const el = document.getElementById("loginName");
+  let name = String(el?.value || "").trim().replace(/\s+/g," ").slice(0,16);
+  if (name.length < 3){ alert("Display Name must be at least 3 characters."); return; }
+
+  profile = loadProfile();
+  if (profile.loggedIn){ loadAccount(); return; }
+
+  profile.loggedIn = true;
+  profile.displayName = name;
+  saveProfile(profile);
+  loadMainMenu();
+}
+
+function loadAccount(){
+  startMenuMusic();
+  profile = loadProfile();
+  const container = document.getElementById("game-container");
+
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Account</h1>
+      <p><strong>Signed in as:</strong> ${profile.displayName}</p>
+
+      <p class="small-note">For now this is local-only. Later we’ll connect this to cross-device login.</p>
+
+      <button onclick="changeDisplayName()">Change Display Name</button>
+      <button onclick="logout()">Logout</button>
+      <button onclick="loadMainMenu()">Back</button>
+    </div>
+  `;
+}
+
+function changeDisplayName(){
+  profile = loadProfile();
+  const next = prompt("New Display Name (3-16 chars):", profile.displayName || "Runner");
+  if (next === null) return;
+  const name = String(next).trim().replace(/\s+/g," ").slice(0,16);
+  if (name.length < 3){ alert("Display Name must be at least 3 characters."); return; }
+  profile.displayName = name;
+  saveProfile(profile);
+  loadAccount();
+}
+
+function logout(){
+  profile = loadProfile();
+  profile.loggedIn = false;
+  saveProfile(profile);
+  loadMainMenu();
+}
     function loadModeSelect() {
       startMenuMusic();
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Select Mode</h1>
-          <div class="panel">
-            <div class="panelTitle">
-              <strong>Choose your run</strong>
-              <span class="pill">Tip: <b>Campaign</b> unlocks Worlds</span>
-            </div>
-            <button onclick="loadCampaignMode()">Campaign</button>
-            <button onclick="loadEndlessIntro()">Endless</button>
-          </div>
+          <button onclick="loadCampaignMode()">Campaign</button>
+          <button onclick="loadEndlessIntro()">Endless</button>
           <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
@@ -598,11 +363,8 @@ function getActiveUser() {
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Campaign</h1>
-          <p class="subhead">Survive each level to unlock the next. Your best scores build your Campaign Total.</p>
-          <div class="panel">
-            <div class="panelTitle"><strong>Select a World</strong><span class="pill">Unlocked: <b>${progress.worldsUnlocked}/3</b></span></div>
-            ${worldButtons}
-          </div>
+          <p>Select a World</p>
+          ${worldButtons}
           <button onclick="loadModeSelect()">Back</button>
         </div>
       `;
@@ -629,11 +391,8 @@ function getActiveUser() {
       container.innerHTML = `
         <div class="menu-screen">
           <h1>${worlds[worldIdx].name}</h1>
-          <p class="subhead">${worlds[worldIdx].description}</p>
-          <div class="panel">
-            <div class="panelTitle"><strong>Levels</strong><span class="pill">Unlocked: <b>${levelsUnlocked}/5</b></span></div>
-            ${levelButtons}
-          </div>
+          <p>${worlds[worldIdx].description}</p>
+          ${levelButtons}
           <button onclick="loadCampaignMode()">Back</button>
         </div>
       `;
@@ -650,25 +409,15 @@ function getActiveUser() {
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>Level ${levelNumber}</h1>
-          <p class="subhead">${worlds[w].name}</p>
-
-          <div class="panel">
-            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive: <b>${ld.time}s</b></span></div>
-            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85);">
-              Stay alive until the timer hits zero. More points = better tier.
-            </p>
-            <div style="height:10px"></div>
-            <div class="panelTitle"><strong>Your Best</strong><span class="pill"><b>${best}</b></span></div>
-            <div style="height:10px"></div>
-            <div class="panelTitle"><strong>Performance Tiers</strong><span class="pill">Targets</span></div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
-              <span class="pill">Bronze <b>${ld.scores.bronze}</b></span>
-              <span class="pill">Silver <b>${ld.scores.silver}</b></span>
-              <span class="pill">Gold <b>${ld.scores.gold}</b></span>
-            </div>
-          </div>
-
+          <h1>Level ${levelNumber} - ${worlds[w].name}</h1>
+          <p><strong>Requirement:</strong> Survive <strong>${ld.time} seconds</strong></p>
+          <p><strong>Your Best:</strong> ${best}</p>
+          <p>Performance Tiers:</p>
+          <ul style="list-style:none;padding:0;text-align:left;">
+            <li>Bronze: ${ld.scores.bronze} points</li>
+            <li>Silver: ${ld.scores.silver} points</li>
+            <li>Gold: ${ld.scores.gold} points</li>
+          </ul>
           <button onclick="playLevel(${worldNumber}, ${levelNumber})">Start</button>
           <button onclick="loadWorld(${worldNumber})">Back</button>
         </div>
@@ -682,11 +431,9 @@ function getActiveUser() {
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Endless</h1>
-          <p class="subhead">Difficulty ramps from <b>W1L1</b> → <b>W3L5</b> over ~120s, then plateaus.</p>
-          <div class="panel">
-            <div class="panelTitle"><strong>Local Best</strong><span class="pill"><b>${progress.endlessBest}</b></span></div>
-            <button onclick="startGameplay({ mode:'endless' })">Start Endless</button>
-          </div>
+          <p>Ramps from <strong>W1L1</strong> to <strong>W3L5</strong> over ~120s, then plateaus.</p>
+          <p><strong>Local Best:</strong> ${progress.endlessBest}</p>
+          <button onclick="startGameplay({ mode:'endless' })">Start Endless</button>
           <button onclick="loadModeSelect()">Back</button>
         </div>
       `;
@@ -696,344 +443,151 @@ function getActiveUser() {
       startMenuMusic();
       settings = loadSettingsState();
       const container = document.getElementById("game-container");
+
       const onOff = (v)=> v ? "ON" : "OFF";
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Settings</h1>
-          <div class="panel">
-            <div class="toggle-row">
-              <span>Menu Music</span>
-              <button onclick="toggleSetting('menuMusic')">${onOff(settings.menuMusic)}</button>
-            </div>
-            <div class="toggle-row">
-              <span>Gameplay Music</span>
-              <button onclick="toggleSetting('gameplayMusic')">${onOff(settings.gameplayMusic)}</button>
-            </div>
-            <div class="toggle-row">
-              <span>Sound Effects (SFX)</span>
-              <button onclick="toggleSetting('sfx')">${onOff(settings.sfx)}</button>
-            </div>
 
-            <p class="small-note" style="margin-top:10px">
-              Audio is optional. If you don’t add files in <b>/audio/</b>, the game still runs silently.
-            </p>
+          <div class="toggle-row">
+            <span>Menu Music</span>
+            <button onclick="toggleSetting('menuMusic')">${onOff(settings.menuMusic)}</button>
           </div>
+
+          <div class="toggle-row">
+            <span>Gameplay Music</span>
+            <button onclick="toggleSetting('gameplayMusic')">${onOff(settings.gameplayMusic)}</button>
+          </div>
+
+          <div class="toggle-row">
+            <span>Sound Effects (SFX)</span>
+            <button onclick="toggleSetting('sfx')">${onOff(settings.sfx)}</button>
+          </div>
+
+          <p class="small-note">
+            Audio files are loaded from <strong>/audio/</strong>. If you don't add files, the game still runs (silently).
+          </p>
+
           <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
     }
+function loadHowTo(){
+  startMenuMusic();
+  const container = document.getElementById("game-container");
 
+  container.innerHTML = `
+    <div class="menu-screen howto-shell">
+      <h1>How To Play</h1>
+
+      <div class="howto-panel howto-scroll">
+
+        <div class="howto-card">
+          <div class="howto-title">Objective</div>
+          <div class="howto-body">
+            Survive the level by avoiding incoming hazards.
+            Your score increases over time and through skilled movement.
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title world-w1">World 1 — Neon Bliss</div>
+          <div class="howto-body">
+            Introduction to GRIDRUN’s flow.<br>
+            • Moderate speed<br>
+            • Fewer hazards<br>
+            • Learn spacing and timing
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title world-w2">World 2 — Techno Abyss</div>
+          <div class="howto-body">
+            Increased pressure and density.<br>
+            • Faster patterns<br>
+            • EMP disruptions<br>
+            • Requires precision control
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title world-w3">World 3 — Astral Surge</div>
+          <div class="howto-body">
+            Maximum intensity.<br>
+            • Lasers & blackout hazards<br>
+            • Complex patterns<br>
+            • Survival mastery required
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title">Scoring & Tiers</div>
+          <div class="howto-body">
+            • Score increases every second you survive<br>
+            • Bonus points for clean dodges & near passes<br>
+            • Bronze / Silver / Gold tiers are balanced per level
+          </div>
+        </div>
+
+        <div class="howto-card">
+          <div class="howto-title">Endless Mode</div>
+          <div class="howto-body">
+            Difficulty ramps from World 1 Level 1 to World 3 Level 5
+            and then stabilizes.<br>
+            Compete against your personal best.
+          </div>
+        </div>
+
+      </div>
+
+      <button onclick="loadMainMenu()">Back</button>
+    </div>
+  `;
+}
     function toggleSetting(key){
       settings = loadSettingsState();
       settings[key] = !settings[key];
       saveSettingsState(settings);
       updateMenuMusicState();
+      // also update Phaser volumes if running
       if (window.GRIDRUN_AUDIO && typeof window.GRIDRUN_AUDIO.applySettings === "function"){
         window.GRIDRUN_AUDIO.applySettings(settings);
       }
       loadSettings();
     }
 
-    function loadHowTo(){
-      startMenuMusic();
-      const container = document.getElementById("game-container");
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>How To Play</h1>
-          <p class="subhead">Everything you need — objective, scoring, worlds, and endless.</p>
+function loadMainMenu() {
+  startMenuMusic();
+  const container = document.getElementById("game-container");
+  container.innerHTML = `
+    <div class="menu-screen" id="main-menu">
+      <h1>GRIDRUN</h1>
 
-          <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive</span></div>
-            <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              Stay alive inside the grid. In <b>Campaign</b>, you must survive the full timer for each level to clear it and unlock progression.
-              In <b>Endless</b>, survive as long as you can while difficulty ramps up.
-            </p>
-
-            <div class="panelTitle"><strong>Controls</strong><span class="pill">Touch or WASD</span></div>
-            <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              <b>Mobile:</b> touch where you want to move — your runner follows.
-              <br><b>Desktop:</b> WASD / Arrow keys.
-            </p>
-
-            <div class="panelTitle"><strong>Scoring</strong><span class="pill">Climb ranks</span></div>
-            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              You gain points over time for staying alive, plus bonuses for clean survival and skillful dodges.
-              Clearing a level adds a <b>Clear Bonus</b>.
-            </p>
-
-            <p class="hint">
-              Your <b>Leaderboards</b> scores update automatically when you improve a best score (Campaign or Endless).
-            </p>
-          </div>
-
-          <button onclick="loadMainMenu()">Back</button>
-        </div>
-      `;
-    }
-
-    /***********************
-     * AUTH SCREENS
-     ***********************/
-    function loadAuthGate(){
-      startMenuMusic();
-      const container = document.getElementById("game-container");
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Login</h1>
-          <p class="subhead">Choose a username. This preps your identity for leaderboards.</p>
-          <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars</span></div>
-            <input id="usernameInput" placeholder="Enter username..." autocomplete="nickname"
-              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
-            <p class="hint">No password yet (local-only). Global accounts come later.</p>
-            <button onclick="doLogin()">Confirm</button>
-          </div>
-          <button onclick="loadMainMenu()">Back</button>
-        </div>
-      `;
-    }
-
-    function doLogin(){
-      const el = document.getElementById("usernameInput");
-      if (!el) return;
-      const u = sanitizeUsername(el.value);
-      if (!u){
-        alert("Please enter a username.");
-        return;
-      }
-      setActiveUser(u);
-      // reload user progress & update LB snapshot
-      progress = loadProgress();
-      updateLeaderboardsFromProgress();
-      loadMainMenu();
-    }
-
-    function loadAccount(){
-      startMenuMusic();
-      const u = getActiveUser();
-      const container = document.getElementById("game-container");
-      if (!u){ loadAuthGate(); return; }
-
-      progress = loadProgress();
-      const totals = sumCampaignTotals(progress);
-
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Account</h1>
-          <p class="subhead">Logged in as <b>${u}</b></p>
-
-          <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Your Stats</strong><span class="pill">Local</span></div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
-              <span class="pill">Endless Best <b>${progress.endlessBest}</b></span>
-              <span class="pill">Campaign Total <b>${totals.campaignTotal}</b></span>
-            </div>
-
-            <div style="height:12px"></div>
-            <div class="panelTitle"><strong>Edit Username</strong><span class="pill">renames profile</span></div>
-            <input id="usernameEdit" value="${u}" autocomplete="nickname"
-              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
-            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
-              <button onclick="saveUsernameChange()">Save</button>
-              <button onclick="logout()">Logout</button>
-            </div>
-            <p class="hint">This is local-only for now. Global accounts come later.</p>
-          </div>
-
-          <button onclick="loadMainMenu()">Back</button>
-        </div>
-      `;
-    }
-
-    function saveUsernameChange(){
-      const el = document.getElementById("usernameEdit");
-      if (!el) return;
-      const newU = sanitizeUsername(el.value);
-      if (!newU){ alert("Invalid username."); return; }
-
-      const oldU = getActiveUser();
-      if (!oldU) return;
-
-      // Move progress to new user key (copy old key content)
-      const oldKey = `gridrun_progress_user_${oldU.toLowerCase()}`;
-      const newKey = `gridrun_progress_user_${newU.toLowerCase()}`;
-      const raw = localStorage.getItem(oldKey);
-      if (raw) localStorage.setItem(newKey, raw);
-
-      setActiveUser(newU);
-      progress = loadProgress();
-      updateLeaderboardsFromProgress();
-      loadAccount();
-    }
-
-    function logout(){
-      clearActiveUser();
-      progress = loadProgress();
-      loadMainMenu();
-    }
-
-    /***********************
-     * LEADERBOARDS (polished)
-     ***********************/
-    function buildRanking(metric){
-      const lb = loadLeaderboardsState();
-      const rows = Object.values(lb.users || {});
-      const cleaned = rows
-        .filter(r => r && r.username)
-        .map(r => ({
-          username: r.username,
-          endlessBest: Math.floor(r.endlessBest || 0),
-          campaignTotal: Math.floor(r.campaignTotal || 0),
-          worldTotals: [
-            Math.floor(r.worldTotals?.[0] || 0),
-            Math.floor(r.worldTotals?.[1] || 0),
-            Math.floor(r.worldTotals?.[2] || 0),
-          ],
-          updatedAt: Math.floor(r.updatedAt || 0)
-        }));
-
-      const scoreOf = (r)=>{
-        if (metric === "endless") return r.endlessBest;
-        if (metric === "campaign") return r.campaignTotal;
-        if (metric === "w1") return r.worldTotals[0];
-        if (metric === "w2") return r.worldTotals[1];
-        if (metric === "w3") return r.worldTotals[2];
-        return 0;
-      };
-
-      cleaned.sort((a,b)=>{
-        const da = scoreOf(a), db = scoreOf(b);
-        if (db !== da) return db - da;
-        return (b.updatedAt||0) - (a.updatedAt||0);
-      });
-
-      return { list: cleaned, scoreOf };
-    }
-
-    function renderLeaderboardList(metric){
-      const u = getActiveUser();
-      const myKey = u ? u.toLowerCase() : null;
-
-      const { list, scoreOf } = buildRanking(metric);
-      const top = list.slice(0, 25);
-
-      const header = `
-        <div class="lbHeader">
-          <div>RANK</div>
-          <div>PLAYER</div>
-          <div style="text-align:right">SCORE</div>
-        </div>
-      `;
-
-      const rows = top.map((r, idx)=>{
-        const isMe = (myKey && r.username.toLowerCase() === myKey);
-        const val = scoreOf(r);
-        return `
-          <div class="lbRow ${isMe ? "me" : ""}">
-            <div class="rank">#${idx+1}</div>
-            <div class="name">
-              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.username}</span>
-              ${isMe ? `<span class="badge">YOU</span>` : ``}
-            </div>
-            <div class="score">${val}</div>
-          </div>
-        `;
-      }).join("");
-
-      // find my rank (if logged in)
-      let myRankHtml = "";
-      if (myKey){
-        const i = list.findIndex(r => r.username.toLowerCase() === myKey);
-        if (i >= 0){
-          const me = list[i];
-          myRankHtml = `
-            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:10px 0 0 0">
-              <span class="pill">Your Rank <b>#${i+1}</b></span>
-              <span class="pill">Your Score <b>${scoreOf(me)}</b></span>
-            </div>
-          `;
-        } else {
-          myRankHtml = `
-            <div class="hint" style="margin-top:10px">
-              Play a run to appear here.
-            </div>
-          `;
-        }
-      } else {
-        myRankHtml = `
-          <div class="hint" style="margin-top:10px">
-            Login to post scores. You can still view the board.
-          </div>
-        `;
-      }
-
-      return `
-        <div class="lbWrap">
-          ${header}
-          ${rows || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
-        </div>
-        ${myRankHtml}
-      `;
-    }
-
-    function loadLeaderboards(){
-      startMenuMusic();
-      updateLeaderboardsFromProgress(); // refresh snapshot for current user
-      const container = document.getElementById("game-container");
-      const u = getActiveUser();
-
-      const tabs = [
-        { key:"endless", label:"Endless" },
-        { key:"campaign", label:"Campaign Total" },
-        { key:"w1", label:"World 1" },
-        { key:"w2", label:"World 2" },
-        { key:"w3", label:"World 3" },
-      ];
-
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Leaderboards</h1>
-          <p class="subhead">${u ? `Logged in as <b>${u}</b>. Scores update when you beat a personal best.` : `View rankings. Login to post scores.`}</p>
-
-          <div class="panel">
-            <div class="panelTitle">
-              <strong>Rankings</strong>
-              <span class="pill">Top <b>25</b> (local)</span>
-            </div>
-
-            <div class="tabs" id="lbTabs">
-              ${tabs.map((t,i)=>`<div class="tab ${i===0?"active":""}" onclick="switchLbTab('${t.key}', this)">${t.label}</div>`).join("")}
-            </div>
-
-            <div id="lbContent">
-              ${renderLeaderboardList("endless")}
-            </div>
-
-            <p class="hint">
-              Local leaderboards are stored on-device for now. When we add <b>Global Leaderboards</b>, this screen stays — only the data source changes.
-            </p>
-          </div>
-
-          <button onclick="loadMainMenu()">Back</button>
-        </div>
-      `;
-    }
-
-    function switchLbTab(key, el){
-      document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-      el.classList.add("active");
-      document.getElementById("lbContent").innerHTML = renderLeaderboardList(key);
-    }
-
+      <button onclick="loadModeSelect()">PLAY</button>
+      <button onclick="loadHowTo()">HOW TO PLAY</button>
+      ${(loadProfile().loggedIn)
+  ? `<button onclick="loadAccount()">ACCOUNT</button>`
+  : `<button onclick="loadLogin()">LOGIN</button>`
+}
+      <button onclick="loadSettings()">SETTINGS</button>
+    </div>
+  `;
+}
     function playLevel(worldNumber, levelNumber) {
       startGameplay({ mode:"campaign", world: worldNumber-1, level: levelNumber-1 });
     }
 
-    /***********************
-     * GAME BRIDGE (menus <-> phaser)
-     ***********************/
+    function showMenus(){
+      document.getElementById("phaser-container").style.display = "none";
+      document.getElementById("game-container").style.display = "flex";
+      startMenuMusic();
+    }
+    function showGameplay(){
+      document.getElementById("game-container").style.display = "none";
+      document.getElementById("phaser-container").style.display = "flex";
+      stopMenuMusic();
+    }
+
     window.GRIDRUN = {
       completeCampaignLevel: (worldIdx, levelIdx, score) => {
         const p = loadProgress();
@@ -1047,16 +601,13 @@ function getActiveUser() {
             p.levelsUnlocked[worldIdx + 1] = Math.max(p.levelsUnlocked[worldIdx + 1] || 0, 1);
           }
         }
-
         saveProgress(p);
-        updateLeaderboardsFromProgress();
       },
 
       setEndlessBest: (score) => {
         const p = loadProgress();
         p.endlessBest = Math.max(p.endlessBest || 0, score);
         saveProgress(p);
-        updateLeaderboardsFromProgress();
       },
 
       getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,
@@ -1077,7 +628,8 @@ function getActiveUser() {
       phaserGame.scene.stop("Play");
       phaserGame.scene.start("Play", payload);
     }
-        function createPhaserGame(){
+
+    function createPhaserGame(){
       const W = 420, H = 760;
       const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
 
@@ -1094,7 +646,10 @@ function getActiveUser() {
       const FOLLOW_MAX_SPEED_MULT = 3.0;
       const lerp = (a,b,t)=>a+(b-a)*t;
 
-      // WORLD THEMES + AUDIO keys
+      // ===== World Themes + AUDIO per world (same track for all 5 levels in the world) =====
+      // Put files here:
+      // audio/world1.mp3, audio/world2.mp3, audio/world3.mp3
+      // audio/sfx_hit.mp3, audio/sfx_bonus.mp3, audio/sfx_clear.mp3, audio/sfx_click.mp3 (optional)
       const WORLDS = [
         {
           id:0,
@@ -1107,14 +662,16 @@ function getActiveUser() {
           glowB: 0x55f7ff,
           player: 0xffffff,
           fx:"sparkle",
+          gridStyle:"glow",
           musicKey:"music_w1",
           obstacleStyle:{ palette:[0xff2fd6,0x55f7ff,0xfff06a], shapes:["tri","hex","frame","rect"] },
+          // Hazard W1: Hot Column (warning -> one column becomes dangerous briefly)
           hazardHotColumn:{ enabled:true, startAt:10, every:11.5, warn:0.9, active:1.1, alphaWarn:0.22, alphaActive:0.58 }
         },
         {
           id:1,
           name:"Techno Abyss",
-          subtitle:"Icy pulses. Faster and denser.",
+          subtitle:"Icy blues & silvers. Pulse waves.",
           bg: 0x00131f,
           border: 0xa8e9ff,
           gridLine: 0x44a3ff,
@@ -1122,8 +679,10 @@ function getActiveUser() {
           glowB: 0x44a3ff,
           player: 0xe9fbff,
           fx:"pulse",
+          gridStyle:"pulse",
           musicKey:"music_w2",
           obstacleStyle:{ palette:[0xa8e9ff,0x44a3ff,0xffffff,0x7cffd2], shapes:["bar","plus","rect","frame","hex"] },
+          // Hazard W2: EMP Jam (warning -> brief movement jam)
           hazardEmp:{ enabled:true, startAt:14, every:12.5, warn:0.9, jam:0.55 }
         },
         {
@@ -1137,12 +696,14 @@ function getActiveUser() {
           glowB: 0x38ffb8,
           player: 0xf1e8ff,
           fx:"astral",
+          gridStyle:"astral",
           musicKey:"music_w3",
           obstacleStyle:{ palette:[0xb45cff,0x38ffb8,0xff4d7d,0xffd166], shapes:["hex","tri","bar","frame","plus","rect"] },
           boss:{ enabled:true, cycleSeconds:5.7, warnSeconds:1.20, activeSeconds:1.12, thickness:16, warnThickness:6 }
         }
       ];
 
+      // Difficulty generator (scaled-back speed; difficulty via spawns/hazards/behaviors)
       function mkLevelsForWorld(worldIndex){
         const base = [
           { baseScroll0: 78, baseScrollStep: 16, ramp0: 6.4, rampStep: 2.4, spawnStart0: 920, spawnStep: 120, spawnRamp0: 12.0, spawnRampStep: 3.1, spawnMin0: 480, spawnMinStep: 55, spawnMinFloor: 280, sizeMin0: 21, sizeMinStep: 1, sizeMax0: 33, sizeMaxStep: 1 },
@@ -1168,6 +729,7 @@ function getActiveUser() {
       WORLDS[2].levels = mkLevelsForWorld(2);
 
       function buildBackdrop(scene, fxType, cA, cB) {
+        const items = [];
         if (fxType === "sparkle") {
           const dots = [];
           for (let i=0;i<52;i++){
@@ -1186,6 +748,7 @@ function getActiveUser() {
               if (d.x > W+10) d.x = -10;
             }
           });
+          items.push(...dots);
         }
         if (fxType === "pulse") {
           const waves = [];
@@ -1202,6 +765,7 @@ function getActiveUser() {
               if (wv.y > H+20) wv.y = -20;
             }
           });
+          items.push(...waves);
         }
         if (fxType === "astral") {
           const stars = [];
@@ -1218,7 +782,9 @@ function getActiveUser() {
               if (s.y > H+10){ s.y=-10; s.x=Phaser.Math.Between(0,W); }
             }
           });
+          items.push(...stars);
         }
+        return items;
       }
 
       function ensureObstacleTextures(scene) {
@@ -1273,6 +839,7 @@ function getActiveUser() {
       const STREAK_EVERY = 12;
       const STREAK_BONUS = 55;
       const CLEAR_BONUS_BASE = 220;
+
       const MAX_SCROLL_SPEED = 360;
 
       function formatTime(sec){
@@ -1280,6 +847,7 @@ function getActiveUser() {
         return m>0?`${m}:${String(s).padStart(2,"0")}`:`${s}s`;
       }
 
+      // Endless: ramp to W3L5 by 120s then plateau
       const ENDLESS = {
         rampSeconds: 120,
         t_blackout: 50,
@@ -1295,6 +863,7 @@ function getActiveUser() {
       }
       const BLACKOUT = { period: 10.5, active: 0.65, alpha: 0.35 };
 
+      // World-style pill buttons (Results)
       function makePillButton(scene, label, y, onClick, accentColor, glowColor){
         const container = scene.add.container(W/2, y).setDepth(210);
         const g = scene.add.graphics();
@@ -1326,11 +895,13 @@ function getActiveUser() {
         return container;
       }
 
+      // AUDIO REGISTRY (Phaser)
       window.GRIDRUN_AUDIO = {
         applySettings: (s) => {
+          // called from Settings toggles if Phaser is already running
           const g = phaserGame;
           if (!g) return;
-          g.sound.volume = s.volumeSfx;
+          g.sound.volume = s.volumeSfx; // affects SFX
         }
       };
 
@@ -1358,16 +929,18 @@ function getActiveUser() {
           this.hLaser=null; this.hLaserWarn=null; this.vLaser=null; this.vLaserWarn=null;
           this.bossT=0; this.hLaserMode="off"; this.vLaserMode="off";
 
-          this.hotCol = { col:0, t:0 };
-          this.hotColWarnRect=null;
-          this.hotColActiveRect=null;
+          // W1/W2 hazards
+          this.hotCol = { col:0, mode:"off", t:0 }; // W1
+          this.hotColWarnRect = null;
+          this.hotColActiveRect = null;
 
-          this.emp = { t:0, jamLeft:0 };
-          this.empText=null;
+          this.emp = { mode:"off", t:0, jamLeft:0 }; // W2
+          this.empText = null;
 
           this.decor=[];
           this.hudBg=null;
 
+          // Audio
           this.music=null;
         }
 
@@ -1386,11 +959,14 @@ function getActiveUser() {
         }
 
         preload(){
+          // MUSIC
           if (!this.cache.audio.exists("music_w1")) this.load.audio("music_w1", ["audio/world1.mp3"]);
           if (!this.cache.audio.exists("music_w2")) this.load.audio("music_w2", ["audio/world2.mp3"]);
           if (!this.cache.audio.exists("music_w3")) this.load.audio("music_w3", ["audio/world3.mp3"]);
 
+          // SFX (optional files; if missing, Phaser will warn but game still runs)
           if (!this.cache.audio.exists("sfx_hit")) this.load.audio("sfx_hit", ["audio/sfx_hit.mp3"]);
+          if (!this.cache.audio.exists("sfx_bonus")) this.load.audio("sfx_bonus", ["audio/sfx_bonus.mp3"]);
           if (!this.cache.audio.exists("sfx_clear")) this.load.audio("sfx_clear", ["audio/sfx_clear.mp3"]);
           if (!this.cache.audio.exists("sfx_click")) this.load.audio("sfx_click", ["audio/sfx_click.mp3"]);
         }
@@ -1402,6 +978,7 @@ function getActiveUser() {
           this.cameras.main.setBackgroundColor(this.wcfg.bg);
           buildBackdrop(this, this.wcfg.fx, this.wcfg.glowA, this.wcfg.glowB);
 
+          // Gameplay music (per world, same for all levels in that world)
           this.stopMusic();
           if (settings.gameplayMusic){
             try{
@@ -1409,6 +986,8 @@ function getActiveUser() {
               this.music.play();
             }catch(e){}
           }
+
+          // SFX volume
           this.sound.volume = settings.volumeSfx;
 
           this.gridGraphics = this.add.graphics();
@@ -1428,11 +1007,13 @@ function getActiveUser() {
 
           this.touchDot = this.add.circle(0,0,6,this.wcfg.glowB).setAlpha(0).setDepth(60);
 
+          // HUD readability panel
           this.hudBg = this.add.graphics().setDepth(65);
           this.uiTop = this.add.text(18,12,"",{fontFamily:uiFont,fontSize:"14px",color:"#ffffff"}).setDepth(70).setAlpha(0.98);
           this.uiSub = this.add.text(18,32,"",{fontFamily:uiFont,fontSize:"12px",color:"#eaeaff"}).setDepth(70).setAlpha(0.95);
           this.uiCombo = this.add.text(W-18,12,"",{fontFamily:uiFont,fontSize:"12px",color:"#ffffff"}).setOrigin(1,0).setDepth(70).setAlpha(0.90);
 
+          // Pause button
           this.pauseBtn = this.add.text(W-18,34,"PAUSE",{
             fontFamily:uiFont,fontSize:"12px",color:"#ffffff",
             backgroundColor:"rgba(0,0,0,0.35)", padding:{left:10,right:10,top:6,bottom:6}
@@ -1465,9 +1046,11 @@ function getActiveUser() {
           this.keys = this.input.keyboard.addKeys("W,A,S,D,ESC");
           this.input.keyboard.on("keydown-ESC", ()=>this.togglePause(!this.paused));
 
+          // W1 hot column visuals
           this.hotColWarnRect = this.add.rectangle(GRID_X, GRID_Y, TILE, GRID_H, this.wcfg.glowB).setOrigin(0,0).setAlpha(0).setDepth(95);
           this.hotColActiveRect = this.add.rectangle(GRID_X, GRID_Y, TILE, GRID_H, 0xff3b30).setOrigin(0,0).setAlpha(0).setDepth(96);
 
+          // W2 EMP text
           this.empText = this.add.text(W/2, H*0.58, "", { fontFamily:uiFont, fontSize:"18px", color:"#ffffff" })
             .setOrigin(0.5).setAlpha(0).setDepth(170);
 
@@ -1488,6 +1071,10 @@ function getActiveUser() {
           }catch(e){}
         }
 
+        shutdown(){
+          this.stopMusic();
+        }
+
         isInNoTouchZone(x,y){
           const z=this.uiNoTouchZone;
           return x>=z.x && x<=z.x+z.w && y>=z.y && y<=z.y+z.h;
@@ -1500,8 +1087,8 @@ function getActiveUser() {
           this.survivalPts=0; this.nearPts=0; this.dodgePts=0; this._lastStreakTick=0;
           this.blackoutOn=false; this.blackoutEnabled=false;
 
-          this.hotCol = { col: Phaser.Math.Between(0, GRID_COLS-1), t:0 };
-          this.emp = { t:0, jamLeft:0 };
+          this.hotCol = { col: Phaser.Math.Between(0, GRID_COLS-1), mode:"off", t:0 };
+          this.emp = { mode:"off", t:0, jamLeft:0 };
 
           this.obstacles.children.iterate(o=>{ if(o) o.destroy(); });
 
@@ -1515,8 +1102,7 @@ function getActiveUser() {
             this.scrollSpeed=w1l1.baseScroll;
             this.spawnEvery=w1l1.spawnStart;
           }
-        }
-
+        }<!-- PART 3 / 3 -->
         startCountdown(n){
           this.countdown=n;
           this.countText = this.add.text(W/2,H*0.42,"",{fontFamily:uiFont,fontSize:"54px",color:"#ffffff"})
@@ -1606,29 +1192,50 @@ function getActiveUser() {
         playSfx(key){
           settings = loadSettingsState();
           if (!settings.sfx) return;
-          try{ this.sound.play(key, { volume: settings.volumeSfx }); }catch(e){}
+          try{
+            this.sound.play(key, { volume: settings.volumeSfx });
+          }catch(e){}
         }
 
+        // W1 hazard: Hot Column (warn -> active)
         updateHotColumn(dt){
           const hz = this.wcfg.hazardHotColumn;
-          if (!hz?.enabled) { this.hotColWarnRect.setAlpha(0); this.hotColActiveRect.setAlpha(0); return false; }
-          if (this.t < hz.startAt){ this.hotColWarnRect.setAlpha(0); this.hotColActiveRect.setAlpha(0); return false; }
+          if (!hz?.enabled) {
+            this.hotColWarnRect.setAlpha(0);
+            this.hotColActiveRect.setAlpha(0);
+            return false;
+          }
+          if (this.t < hz.startAt){
+            this.hotColWarnRect.setAlpha(0);
+            this.hotColActiveRect.setAlpha(0);
+            return false;
+          }
 
           this.hotCol.t += dt;
-          const phase = this.hotCol.t % hz.every;
+          const cycle = hz.every;
+          const phase = this.hotCol.t % cycle;
 
           const warnOn = phase < hz.warn;
           const activeOn = phase >= hz.warn && phase < (hz.warn + hz.active);
 
-          if (phase < dt) this.hotCol.col = Phaser.Math.Between(0, GRID_COLS-1);
+          // pick new column at cycle start
+          if (phase < dt){
+            this.hotCol.col = Phaser.Math.Between(0, GRID_COLS-1);
+          }
 
           const x = GRID_X + this.hotCol.col * TILE;
           this.hotColWarnRect.setPosition(x, GRID_Y);
+          this.hotColWarnRect.width = TILE;
+          this.hotColWarnRect.height = GRID_H;
+
           this.hotColActiveRect.setPosition(x, GRID_Y);
+          this.hotColActiveRect.width = TILE;
+          this.hotColActiveRect.height = GRID_H;
 
           this.hotColWarnRect.setAlpha(warnOn ? hz.alphaWarn : 0);
           this.hotColActiveRect.setAlpha(activeOn ? hz.alphaActive : 0);
 
+          // collision if active and player inside that column
           if (activeOn){
             const colMin = x;
             const colMax = x + TILE;
@@ -1641,13 +1248,21 @@ function getActiveUser() {
           return false;
         }
 
+        // W2 hazard: EMP Jam (warn -> movement jam)
         updateEmp(dt){
           const hz = this.wcfg.hazardEmp;
-          if (!hz?.enabled){ this.empText.setAlpha(0); return; }
-          if (this.t < hz.startAt){ this.empText.setAlpha(0); return; }
+          if (!hz?.enabled) {
+            this.empText.setAlpha(0);
+            return;
+          }
+          if (this.t < hz.startAt) {
+            this.empText.setAlpha(0);
+            return;
+          }
 
           this.emp.t += dt;
-          const phase = this.emp.t % hz.every;
+          const cycle = hz.every;
+          const phase = this.emp.t % cycle;
 
           const warnOn = phase < hz.warn;
           const jamOn = phase >= hz.warn && phase < (hz.warn + hz.jam);
@@ -1663,7 +1278,9 @@ function getActiveUser() {
             this.empText.setAlpha(0);
           }
 
-          if (this.emp.jamLeft > 0) this.emp.jamLeft -= dt;
+          if (this.emp.jamLeft > 0){
+            this.emp.jamLeft -= dt;
+          }
         }
 
         update(_, deltaMs){
@@ -1678,9 +1295,11 @@ function getActiveUser() {
 
           this.t += dt;
 
+          // combo decay
           this.comboTimer += dt;
           if (this.comboTimer > COMBO_DECAY_SEC) this.combo = 1;
 
+          // streak bonus
           const tick = Math.floor(this.t / STREAK_EVERY);
           if (tick > this._lastStreakTick){
             this._lastStreakTick = tick;
@@ -1691,12 +1310,20 @@ function getActiveUser() {
 
           let timeLeft = 0;
 
+          // W1/W2 hazards (campaign only; endless uses existing blackout/lasers ramp)
           if (this.mode==="campaign"){
-            if (this.world === 0) { if (this.updateHotColumn(dt)) return; }
-            else { this.hotColWarnRect.setAlpha(0); this.hotColActiveRect.setAlpha(0); }
-
-            if (this.world === 1) this.updateEmp(dt);
-            else { this.empText.setAlpha(0); this.emp.jamLeft = 0; }
+            if (this.world === 0) {
+              if (this.updateHotColumn(dt)) return;
+            } else {
+              this.hotColWarnRect.setAlpha(0);
+              this.hotColActiveRect.setAlpha(0);
+            }
+            if (this.world === 1) {
+              this.updateEmp(dt);
+            } else {
+              this.empText.setAlpha(0);
+              this.emp.jamLeft = 0;
+            }
           }
 
           if (this.mode==="campaign"){
@@ -1718,6 +1345,7 @@ function getActiveUser() {
             if (this.world===2){ this.hLaserMode="active"; this.vLaserMode="off"; }
 
           } else {
+            // endless ramps to W3L5 and then stays there
             const tNorm = clamp(this.t / ENDLESS.rampSeconds, 0, 1);
             const a = WORLDS[0].levels[0];
             const b = WORLDS[2].levels[4];
@@ -1733,6 +1361,9 @@ function getActiveUser() {
             const targetSpawn = d.spawnStart - this.t * d.spawnRamp;
             this.spawnEvery = clamp(targetSpawn, d.spawnMin, d.spawnStart);
 
+            this.applyEndlessThemeBlend(tNorm);
+
+            // hazards stage in
             this.blackoutEnabled = this.t >= ENDLESS.t_blackout;
             if (this.blackoutEnabled){
               const bp = (this.t % BLACKOUT.period);
@@ -1746,10 +1377,12 @@ function getActiveUser() {
             this.vLaserMode = (this.t >= ENDLESS.t_verticalLaser) ? ((this.t >= ENDLESS.t_laserActive) ? "active" : "warn") : "off";
           }
 
+          // survival score
           const add = SCORE_PPS * dt;
           this.survivalPts += add;
           this.score += add;
 
+          // movement (EMP jam blocks movement briefly)
           const jammed = (this.mode==="campaign" && this.world===1 && this.emp.jamLeft > 0);
 
           if (!IS_TOUCH){
@@ -1789,19 +1422,23 @@ function getActiveUser() {
             }
           }
 
+          // clamp to grid
           const pad=14;
           const px=clamp(this.player.x, GRID_X+pad, GRID_X+GRID_W-pad);
           const py=clamp(this.player.y, GRID_Y+pad, GRID_Y+GRID_H-pad);
           if (px!==this.player.x || py!==this.player.y){ this.player.x=px; this.player.y=py; this.player.body.reset(px,py); }
 
+          // spawn
           this.spawnTimer += deltaMs;
           while (this.spawnTimer >= this.spawnEvery){
             this.spawnTimer -= this.spawnEvery;
             this.spawnObstacle();
           }
 
+          // move obstacles + bonuses
           this.obstacles.children.iterate((o)=>{
             if (!o) return;
+
             o.y += this.scrollSpeed * dt;
 
             if (o._drift){
@@ -1837,6 +1474,41 @@ function getActiveUser() {
           this.updateHud(timeLeft);
         }
 
+        applyEndlessThemeBlend(tNorm){
+          const w1=WORLDS[0], w2=WORLDS[1], w3=WORLDS[2];
+          const mid = clamp((tNorm-0.33)/0.33, 0, 1);
+          const end = clamp((tNorm-0.66)/0.34, 0, 1);
+
+          const mix=(c1,c2,t)=>{
+            const r1=(c1>>16)&255,g1=(c1>>8)&255,b1=c1&255;
+            const r2=(c2>>16)&255,g2=(c2>>8)&255,b2=c2&255;
+            const r=Math.floor(lerp(r1,r2,t)), g=Math.floor(lerp(g1,g2,t)), b=Math.floor(lerp(b1,b2,t));
+            return (r<<16)|(g<<8)|b;
+          };
+
+          let base = w1;
+          let next = w2;
+          let t = mid;
+          if (tNorm >= 0.66){ base=w2; next=w3; t=end; }
+
+          this.wcfg = {
+            ...this.wcfg,
+            bg: mix(base.bg, next.bg, t),
+            border: mix(base.border, next.border, t),
+            gridLine: mix(base.gridLine, next.gridLine, t),
+            glowA: mix(base.glowA, next.glowA, t),
+            glowB: mix(base.glowB, next.glowB, t),
+            player: mix(base.player, next.player, t),
+            obstacleStyle: {
+              palette: [...base.obstacleStyle.palette, ...next.obstacleStyle.palette],
+              shapes: [...new Set([...base.obstacleStyle.shapes, ...next.obstacleStyle.shapes])]
+            }
+          };
+
+          this.player.fillColor = this.wcfg.player;
+          this.touchDot.fillColor = this.wcfg.glowB;
+        }
+
         updateHud(timeLeft){
           const panelX = 10, panelY = 8, panelW = W - 20, panelH = 64;
           this.hudBg.clear();
@@ -1852,7 +1524,8 @@ function getActiveUser() {
           const blackoutLabel = (this.blackoutOn) ? " • BLACKOUT" : "";
 
           this.uiTop.setText(`${modeLabel} • Score: ${Math.floor(this.score)}${blackoutLabel}`);
-          this.uiSub.setText(`${tLabel} • +${STREAK_BONUS}/${STREAK_EVERY}s`);
+          this.uiSub.setText(`${tLabel} • Dodge: ${Math.floor(this.dodgePts)} • Near: ${Math.floor(this.nearPts)} • +${STREAK_BONUS}/${STREAK_EVERY}s`);
+
           const cm = Math.min(COMBO_MAX, this.combo);
           this.uiCombo.setText(cm > 1.01 ? `x${cm.toFixed(2)}` : "");
         }
@@ -1900,6 +1573,10 @@ function getActiveUser() {
           let smin=20,smax=32;
           if (this.mode==="campaign"){
             const [a,b]=this.lcfg.size; smin=a; smax=b;
+          } else {
+            const tNorm = clamp(this.t/ENDLESS.rampSeconds,0,1);
+            smin = clamp(21 - Math.floor(tNorm*4), 16, 21);
+            smax = clamp(32 - Math.floor(tNorm*5), 22, 32);
           }
 
           let w=Phaser.Math.Between(smin,smax);
@@ -1920,13 +1597,55 @@ function getActiveUser() {
           o._nearAwarded=false;
           o._dodgeAwarded=false;
 
-          let driftChance=this.lcfg.driftChance;
-          let chaseChance=this.lcfg.chaseChance;
+          let driftChance=0, chaseChance=0;
+          if (this.mode==="campaign"){
+            driftChance=this.lcfg.driftChance;
+            chaseChance=this.lcfg.chaseChance;
+          } else {
+            const tNorm=clamp(this.t/ENDLESS.rampSeconds,0,1);
+            driftChance = 0.12 + 0.35*tNorm;
+            chaseChance = 0.01 + 0.12*tNorm;
+          }
 
           if (Math.random() < driftChance) o._drift = Phaser.Math.FloatBetween(-40, 40);
           if (Math.random() < chaseChance && this.t > 12) o._chase = true;
 
           this.obstacles.add(o);
+
+          let overlapChance=0;
+          if (this.mode==="campaign"){
+            overlapChance = clamp(0.06 + this.world*0.07 + this.level*0.06, 0, 0.44);
+          } else {
+            const tNorm=clamp(this.t/ENDLESS.rampSeconds,0,1);
+            overlapChance = 0.10 + 0.30*tNorm;
+          }
+
+          if (Math.random() < overlapChance && this.t > 6){
+            let col2 = Phaser.Math.Between(0, GRID_COLS-1);
+            if (col2===col) col2=(col+Phaser.Math.Between(1,GRID_COLS-1))%GRID_COLS;
+            const x2=GRID_X+col2*TILE+TILE/2;
+
+            const shape2=shapes[Phaser.Math.Between(0,shapes.length-1)];
+            const tex2=shapeToTex[shape2]||"obs_rect";
+            const color2=palette[Phaser.Math.Between(0,palette.length-1)];
+
+            const o2=this.add.image(x2, y-Phaser.Math.Between(18, 80), tex2).setTint(color2).setAlpha(0.90);
+            o2.displayWidth=Math.max(14, w*0.78);
+            o2.displayHeight=Math.max(14, h*0.78);
+
+            this.physics.add.existing(o2);
+            o2.body.setAllowGravity(false);
+            o2.body.setImmovable(true);
+            o2.body.setSize(o2.displayWidth*0.88,o2.displayHeight*0.88,true);
+
+            o2._nearAwarded=false;
+            o2._dodgeAwarded=false;
+
+            if (Math.random() < driftChance*0.7) o2._drift = Phaser.Math.FloatBetween(-35, 35);
+            if (Math.random() < chaseChance*0.7 && this.t>14) o2._chase = true;
+
+            this.obstacles.add(o2);
+          }
         }
 
         checkNearMiss(o){
@@ -1940,9 +1659,11 @@ function getActiveUser() {
             this.comboTimer=0;
             this.combo = Math.min(COMBO_MAX, this.combo + COMBO_STEP);
             this.maxCombo = Math.max(this.maxCombo, this.combo);
+
             const award = NEAR_POINTS * this.combo;
             this.nearPts += award;
             this.score += award;
+            this.playSfx("sfx_bonus");
           }
         }
 
@@ -1956,6 +1677,7 @@ function getActiveUser() {
             o._dodgeAwarded = true;
             this.dodgePts += DODGE_POINTS;
             this.score += DODGE_POINTS;
+            this.playSfx("sfx_bonus");
           }
         }
 
@@ -2116,11 +1838,9 @@ function getActiveUser() {
         scene: [PlayScene, ResultsScene]
       });
     }
-
-    // Boot
     window.addEventListener("load", () => {
-      loadMainMenu();
-    });
+  loadMainMenu();
+});
   </script>
 </body>
 </html>

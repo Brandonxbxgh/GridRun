@@ -151,6 +151,9 @@
   window.onerror = (m, s, l, c) => {
   alert("JS ERROR:\n" + m + "\n" + s + ":" + l + ":" + c);
 };
+window.addEventListener("unhandledrejection", (e) => {
+  alert("PROMISE ERROR:\n" + (e.reason?.message || e.reason));
+});
   /************************************************************
    * SUPABASE CLIENT (GLOBAL)
    ************************************************************/

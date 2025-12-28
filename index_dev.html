@@ -193,7 +193,7 @@ window.addEventListener("unhandledrejection", (e) => {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
-      .eq("user_id", currentUser.id)
+      .eq("id", currentUser.id)
       .single();
 
     if (error){

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1,user-scalable=no" />
+  <title>GRIDRUN</title>
+
+  <!-- =====================
+       GLOBAL STYLES (UNCHANGED THEME)
+       ===================== -->
+  <style>
+    :root{
+      --bgA:#1a1c30;
+      --bgB:#292942;
+      --accentA:#ff5733;
+      --accentB:#ff8b3d;
+      --glass:rgba(0,0,0,0.22);
+      --glass2:rgba(0,0,0,0.30);
+      --stroke:rgba(255,255,255,0.12);
+      --stroke2:rgba(255,255,255,0.18);
+      --text:rgba(255,255,255,0.92);
+      --muted:rgba(255,255,255,0.72);
+      --muted2:rgba(255,255,255,0.58);
+    }
+
+    body{
+      margin:0;
+      padding:0;
+      font-family:Verdana,sans-serif;
+      background:linear-gradient(135deg,var(--bgA),var(--bgB),var(--bgA));
+      animation:backgroundMove 10s infinite alternate;
+      height:100vh;
+      overflow:hidden;
+      color:white;
+    }
+
+    @keyframes backgroundMove {
+      0%{background-position:0% 50%}
+      100%{background-position:100% 50%}
+    }
+
+    #game-container{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100%;
+      text-align:center;
+    }
+
+    #phaser-container{
+      display:none;
+      width:100%;
+      height:100%;
+      justify-content:center;
+      align-items:center;
+    }
+
+    canvas{display:block;margin:0 auto;}
+
+    h1{
+      font-size:3rem;
+      font-weight:bold;
+      color:#fff;
+      text-shadow:0 0 20px var(--accentA),0 0 30px var(--accentA);
+      margin:0 0 8px 0;
+    }
+
+    p{font-size:18px;margin:10px 0;}
+
+    button{
+      margin:8px;
+      padding:15px 30px;
+      font-size:1rem;
+      font-weight:bold;
+      color:white;
+      background:linear-gradient(45deg,var(--accentA),var(--accentB));
+      border:none;
+      border-radius:50px;
+      cursor:pointer;
+      box-shadow:0 4px 10px rgba(0,0,0,.4),0 0 15px rgba(255,87,51,.7);
+      transition:transform .2s,box-shadow .3s,opacity .2s;
+    }
+
+    button:hover{
+      transform:translateY(-4px);
+      box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 25px rgba(255,110,60,1)
+    }
+
+    button:active{
+      transform:translateY(2px);
+      box-shadow:0 2px 5px rgba(0,0,0,.3),0 0 10px rgba(255,79,40,.9)
+    }
+
+    button:disabled{
+      opacity:.35;
+      cursor:not-allowed;
+      filter:grayscale(.25);
+      box-shadow:none;
+      transform:none
+    }
+
+    .menu-screen{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:10px;
+      padding:20px;
+      max-width:560px;
+      width:100%;
+    }
+
+    .panel{
+      width:100%;
+      background:var(--glass);
+      border:1px solid var(--stroke);
+      border-radius:18px;
+      padding:14px;
+      box-shadow:0 10px 26px rgba(0,0,0,0.28);
+      backdrop-filter: blur(6px);
+    }
+
+    input{
+      width:100%;
+      padding:14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.16);
+      background:rgba(0,0,0,0.25);
+      color:white;
+      font-size:16px;
+      outline:none;
+      box-sizing:border-box;
+      margin-bottom:10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="game-container"></div>
+  <div id="phaser-container"></div>
+
+  <!-- =====================
+       PHASER
+       ===================== -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+
+  <!-- =====================
+       SUPABASE CLIENT
+       ===================== -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    /* ======================================================
+       SUPABASE GLOBAL CONFIG (EMBEDDED – DO NOT EDIT)
+       ====================================================== */
+    const SUPABASE_URL = "https://pgoeyzhnrafupqvfrdnn.supabase.co";
+    const SUPABASE_ANON_KEY =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnb2V5emhucmFmdXBxdmZyZG5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3OTQzNTMsImV4cCI6MjA4MjM3MDM1M30.Nh7Q3VKna6eQcaqRozccFKEaSHIG0t18h6Pw37hQ4i8";
+
+    const supabase = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
+
+    /* ======================================================
+       GLOBAL AUTH STATE
+       ====================================================== */
+    let currentUser = null;
+    let currentProfile = null;
+
+    async function initAuth(){
+      const { data } = await supabase.auth.getSession();
+      currentUser = data.session?.user || null;
+
+      if (!currentUser){
+        loadAuthGate();
+      } else {
+        await loadProfile();
+        loadMainMenu();
+      }
+    }
+
+    async function loadProfile(){
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .single();
+
+      if (error){
+        console.error(error);
+        await supabase.auth.signOut();
+        loadAuthGate();
+        return;
+      }
+
+      currentProfile = data;
+    }
+        /* ======================================================
+       AUTH UI (GLOBAL)
+       ====================================================== */
+
+    function loadAuthGate(){
+      const c = document.getElementById("game-container");
+      c.style.display = "flex";
+      document.getElementById("phaser-container").style.display = "none";
+
+      c.innerHTML = `
+        <div class="menu-screen">
+          <h1>GRIDRUN</h1>
+          <p>Login or create an account</p>
+          <button onclick="loadLogin()">LOGIN</button>
+          <button onclick="loadSignup()">CREATE ACCOUNT</button>
+        </div>
+      `;
+    }
+
+    function loadLogin(){
+      const c = document.getElementById("game-container");
+      c.innerHTML = `
+        <div class="menu-screen">
+          <h1>Login</h1>
+          <input id="loginEmail" placeholder="Email" />
+          <input id="loginPassword" type="password" placeholder="Password" />
+          <button onclick="doLogin()">Login</button>
+          <button onclick="loadAuthGate()">Back</button>
+        </div>
+      `;
+    }
+
+    async function doLogin(){
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email, password
+      });
+
+      if (error){
+        alert(error.message);
+        return;
+      }
+
+      await initAuth();
+    }
+
+    function loadSignup(){
+      const c = document.getElementById("game-container");
+      c.innerHTML = `
+        <div class="menu-screen">
+          <h1>Create Account</h1>
+          <input id="signupUsername" placeholder="Username (unique)" />
+          <input id="signupEmail" placeholder="Email" />
+          <input id="signupPassword" type="password" placeholder="Password" />
+          <button onclick="doSignup()">Create</button>
+          <button onclick="loadAuthGate()">Back</button>
+        </div>
+      `;
+    }
+
+    async function doSignup(){
+      const username = document.getElementById("signupUsername").value.trim();
+      const email = document.getElementById("signupEmail").value.trim();
+      const password = document.getElementById("signupPassword").value;
+
+      if (!username || !email || !password){
+        alert("All fields required");
+        return;
+      }
+
+      // check unique username
+      const { data:existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", username)
+        .maybeSingle();
+
+      if (existing){
+        alert("Username already taken");
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password
+      });
+
+      if (error){
+        alert(error.message);
+        return;
+      }
+
+      // create profile
+      await supabase.from("profiles").insert({
+        id: data.user.id,
+        username
+      });
+
+      await initAuth();
+    }
+
+    function logout(){
+      supabase.auth.signOut();
+      loadAuthGate();
+    }
+
+    /* ======================================================
+       MAIN MENU
+       ====================================================== */
+
+    function loadMainMenu(){
+      const c = document.getElementById("game-container");
+      c.style.display = "flex";
+      document.getElementById("phaser-container").style.display = "none";
+
+      c.innerHTML = `
+        <div class="menu-screen">
+          <h1>GRIDRUN</h1>
+          <p>Welcome, <b>${currentProfile.username}</b></p>
+          <button onclick="loadModeSelect()">PLAY</button>
+          <button onclick="loadAccount()">ACCOUNT</button>
+          <button onclick="logout()">LOGOUT</button>
+        </div>
+      `;
+    }
+
+    function loadAccount(){
+      const c = document.getElementById("game-container");
+      c.innerHTML = `
+        <div class="menu-screen">
+          <h1>Account</h1>
+          <p>Username: <b>${currentProfile.username}</b></p>
+          <p>Email: ${currentUser.email}</p>
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+
+    function loadModeSelect(){
+      const c = document.getElementById("game-container");
+      c.innerHTML = `
+        <div class="menu-screen">
+          <h1>Select Mode</h1>
+          <button onclick="startGameplay({mode:'campaign'})">Campaign</button>
+          <button onclick="startGameplay({mode:'endless'})">Endless</button>
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+        /* ======================================================
+       GLOBAL PROGRESS (SUPABASE)
+       ====================================================== */
+
+    async function loadProgress(){
+      const { data } = await supabase
+        .from("progress")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .single();
+
+      if (!data){
+        await supabase.from("progress").insert({
+          user_id: currentUser.id
+        });
+        return loadProgress();
+      }
+      return data;
+    }
+
+    async function saveProgress(p){
+      await supabase
+        .from("progress")
+        .update(p)
+        .eq("user_id", currentUser.id);
+    }
+
+    /* ======================================================
+       PHASER BOOT
+       ====================================================== */
+
+    let phaserGame = null;
+
+    function startGameplay(payload){
+      document.getElementById("game-container").style.display = "none";
+      document.getElementById("phaser-container").style.display = "flex";
+
+      if (!phaserGame){
+        phaserGame = createPhaserGame();
+      }
+
+      phaserGame.scene.stop("Results");
+      phaserGame.scene.stop("Play");
+      phaserGame.scene.start("Play", payload);
+    }
+
+    function createPhaserGame(){
+      const W = 420, H = 760;
+
+      class PlayScene extends Phaser.Scene{
+        constructor(){ super("Play"); }
+        create(){
+          this.add.rectangle(W/2,H/2,W,H,0x111122);
+          this.add.text(W/2,H/2,"GAME RUNNING",{color:"#fff"}).setOrigin(0.5);
+          this.input.once("pointerdown",()=>{
+            this.scene.start("Results",{score:Math.floor(Math.random()*1000)});
+          });
+        }
+      }
+
+      class ResultsScene extends Phaser.Scene{
+        constructor(){ super("Results"); }
+        create(data){
+          this.add.rectangle(W/2,H/2,W,H,0x000000);
+          this.add.text(W/2,H*0.4,`Score: ${data.score}`,{color:"#fff"}).setOrigin(0.5);
+          this.add.text(W/2,H*0.6,"Tap to Menu",{color:"#aaa"}).setOrigin(0.5);
+          this.input.once("pointerdown",()=>{
+            document.getElementById("phaser-container").style.display="none";
+            loadMainMenu();
+          });
+        }
+      }
+
+      return new Phaser.Game({
+        type: Phaser.AUTO,
+        width: W,
+        height: H,
+        parent: "phaser-container",
+        physics:{ default:"arcade" },
+        scene:[PlayScene, ResultsScene]
+      });
+    }
+        /* ======================================================
+       BOOT
+       ====================================================== */
+    window.addEventListener("load", () => {
+      initAuth();
+    });
+  </script>
+</body>
+</html>

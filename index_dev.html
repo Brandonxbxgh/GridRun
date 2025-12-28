@@ -150,6 +150,11 @@
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const gc = document.getElementById("game-container");
+  gc.innerHTML += "<div style='padding:18px;color:#fff;font-family:Verdana'>Phaser: " + (window.Phaser ? "✅" : "❌") + "</div>";
+  gc.innerHTML += "<div style='padding:18px;color:#fff;font-family:Verdana'>Supabase: " + (window.supabase ? "✅" : "❌") + "</div>";
+</script>
 
   <script>
   window.onerror = (m, s, l, c) => {

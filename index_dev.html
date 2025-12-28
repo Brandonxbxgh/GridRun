@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1,user-scalable=no" />
   <title>GRIDRUN</title>
 
-  <!-- =====================
-       GLOBAL STYLES (UNCHANGED THEME)
-       ===================== -->
   <style>
     :root{
       --bgA:#1a1c30;
@@ -24,16 +21,12 @@
     }
 
     body{
-      margin:0;
-      padding:0;
+      margin:0;padding:0;
       font-family:Verdana,sans-serif;
       background:linear-gradient(135deg,var(--bgA),var(--bgB),var(--bgA));
       animation:backgroundMove 10s infinite alternate;
-      height:100vh;
-      overflow:hidden;
-      color:white;
+      height:100vh; overflow:hidden; color:white;
     }
-
     @keyframes backgroundMove {
       0%{background-position:0% 50%}
       100%{background-position:100% 50%}
@@ -46,7 +39,6 @@
       height:100%;
       text-align:center;
     }
-
     #phaser-container{
       display:none;
       width:100%;
@@ -54,7 +46,6 @@
       justify-content:center;
       align-items:center;
     }
-
     canvas{display:block;margin:0 auto;}
 
     h1{
@@ -64,7 +55,6 @@
       text-shadow:0 0 20px var(--accentA),0 0 30px var(--accentA);
       margin:0 0 8px 0;
     }
-
     p{font-size:18px;margin:10px 0;}
 
     button{
@@ -80,23 +70,16 @@
       box-shadow:0 4px 10px rgba(0,0,0,.4),0 0 15px rgba(255,87,51,.7);
       transition:transform .2s,box-shadow .3s,opacity .2s;
     }
-
     button:hover{
       transform:translateY(-4px);
       box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 25px rgba(255,110,60,1)
     }
-
-    button:active{
-      transform:translateY(2px);
-      box-shadow:0 2px 5px rgba(0,0,0,.3),0 0 10px rgba(255,79,40,.9)
-    }
-
     button:disabled{
       opacity:.35;
       cursor:not-allowed;
       filter:grayscale(.25);
       box-shadow:none;
-      transform:none
+      transform:none;
     }
 
     .menu-screen{
@@ -109,6 +92,14 @@
       width:100%;
     }
 
+    .subhead{
+      font-size:14px;
+      color:var(--muted);
+      margin:0 0 14px 0;
+      line-height:1.4;
+      max-width:520px;
+    }
+
     .panel{
       width:100%;
       background:var(--glass);
@@ -119,17 +110,29 @@
       backdrop-filter: blur(6px);
     }
 
-    input{
-      width:100%;
-      padding:14px;
-      border-radius:14px;
-      border:1px solid rgba(255,255,255,0.16);
-      background:rgba(0,0,0,0.25);
-      color:white;
-      font-size:16px;
-      outline:none;
-      box-sizing:border-box;
+    .panelTitle{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
       margin-bottom:10px;
+    }
+    .panelTitle strong{
+      font-size:14px;
+      color:var(--text);
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(0,0,0,0.25);
+      border:1px solid var(--stroke);
+      color:var(--muted);
+      font-size:12px;
+      user-select:none;
     }
   </style>
 </head>
@@ -138,302 +141,595 @@
   <div id="game-container"></div>
   <div id="phaser-container"></div>
 
-  <!-- =====================
-       PHASER
-       ===================== -->
+  <!-- Phaser -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
-  <!-- =====================
-       SUPABASE CLIENT
-       ===================== -->
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
-    /* ======================================================
-       SUPABASE GLOBAL CONFIG (EMBEDDED – DO NOT EDIT)
-       ====================================================== */
-    const SUPABASE_URL = "https://pgoeyzhnrafupqvfrdnn.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnb2V5emhucmFmdXBxdmZyZG5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3OTQzNTMsImV4cCI6MjA4MjM3MDM1M30.Nh7Q3VKna6eQcaqRozccFKEaSHIG0t18h6Pw37hQ4i8";
+  /************************************************************
+   * SUPABASE CLIENT (GLOBAL)
+   ************************************************************/
+  const SUPABASE_URL = "https://pgoeyzhnrafupqvfrdnn.supabase.co";
+  const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnb2V5emhucmFmdXBxdmZyZG5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3OTQzNTMsImV4cCI6MjA4MjM3MDM1M30.Nh7Q3VKna6eQcaqRozccFKEaSHIG0t18h6Pw37hQ4i8";
 
-    const supabase = window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY
-    );
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    /* ======================================================
-       GLOBAL AUTH STATE
-       ====================================================== */
-    let currentUser = null;
-    let currentProfile = null;
+  /************************************************************
+   * GLOBAL AUTH STATE
+   ************************************************************/
+  let currentUser = null;
+  let currentProfile = null;
 
-    async function initAuth(){
-      const { data } = await supabase.auth.getSession();
-      currentUser = data.session?.user || null;
-
-      if (!currentUser){
-        loadAuthGate();
-      } else {
-        await loadProfile();
-        loadMainMenu();
-      }
+  async function requireAuth(){
+    const { data:{ session } } = await supabase.auth.getSession();
+    if (!session){
+      loadAuthGate();
+      return false;
     }
+    currentUser = session.user;
+    await loadProfile();
+    return true;
+  }
 
-    async function loadProfile(){
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", currentUser.id)
-        .single();
+  async function loadProfile(){
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .single();
 
-      if (error){
-        console.error(error);
-        await supabase.auth.signOut();
-        loadAuthGate();
-        return;
-      }
-
-      currentProfile = data;
+    if (error){
+      console.error("Profile load error", error);
+      return;
     }
-        /* ======================================================
-       AUTH UI (GLOBAL)
-       ====================================================== */
+    currentProfile = data;
+  }
 
-    function loadAuthGate(){
-      const c = document.getElementById("game-container");
-      c.style.display = "flex";
-      document.getElementById("phaser-container").style.display = "none";
+  function showMenus(){
+    document.getElementById("phaser-container").style.display = "none";
+    document.getElementById("game-container").style.display = "flex";
+  }
 
-      c.innerHTML = `
-        <div class="menu-screen">
-          <h1>GRIDRUN</h1>
-          <p>Login or create an account</p>
+  function showGameplay(){
+    document.getElementById("game-container").style.display = "none";
+    document.getElementById("phaser-container").style.display = "flex";
+  }
+
+  /************************************************************
+   * AUTH UI (GLOBAL)
+   ************************************************************/
+  function loadAuthGate(){
+    const c = document.getElementById("game-container");
+    c.innerHTML = `
+      <div class="menu-screen">
+        <h1>GRIDRUN</h1>
+        <p class="subhead">Create an account or sign in to play.</p>
+
+        <div class="panel">
           <button onclick="loadLogin()">LOGIN</button>
           <button onclick="loadSignup()">CREATE ACCOUNT</button>
         </div>
-      `;
-    }
+      </div>
+    `;
+  }
 
-    function loadLogin(){
-      const c = document.getElementById("game-container");
-      c.innerHTML = `
-        <div class="menu-screen">
-          <h1>Login</h1>
-          <input id="loginEmail" placeholder="Email" />
-          <input id="loginPassword" type="password" placeholder="Password" />
-          <button onclick="doLogin()">Login</button>
-          <button onclick="loadAuthGate()">Back</button>
+  function loadLogin(){
+    const c = document.getElementById("game-container");
+    c.innerHTML = `
+      <div class="menu-screen">
+        <h1>Login</h1>
+
+        <div class="panel" style="text-align:left;">
+          <input id="loginEmail" placeholder="Email" style="width:100%;padding:14px;margin-bottom:10px" />
+          <input id="loginPass" type="password" placeholder="Password" style="width:100%;padding:14px" />
+          <button onclick="doLogin()">Confirm</button>
         </div>
-      `;
-    }
 
-    async function doLogin(){
-      const email = document.getElementById("loginEmail").value.trim();
-      const password = document.getElementById("loginPassword").value;
+        <button onclick="loadAuthGate()">Back</button>
+      </div>
+    `;
+  }
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email, password
-      });
+  async function doLogin(){
+    const email = document.getElementById("loginEmail").value;
+    const password = document.getElementById("loginPass").value;
 
-      if (error){
-        alert(error.message);
-        return;
-      }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error){ alert(error.message); return; }
 
-      await initAuth();
-    }
+    await requireAuth();
+    loadMainMenu();
+  }
 
-    function loadSignup(){
-      const c = document.getElementById("game-container");
-      c.innerHTML = `
-        <div class="menu-screen">
-          <h1>Create Account</h1>
-          <input id="signupUsername" placeholder="Username (unique)" />
-          <input id="signupEmail" placeholder="Email" />
-          <input id="signupPassword" type="password" placeholder="Password" />
+  function loadSignup(){
+    const c = document.getElementById("game-container");
+    c.innerHTML = `
+      <div class="menu-screen">
+        <h1>Create Account</h1>
+
+        <div class="panel" style="text-align:left;">
+          <input id="signupEmail" placeholder="Email" style="width:100%;padding:14px;margin-bottom:10px" />
+          <input id="signupUser" placeholder="Username" style="width:100%;padding:14px;margin-bottom:10px" />
+          <input id="signupPass" type="password" placeholder="Password" style="width:100%;padding:14px" />
           <button onclick="doSignup()">Create</button>
-          <button onclick="loadAuthGate()">Back</button>
         </div>
-      `;
-    }
 
-    async function doSignup(){
-      const username = document.getElementById("signupUsername").value.trim();
-      const email = document.getElementById("signupEmail").value.trim();
-      const password = document.getElementById("signupPassword").value;
+        <button onclick="loadAuthGate()">Back</button>
+      </div>
+    `;
+  }
 
-      if (!username || !email || !password){
-        alert("All fields required");
-        return;
-      }
+  async function doSignup(){
+    const email = signupEmail.value;
+    const password = signupPass.value;
+    const username = signupUser.value.trim();
 
-      // check unique username
-      const { data:existing } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("username", username)
-        .maybeSingle();
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error){ alert(error.message); return; }
 
-      if (existing){
-        alert("Username already taken");
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password
-      });
-
-      if (error){
-        alert(error.message);
-        return;
-      }
-
-      // create profile
-      await supabase.from("profiles").insert({
-        id: data.user.id,
-        username
-      });
-
-      await initAuth();
-    }
-
-    function logout(){
-      supabase.auth.signOut();
-      loadAuthGate();
-    }
-
-    /* ======================================================
-       MAIN MENU
-       ====================================================== */
-
-    function loadMainMenu(){
-      const c = document.getElementById("game-container");
-      c.style.display = "flex";
-      document.getElementById("phaser-container").style.display = "none";
-
-      c.innerHTML = `
-        <div class="menu-screen">
-          <h1>GRIDRUN</h1>
-          <p>Welcome, <b>${currentProfile.username}</b></p>
-          <button onclick="loadModeSelect()">PLAY</button>
-          <button onclick="loadAccount()">ACCOUNT</button>
-          <button onclick="logout()">LOGOUT</button>
-        </div>
-      `;
-    }
-
-    function loadAccount(){
-      const c = document.getElementById("game-container");
-      c.innerHTML = `
-        <div class="menu-screen">
-          <h1>Account</h1>
-          <p>Username: <b>${currentProfile.username}</b></p>
-          <p>Email: ${currentUser.email}</p>
-          <button onclick="loadMainMenu()">Back</button>
-        </div>
-      `;
-    }
-
-    function loadModeSelect(){
-      const c = document.getElementById("game-container");
-      c.innerHTML = `
-        <div class="menu-screen">
-          <h1>Select Mode</h1>
-          <button onclick="startGameplay({mode:'campaign'})">Campaign</button>
-          <button onclick="startGameplay({mode:'endless'})">Endless</button>
-          <button onclick="loadMainMenu()">Back</button>
-        </div>
-      `;
-    }
-        /* ======================================================
-       GLOBAL PROGRESS (SUPABASE)
-       ====================================================== */
-
-    async function loadProgress(){
-      const { data } = await supabase
-        .from("progress")
-        .select("*")
-        .eq("user_id", currentUser.id)
-        .single();
-
-      if (!data){
-        await supabase.from("progress").insert({
-          user_id: currentUser.id
-        });
-        return loadProgress();
-      }
-      return data;
-    }
-
-    async function saveProgress(p){
-      await supabase
-        .from("progress")
-        .update(p)
-        .eq("user_id", currentUser.id);
-    }
-
-    /* ======================================================
-       PHASER BOOT
-       ====================================================== */
-
-    let phaserGame = null;
-
-    function startGameplay(payload){
-      document.getElementById("game-container").style.display = "none";
-      document.getElementById("phaser-container").style.display = "flex";
-
-      if (!phaserGame){
-        phaserGame = createPhaserGame();
-      }
-
-      phaserGame.scene.stop("Results");
-      phaserGame.scene.stop("Play");
-      phaserGame.scene.start("Play", payload);
-    }
-
-    function createPhaserGame(){
-      const W = 420, H = 760;
-
-      class PlayScene extends Phaser.Scene{
-        constructor(){ super("Play"); }
-        create(){
-          this.add.rectangle(W/2,H/2,W,H,0x111122);
-          this.add.text(W/2,H/2,"GAME RUNNING",{color:"#fff"}).setOrigin(0.5);
-          this.input.once("pointerdown",()=>{
-            this.scene.start("Results",{score:Math.floor(Math.random()*1000)});
-          });
-        }
-      }
-
-      class ResultsScene extends Phaser.Scene{
-        constructor(){ super("Results"); }
-        create(data){
-          this.add.rectangle(W/2,H/2,W,H,0x000000);
-          this.add.text(W/2,H*0.4,`Score: ${data.score}`,{color:"#fff"}).setOrigin(0.5);
-          this.add.text(W/2,H*0.6,"Tap to Menu",{color:"#aaa"}).setOrigin(0.5);
-          this.input.once("pointerdown",()=>{
-            document.getElementById("phaser-container").style.display="none";
-            loadMainMenu();
-          });
-        }
-      }
-
-      return new Phaser.Game({
-        type: Phaser.AUTO,
-        width: W,
-        height: H,
-        parent: "phaser-container",
-        physics:{ default:"arcade" },
-        scene:[PlayScene, ResultsScene]
-      });
-    }
-        /* ======================================================
-       BOOT
-       ====================================================== */
-    window.addEventListener("load", () => {
-      initAuth();
+    await supabase.from("profiles").insert({
+      user_id: data.user.id,
+      username
     });
+
+    await requireAuth();
+    loadMainMenu();
+  }
+
+  async function logout(){
+    await supabase.auth.signOut();
+    currentUser = null;
+    currentProfile = null;
+    loadAuthGate();
+  }
+
+  /************************************************************
+   * BOOT
+   ************************************************************/
+  window.addEventListener("load", async () => {
+    showMenus();
+    const ok = await requireAuth();
+    if (ok) loadMainMenu();
+  });
   </script>
-</body>
-</html>
+  <script>
+/************************************************************
+ * GLOBAL SAVE + PROGRESS (SUPABASE)
+ * Tables used:
+ *  - profiles
+ *  - progress
+ *  - scores
+ ************************************************************/
+
+/***************
+ * DEFAULT STATE
+ ***************/
+function defaultProgress(){
+  return {
+    worldsUnlocked: 1,
+    levelsUnlocked: [1,0,0],
+    bestScores: [
+      [0,0,0,0,0],
+      [0,0,0,0,0],
+      [0,0,0,0,0],
+    ],
+    endlessBest: 0
+  };
+}
+
+let progress = defaultProgress();
+
+/***************
+ * LOAD PROGRESS
+ ***************/
+async function loadProgress(){
+  if (!currentUser) return defaultProgress();
+
+  const { data, error } = await supabase
+    .from("progress")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .single();
+
+  if (error || !data){
+    // create fresh row if none exists
+    await supabase.from("progress").insert({
+      user_id: currentUser.id,
+      ...defaultProgress()
+    });
+    progress = defaultProgress();
+    return progress;
+  }
+
+  progress = {
+    worldsUnlocked: data.worldsUnlocked,
+    levelsUnlocked: data.levelsUnlocked,
+    bestScores: data.bestScores,
+    endlessBest: data.endlessBest
+  };
+  return progress;
+}
+
+/***************
+ * SAVE PROGRESS
+ ***************/
+async function saveProgress(){
+  if (!currentUser) return;
+
+  await supabase
+    .from("progress")
+    .update({
+      worldsUnlocked: progress.worldsUnlocked,
+      levelsUnlocked: progress.levelsUnlocked,
+      bestScores: progress.bestScores,
+      endlessBest: progress.endlessBest,
+      updated_at: new Date()
+    })
+    .eq("user_id", currentUser.id);
+}
+
+/************************************************************
+ * LEADERBOARDS (GLOBAL)
+ ************************************************************/
+function sumCampaignTotals(p){
+  const worldTotals = [0,0,0];
+  for (let w=0; w<3; w++){
+    for (let l=0; l<5; l++){
+      worldTotals[w] += Math.floor(p.bestScores[w][l] || 0);
+    }
+  }
+  return {
+    campaignTotal: worldTotals.reduce((a,b)=>a+b,0),
+    worldTotals
+  };
+}
+
+async function updateLeaderboardsFromProgress(){
+  if (!currentUser || !currentProfile) return;
+
+  const totals = sumCampaignTotals(progress);
+
+  await supabase
+    .from("scores")
+    .upsert({
+      user_id: currentUser.id,
+      username: currentProfile.username,
+      endlessBest: progress.endlessBest,
+      campaignTotal: totals.campaignTotal,
+      worldTotals: totals.worldTotals,
+      updated_at: new Date()
+    }, { onConflict: "user_id" });
+}
+
+/***************
+ * FETCH LEADERBOARD
+ ***************/
+async function fetchLeaderboard(metric){
+  let column = "endlessBest";
+  if (metric==="campaign") column="campaignTotal";
+  if (metric==="w1") column="worldTotals->>0";
+  if (metric==="w2") column="worldTotals->>1";
+  if (metric==="w3") column="worldTotals->>2";
+
+  const { data } = await supabase
+    .from("scores")
+    .select("*")
+    .order(column, { ascending:false })
+    .limit(25);
+
+  return data || [];
+}
+</script>
+<script>
+/************************************************************
+ * MENUS (GLOBAL DATA)
+ * UI IS IDENTICAL — ONLY DATA SOURCE CHANGED
+ ************************************************************/
+
+async function showMenus(){
+  document.getElementById("phaser-container").style.display = "none";
+  document.getElementById("game-container").style.display = "flex";
+  startMenuMusic();
+}
+
+/***********************
+ * MAIN MENU
+ ***********************/
+async function loadMainMenu(){
+  startMenuMusic();
+  if (!currentUser) return loadAuthGate();
+
+  await loadProfile();
+  await loadProgress();
+
+  const container = document.getElementById("game-container");
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>GRIDRUN</h1>
+      <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
+
+      <button onclick="loadModeSelect()">PLAY</button>
+      <button onclick="loadAccount()">ACCOUNT</button>
+      <button onclick="loadLeaderboards()">LEADERBOARDS</button>
+      <button onclick="loadHowTo()">HOW TO PLAY</button>
+      <button onclick="loadSettings()">SETTINGS</button>
+    </div>
+  `;
+}
+
+/***********************
+ * MODE SELECT
+ ***********************/
+function loadModeSelect(){
+  const container = document.getElementById("game-container");
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Select Mode</h1>
+      <div class="panel">
+        <button onclick="loadCampaignMode()">Campaign</button>
+        <button onclick="loadEndlessIntro()">Endless</button>
+      </div>
+      <button onclick="loadMainMenu()">Back</button>
+    </div>
+  `;
+}
+
+/***********************
+ * CAMPAIGN
+ ***********************/
+async function loadCampaignMode(){
+  await loadProgress();
+  const container = document.getElementById("game-container");
+
+  const worldButtons = worlds.map((w,i)=>`
+    <button onclick="loadWorld(${i+1})" ${progress.worldsUnlocked>i?"":"disabled"}>
+      ${progress.worldsUnlocked>i?w.name:"Locked"}
+    </button>
+  `).join("");
+
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Campaign</h1>
+      <div class="panel">${worldButtons}</div>
+      <button onclick="loadModeSelect()">Back</button>
+    </div>
+  `;
+}
+
+/***********************
+ * WORLD
+ ***********************/
+async function loadWorld(worldNumber){
+  await loadProgress();
+  const w = worldNumber-1;
+  const unlocked = progress.levelsUnlocked[w] || 0;
+
+  const container = document.getElementById("game-container");
+  const levelButtons = Array.from({length:5},(_,i)=>{
+    const best = progress.bestScores[w][i] || 0;
+    const ld = levelData(w,i);
+    return `
+      <button onclick="loadLevelIntro(${worldNumber},${i+1})" ${i<unlocked?"":"disabled"}>
+        ${i<unlocked?`Level ${i+1} • ${ld.time}s • Best ${best}`:"Locked"}
+      </button>
+    `;
+  }).join("");
+
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>${worlds[w].name}</h1>
+      <p class="subhead">${worlds[w].description}</p>
+      <div class="panel">${levelButtons}</div>
+      <button onclick="loadCampaignMode()">Back</button>
+    </div>
+  `;
+}
+
+/***********************
+ * LEVEL INTRO
+ ***********************/
+async function loadLevelIntro(worldNumber, levelNumber){
+  await loadProgress();
+  const w=worldNumber-1, l=levelNumber-1;
+  const ld = levelData(w,l);
+  const best = progress.bestScores[w][l] || 0;
+
+  const container = document.getElementById("game-container");
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Level ${levelNumber}</h1>
+      <p class="subhead">${worlds[w].name}</p>
+
+      <div class="panel">
+        <p>Survive ${ld.time}s</p>
+        <p>Your Best: <b>${best}</b></p>
+        <p>Bronze ${ld.scores.bronze} • Silver ${ld.scores.silver} • Gold ${ld.scores.gold}</p>
+      </div>
+
+      <button onclick="playLevel(${worldNumber},${levelNumber})">Start</button>
+      <button onclick="loadWorld(${worldNumber})">Back</button>
+    </div>
+  `;
+}
+
+/***********************
+ * ENDLESS
+ ***********************/
+async function loadEndlessIntro(){
+  await loadProgress();
+  const container = document.getElementById("game-container");
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Endless</h1>
+      <div class="panel">
+        <p>Best: <b>${progress.endlessBest}</b></p>
+        <button onclick="startGameplay({mode:'endless'})">Start Endless</button>
+      </div>
+      <button onclick="loadModeSelect()">Back</button>
+    </div>
+  `;
+}
+</script>
+<script>
+/************************************************************
+ * ACCOUNT (GLOBAL)
+ ************************************************************/
+async function loadAccount(){
+  if (!currentUser) return loadAuthGate();
+
+  await loadProfile();
+  await loadProgress();
+
+  const totals = sumCampaignTotals(progress);
+  const container = document.getElementById("game-container");
+
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Account</h1>
+      <p class="subhead">
+        Logged in as <b>${profile.username}</b><br>
+        <span style="font-size:12px;opacity:.7">${currentUser.email}</span>
+      </p>
+
+      <div class="panel" style="text-align:left;">
+        <div class="panelTitle">
+          <strong>Your Stats</strong>
+          <span class="pill">Global</span>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+          <span class="pill">Endless Best <b>${progress.endlessBest}</b></span>
+          <span class="pill">Campaign Total <b>${totals.campaignTotal}</b></span>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="panelTitle">
+          <strong>Edit Username</strong>
+          <span class="pill">Unique</span>
+        </div>
+
+        <input id="usernameEdit"
+          value="${profile.username}"
+          style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.16);
+          background:rgba(0,0,0,.25);color:white;font-size:16px;" />
+
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:10px">
+          <button onclick="saveUsernameChange()">Save</button>
+          <button onclick="logout()">Logout</button>
+        </div>
+      </div>
+
+      <button onclick="loadMainMenu()">Back</button>
+    </div>
+  `;
+}
+
+async function saveUsernameChange(){
+  const el = document.getElementById("usernameEdit");
+  const newU = sanitizeUsername(el?.value);
+  if (!newU) return alert("Invalid username.");
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ username:newU })
+    .eq("id", currentUser.id);
+
+  if (error){
+    alert("Username already taken.");
+    return;
+  }
+
+  await loadProfile();
+  loadAccount();
+}
+
+/************************************************************
+ * LEADERBOARDS (GLOBAL)
+ ************************************************************/
+async function loadLeaderboards(){
+  if (!currentUser) return loadAuthGate();
+
+  const container = document.getElementById("game-container");
+
+  const { data, error } = await supabase
+    .from("leaderboards")
+    .select("username,endless_best,campaign_total,world1,world2,world3")
+    .order("campaign_total", { ascending:false })
+    .limit(25);
+
+  if (error){
+    container.innerHTML = `<p>Error loading leaderboards.</p>`;
+    return;
+  }
+
+  const rows = data.map((r,i)=>`
+    <div class="lbRow ${r.username===profile.username?"me":""}">
+      <div>#${i+1}</div>
+      <div>${r.username}</div>
+      <div style="text-align:right">${r.campaign_total}</div>
+    </div>
+  `).join("");
+
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Leaderboards</h1>
+      <p class="subhead">Global rankings</p>
+
+      <div class="panel">
+        <div class="lbHeader">
+          <div>RANK</div><div>PLAYER</div><div>SCORE</div>
+        </div>
+        <div class="lbWrap">${rows}</div>
+      </div>
+
+      <button onclick="loadMainMenu()">Back</button>
+    </div>
+  `;
+}
+
+/************************************************************
+ * GAMEPLAY → SUPABASE BRIDGE
+ ************************************************************/
+window.GRIDRUN = {
+  completeCampaignLevel: async (worldIdx, levelIdx, score)=>{
+    await loadProgress();
+
+    progress.bestScores[worldIdx][levelIdx] =
+      Math.max(progress.bestScores[worldIdx][levelIdx], score);
+
+    if (progress.levelsUnlocked[worldIdx] === levelIdx+1){
+      progress.levelsUnlocked[worldIdx]++;
+      if (levelIdx===4 && worldIdx<2){
+        progress.worldsUnlocked = Math.max(progress.worldsUnlocked, worldIdx+2);
+        progress.levelsUnlocked[worldIdx+1] = 1;
+      }
+    }
+
+    await saveProgress();
+    await updateLeaderboardRow();
+  },
+
+  setEndlessBest: async (score)=>{
+    await loadProgress();
+    progress.endlessBest = Math.max(progress.endlessBest, score);
+    await saveProgress();
+    await updateLeaderboardRow();
+  },
+
+  getTierTargets:(w,l)=>levelData(w,l).scores,
+  backToLevelSelect:(w)=>{ showMenus(); loadWorld(w+1); },
+  backToMainMenu:()=>{ showMenus(); loadMainMenu(); }
+};
+
+/************************************************************
+ * BOOT (GLOBAL AUTH REQUIRED)
+ ************************************************************/
+window.addEventListener("load", async ()=>{
+  showMenus();
+  await initAuth();
+});
+</script>

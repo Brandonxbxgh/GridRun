@@ -5,237 +5,2250 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1,user-scalable=no" />
   <title>GRIDRUN</title>
   <style>
-    /* Reset and General Styling */
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: 'Verdana', sans-serif;
-      background: linear-gradient(135deg, #1a1c30, #292942, #1a1c30);
-      animation: backgroundMove 10s infinite alternate;
-      height: 100vh;
-      overflow: hidden;
-      color: white;
+    :root{
+      --bgA:#1a1c30;
+      --bgB:#292942;
+      --accentA:#ff5733;
+      --accentB:#ff8b3d;
+      --glass:rgba(0,0,0,0.22);
+      --glass2:rgba(0,0,0,0.30);
+      --stroke:rgba(255,255,255,0.12);
+      --stroke2:rgba(255,255,255,0.18);
+      --text:rgba(255,255,255,0.92);
+      --muted:rgba(255,255,255,0.72);
+      --muted2:rgba(255,255,255,0.58);
     }
 
-    @keyframes backgroundMove {
-      0% { background-position: 0% 50%; }
-      100% { background-position: 100% 50%; }
+    body{
+      margin:0;padding:0;
+      font-family:Verdana,sans-serif;
+      background:linear-gradient(135deg,var(--bgA),var(--bgB),var(--bgA));
+      animation:backgroundMove 10s infinite alternate;
+      height:100vh; overflow:hidden; color:white;
+    }
+    @keyframes backgroundMove {0%{background-position:0% 50%}100%{background-position:100% 50%}}
+
+    #game-container{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100%;
+      text-align:center;
+    }
+    #phaser-container{
+      display:none;
+      width:100%;
+      height:100%;
+      justify-content:center;
+      align-items:center;
+    }
+    canvas{display:block;margin:0 auto;}
+
+    h1{font-size:3rem;font-weight:bold;color:#fff;text-shadow:0 0 20px var(--accentA),0 0 30px var(--accentA); margin:0 0 8px 0;}
+    p{font-size:18px;margin:10px 0;}
+    button{
+      margin:8px;padding:15px 30px;font-size:1rem;font-weight:bold;color:white;
+      background:linear-gradient(45deg,var(--accentA),var(--accentB));
+      border:none;border-radius:50px;cursor:pointer;
+      box-shadow:0 4px 10px rgba(0,0,0,.4),0 0 15px rgba(255,87,51,.7);
+      transition:transform .2s,box-shadow .3s,opacity .2s;
+    }
+    button:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 25px rgba(255,110,60,1)}
+    button:active{transform:translateY(2px);box-shadow:0 2px 5px rgba(0,0,0,.3),0 0 10px rgba(255,79,40,.9)}
+    button:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.25);box-shadow:none;transform:none}
+
+    .menu-screen{
+      display:flex;flex-direction:column;align-items:center;gap:10px;
+      padding:20px;max-width:560px;width:100%;
     }
 
-    #game-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100%;
-      text-align: center;
+    .subhead{
+      font-size:14px;
+      color:var(--muted);
+      margin:0 0 14px 0;
+      line-height:1.4;
+      max-width:520px;
     }
 
-    #phaser-container {
-      display: none; /* Displays only during gameplay */
-      width: 100%;
-      height: 100%;
-      justify-content: center;
-      align-items: center;
+    .panel{
+      width:100%;
+      background:var(--glass);
+      border:1px solid var(--stroke);
+      border-radius:18px;
+      padding:14px;
+      box-shadow:0 10px 26px rgba(0,0,0,0.28);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
     }
 
-    canvas { display: block; margin: 0 auto; }
+    .panelTitle{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .panelTitle strong{
+      font-size:14px;
+      color:var(--text);
+      letter-spacing:0.3px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(0,0,0,0.25);
+      border:1px solid var(--stroke);
+      color:var(--muted);
+      font-size:12px;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .pill b{color:#fff; font-weight:700;}
 
-    h1 {
-      font-size: 3rem;
-      font-weight: bold;
-      color: #fff;
-      text-shadow: 0 0 20px #ff5733, 0 0 30px #ff5733;
+    .toggle-row{
+      width:100%;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:10px 12px;
+      border-radius:14px;
+      background:rgba(0,0,0,0.22);
+      border:1px solid rgba(255,255,255,0.12);
+    }
+    .toggle-row span{font-size:14px;opacity:0.95}
+    .small-note{font-size:12px;opacity:0.75;max-width:520px;line-height:1.35}
+
+    /* Leaderboards UI */
+    .tabs{
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin:10px 0 12px 0;
+    }
+    .tab{
+      padding:10px 14px;
+      border-radius:999px;
+      background:rgba(0,0,0,0.28);
+      border:1px solid var(--stroke);
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
+      cursor:pointer;
+      transition:transform .15s, border-color .2s, background .2s, color .2s;
+      user-select:none;
+    }
+    .tab:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,0.22); }
+    .tab.active{
+      background:linear-gradient(45deg,rgba(255,87,51,0.35),rgba(255,139,61,0.28));
+      border-color:rgba(255,140,80,0.55);
+      color:#fff;
+      box-shadow:0 0 20px rgba(255,110,60,0.25);
     }
 
-    button {
-      margin: 8px;
-      padding: 15px 30px;
-      font-size: 1rem;
-      font-weight: bold;
-      color: white;
-      background: linear-gradient(45deg, #ff5733, #ff8b3d);
-      border: none;
-      border-radius: 50px;
-      cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), 0 0 15px rgba(255, 87, 51, 0.7);
-      transition: transform 0.2s, box-shadow 0.3s;
+    .lbWrap{
+      width:100%;
+      max-height:52vh;
+      overflow:auto;
+      border-radius:14px;
+      border:1px solid var(--stroke);
+      background:rgba(0,0,0,0.22);
     }
-    button:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 25px rgba(255, 110, 60, 1);
+    .lbHeader, .lbRow{
+      display:grid;
+      grid-template-columns: 70px 1fr 110px;
+      gap:10px;
+      align-items:center;
+      padding:12px 12px;
     }
-    button:disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
+    .lbHeader{
+      position:sticky;
+      top:0;
+      z-index:2;
+      background:rgba(0,0,0,0.45);
+      border-bottom:1px solid rgba(255,255,255,0.10);
+      font-size:12px;
+      color:var(--muted);
+      letter-spacing:0.3px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .lbRow{
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      font-size:14px;
+      color:var(--text);
+    }
+    .lbRow:last-child{border-bottom:none;}
+    .rank{
+      font-weight:900;
+      color:#fff;
+      opacity:0.92;
+    }
+    .name{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .badge{
+      font-size:11px;
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.10);
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .score{
+      text-align:right;
+      font-weight:900;
+      color:#fff;
+      letter-spacing:0.3px;
+    }
+    .me{
+      background:linear-gradient(90deg,rgba(255,87,51,0.16),rgba(0,0,0,0));
+      border-left:3px solid rgba(255,87,51,0.65);
+    }
+    .hint{
+      font-size:12px;
+      color:var(--muted2);
+      line-height:1.4;
+      margin-top:10px;
     }
 
-    .menu-screen, .screen {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      padding: 20px;
-    }
+    .lbWrap{ -webkit-overflow-scrolling: touch; }
   </style>
 </head>
 <body>
-  <div id="game-container">
-    <!-- Main Menu -->
-    <div class="menu-screen" id="main-menu">
-      <h1>GRIDRUN</h1>
-      <button onclick="loadModeSelect()">PLAY</button>
-      <button onclick="alert('Login Feature Coming Soon')">LOGIN</button>
-      <button onclick="alert('Settings Coming Soon')">SETTINGS</button>
-    </div>
-  </div>
-
+  <div id="game-container"></div>
   <div id="phaser-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+
   <script>
     /***********************
-     * SAVING GAME PROGRESS
+     * LOCAL AUTH (email + password + username)
+     * - local-only, upgradeable later
+     * - unique email enforced
      ***********************/
-    const SAVE_KEY = "gridrun_progress";
-    const defaultProgress = () => ({
-      worldsUnlocked: 1,
-      levelsUnlocked: [1, 0, 0],
-      bestScores: [...Array(3)].map(() => Array(5).fill(0)),
-      endlessBest: 0,
-    });
+    const AUTH_KEY = "gridrun_auth_v2";           // active session: { email, username }
+    const ACCOUNTS_KEY = "gridrun_accounts_v1";   // accounts map by emailLower
 
-    const saveProgress = (progress) => localStorage.setItem(SAVE_KEY, JSON.stringify(progress));
-    const loadProgress = () => {
-      const raw = localStorage.getItem(SAVE_KEY);
+    function normalizeEmail(email){ return String(email || "").trim().toLowerCase(); }
+
+    function sanitizeUsername(u){
+      u = String(u || "").trim();
+      u = u.replace(/\s+/g," ");
+      u = u.replace(/[^\w\s\-\.]/g,"");
+      u = u.slice(0, 18);
+      return u;
+    }
+
+    function loadAccounts(){
+      try{
+        const raw = localStorage.getItem(ACCOUNTS_KEY);
+        if (!raw) return {};
+        const obj = JSON.parse(raw);
+        return (obj && typeof obj === "object") ? obj : {};
+      }catch{ return {}; }
+    }
+    function saveAccounts(map){
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(map || {}));
+    }
+
+    function getActiveUser(){
+      try{
+        const raw = localStorage.getItem(AUTH_KEY);
+        if (!raw) return null;
+        const a = JSON.parse(raw);
+        const email = normalizeEmail(a?.email);
+        const username = String(a?.username || "").trim();
+        if (!email || !username) return null;
+        return { email, username };
+      }catch{ return null; }
+    }
+
+    function setActiveUser(email, username){
+      const e = normalizeEmail(email);
+      const u = sanitizeUsername(username);
+      if (!e || !u) return;
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ email: e, username: u }));
+    }
+
+    function clearActiveUser(){ localStorage.removeItem(AUTH_KEY); }
+
+    function isValidEmail(email){
+      const e = String(email || "").trim();
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+    }
+    function isValidPassword(pw){
+      return String(pw || "").length >= 6;
+    }
+
+    async function sha256Hex(str){
+      const enc = new TextEncoder();
+      const buf = await crypto.subtle.digest("SHA-256", enc.encode(String(str)));
+      const bytes = Array.from(new Uint8Array(buf));
+      return bytes.map(b=>b.toString(16).padStart(2,"0")).join("");
+    }
+
+    async function createLocalAccount({ email, password, username }){
+      const e = normalizeEmail(email);
+      const u = sanitizeUsername(username);
+      const pw = String(password || "");
+
+      if (!isValidEmail(e)) throw new Error("Please enter a valid email.");
+      if (!u) throw new Error("Please enter a username.");
+      if (!isValidPassword(pw)) throw new Error("Password must be at least 6 characters.");
+
+      const accounts = loadAccounts();
+      if (accounts[e]) throw new Error("That email already has an account.");
+
+      const passHash = await sha256Hex(pw);
+      accounts[e] = { email:e, username:u, passHash, createdAt: Date.now() };
+      saveAccounts(accounts);
+
+      setActiveUser(e, u);
+      return { email:e, username:u };
+    }
+
+    async function loginLocalAccount({ email, password }){
+      const e = normalizeEmail(email);
+      const pw = String(password || "");
+
+      if (!isValidEmail(e)) throw new Error("Please enter a valid email.");
+      if (!pw) throw new Error("Please enter your password.");
+
+      const accounts = loadAccounts();
+      const acc = accounts[e];
+      if (!acc) throw new Error("No account found for that email.");
+
+      const passHash = await sha256Hex(pw);
+      if (passHash !== acc.passHash) throw new Error("Incorrect password.");
+
+      setActiveUser(e, acc.username);
+      return { email:e, username:acc.username };
+    }
+
+    /***********************
+     * SAVE (progress + settings)
+     * - per-account progress by email
+     ***********************/
+    const SAVE_KEY_LEGACY = "gridrun_dom_progress_v2";
+    const SETTINGS_KEY = "gridrun_audio_settings_v1";
+
+    function progressKey(){
+      const a = getActiveUser();
+      const email = a?.email;
+      return email ? `gridrun_progress_email_${email}` : SAVE_KEY_LEGACY;
+    }
+
+    function defaultProgress() {
+      return {
+        worldsUnlocked: 1,
+        levelsUnlocked: [1, 0, 0],
+        bestScores: [
+          [0,0,0,0,0],
+          [0,0,0,0,0],
+          [0,0,0,0,0],
+        ],
+        endlessBest: 0
+      };
+    }
+
+    function loadProgress() {
       try {
-        return raw ? { ...defaultProgress(), ...JSON.parse(raw) } : defaultProgress();
+        const key = progressKey();
+
+        const raw = localStorage.getItem(key);
+        if (!raw) return defaultProgress();
+
+        const p = JSON.parse(raw);
+        const d = defaultProgress();
+        const out = { ...d, ...p };
+
+        if (!Array.isArray(out.levelsUnlocked) || out.levelsUnlocked.length !== 3) out.levelsUnlocked = d.levelsUnlocked.slice();
+        if (!Array.isArray(out.bestScores) || out.bestScores.length !== 3) out.bestScores = d.bestScores.map(r=>r.slice());
+
+        for (let w=0; w<3; w++){
+          if (!Array.isArray(out.bestScores[w]) || out.bestScores[w].length !== 5) out.bestScores[w] = [0,0,0,0,0];
+          for (let l=0; l<5; l++) out.bestScores[w][l] = Math.max(0, Math.floor(out.bestScores[w][l] || 0));
+        }
+
+        out.worldsUnlocked = Math.max(1, Math.min(3, Math.floor(out.worldsUnlocked || 1)));
+        out.levelsUnlocked = out.levelsUnlocked.map((x)=>Math.max(0, Math.min(5, Math.floor(x || 0))));
+        out.endlessBest = Math.max(0, Math.floor(out.endlessBest || 0));
+        return out;
       } catch {
         return defaultProgress();
       }
-    };
+    }
+
+    function saveProgress(p) { localStorage.setItem(progressKey(), JSON.stringify(p)); }
     let progress = loadProgress();
 
+    function defaultSettings(){
+      return {
+        menuMusic: true,
+        gameplayMusic: true,
+        sfx: true,
+        volumeMusic: 0.75,
+        volumeSfx: 0.85
+      };
+    }
+
+    function loadSettingsState(){
+      try{
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (!raw) return defaultSettings();
+        const s = { ...defaultSettings(), ...JSON.parse(raw) };
+        s.menuMusic = !!s.menuMusic;
+        s.gameplayMusic = !!s.gameplayMusic;
+        s.sfx = !!s.sfx;
+        s.volumeMusic = Math.max(0, Math.min(1, Number(s.volumeMusic ?? 0.75)));
+        s.volumeSfx = Math.max(0, Math.min(1, Number(s.volumeSfx ?? 0.85)));
+        return s;
+      }catch{
+        return defaultSettings();
+      }
+    }
+
+    function saveSettingsState(s){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+    let settings = loadSettingsState();
+
     /***********************
-     * WORLD & LEVEL CONFIGURATION
+     * LOCAL LEADERBOARDS
      ***********************/
-    const WORLDS = [
-      { name: "Neon Bliss", description: "Bright, neon aesthetic for beginners.", colors: [0xff22ff, 0x2222ff, 0x88ffdd] },
-      { name: "Techno Abyss", description: "Metallic visuals with rising difficulty.", colors: [0x55aaff, 0x33ddff, 0x0055ff] },
-      { name: "Astral Surge", description: "Galactic, star-filled chaos.", colors: [0xaa00ff, 0x8855ff, 0x4444ff] },
+    const LB_KEY = "gridrun_leaderboards_local_v1";
+    function defaultLeaderboards(){ return { users: {} }; }
+    function loadLeaderboardsState(){
+      try{
+        const raw = localStorage.getItem(LB_KEY);
+        if (!raw) return defaultLeaderboards();
+        const s = { ...defaultLeaderboards(), ...JSON.parse(raw) };
+        if (!s.users || typeof s.users !== "object") s.users = {};
+        return s;
+      }catch{ return defaultLeaderboards(); }
+    }
+    function saveLeaderboardsState(s){ localStorage.setItem(LB_KEY, JSON.stringify(s)); }
+
+    function sumCampaignTotals(p){
+      const worldTotals = [0,0,0];
+      for (let w=0; w<3; w++){
+        let t=0;
+        for (let l=0; l<5; l++) t += Math.max(0, Math.floor(p.bestScores?.[w]?.[l] || 0));
+        worldTotals[w]=t;
+      }
+      const campaignTotal = worldTotals[0] + worldTotals[1] + worldTotals[2];
+      return { campaignTotal, worldTotals };
+    }
+
+    function updateLeaderboardsFromProgress(){
+      const a = getActiveUser();
+      if (!a) return;
+      const username = a.username;
+      const k = username.toLowerCase();
+      const lb = loadLeaderboardsState();
+      const p = loadProgress();
+      const totals = sumCampaignTotals(p);
+
+      const prev = lb.users[k] || { username, endlessBest:0, campaignTotal:0, worldTotals:[0,0,0], updatedAt:0 };
+
+      lb.users[k] = {
+        username,
+        endlessBest: Math.max(prev.endlessBest || 0, Math.floor(p.endlessBest || 0)),
+        campaignTotal: Math.max(prev.campaignTotal || 0, Math.floor(totals.campaignTotal || 0)),
+        worldTotals: [
+          Math.max(prev.worldTotals?.[0] || 0, totals.worldTotals[0]),
+          Math.max(prev.worldTotals?.[1] || 0, totals.worldTotals[1]),
+          Math.max(prev.worldTotals?.[2] || 0, totals.worldTotals[2]),
+        ],
+        updatedAt: Date.now()
+      };
+
+      saveLeaderboardsState(lb);
+    }
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+        /***********************
+     * SIMPLE MENU AUDIO (HTMLAudioElement)
+     ***********************/
+    const MENU_MUSIC_SRC = "audio/menu.mp3"; // optional
+    let menuMusic = null;
+
+    function ensureMenuMusic(){
+      if (!menuMusic){
+        menuMusic = new Audio(MENU_MUSIC_SRC);
+        menuMusic.loop = true;
+        menuMusic.volume = settings.volumeMusic;
+      }
+    }
+    function startMenuMusic(){
+      ensureMenuMusic();
+      if (!settings.menuMusic) return;
+      menuMusic.volume = settings.volumeMusic;
+      menuMusic.play().catch(()=>{});
+    }
+    function stopMenuMusic(){
+      if (!menuMusic) return;
+      menuMusic.pause();
+      menuMusic.currentTime = 0;
+    }
+    function updateMenuMusicState(){
+      ensureMenuMusic();
+      menuMusic.volume = settings.volumeMusic;
+      if (settings.menuMusic) startMenuMusic();
+      else stopMenuMusic();
+    }
+
+    /***********************
+     * WORLD THEMES (menus)
+     ***********************/
+    const worlds = [
+      { name: "Neon Bliss", description: "Lively neon glow. Learn the flow." },
+      { name: "Techno Abyss", description: "Icy pulses. Faster and denser." },
+      { name: "Astral Surge", description: "Cosmic chaos. Hazards online." },
     ];
 
-    const LEVELS = [
-      { time: 30, scores: { bronze: 350, silver: 500, gold: 750 } },
-      { time: 45, scores: { bronze: 600, silver: 900, gold: 1300 } },
-      { time: 60, scores: { bronze: 1100, silver: 1400, gold: 1800 } },
-      { time: 75, scores: { bronze: 1500, silver: 2000, gold: 2500 } },
-      { time: 90, scores: { bronze: 2000, silver: 2700, gold: 3500 } },
+    /***********************
+     * LEVEL TIMES + TIER TARGETS
+     ***********************/
+    const levelTimes = [
+      [30, 40, 50, 60, 70],    // World 1
+      [45, 60, 75, 90, 100],   // World 2
+      [60, 80, 95, 105, 115],  // World 3
     ];
 
+    const TIER_MODEL = {
+      pps: 7,
+      streakEvery: 12,
+      streakBonus: 55,
+      expectedNearPer10s: [0.45, 0.70, 0.90],
+      expectedNearPoints: 18,
+      expectedAvgCombo: [1.18, 1.30, 1.45],
+      expectedDodgePer10s: [1.10, 1.35, 1.60],
+      expectedDodgePoints: 9,
+      clearBonusBase: 220
+    };
+
+    function computeTierTargets(worldIdx, levelIdx){
+      const t = levelTimes[worldIdx][levelIdx];
+      const survival = t * TIER_MODEL.pps;
+      const streaks = Math.floor(t / TIER_MODEL.streakEvery);
+      const streakScore = streaks * TIER_MODEL.streakBonus;
+
+      const expectedNear = Math.floor((t/10) * TIER_MODEL.expectedNearPer10s[worldIdx]);
+      const nearScore = expectedNear * TIER_MODEL.expectedNearPoints * TIER_MODEL.expectedAvgCombo[worldIdx];
+
+      const expectedDodge = Math.floor((t/10) * TIER_MODEL.expectedDodgePer10s[worldIdx]);
+      const dodgeScore = expectedDodge * TIER_MODEL.expectedDodgePoints;
+
+      const clearBonus = TIER_MODEL.clearBonusBase + worldIdx*60 + levelIdx*35;
+      const expected = survival + streakScore + dodgeScore + nearScore + clearBonus;
+
+      const bronze = Math.floor(expected * (0.78 + 0.015*levelIdx));
+      const silver = Math.floor(expected * (0.98 + 0.02*levelIdx));
+      const gold   = Math.floor(expected * (1.18 + 0.03*levelIdx));
+      return { time: t, scores: { bronze, silver, gold } };
+    }
+    function levelData(worldIdx, levelIdx){ return computeTierTargets(worldIdx, levelIdx); }
+
     /***********************
-     * MENU MANAGEMENT
+     * MENUS
      ***********************/
-    const loadModeSelect = () => {
+    function showMenus(){
+      document.getElementById("phaser-container").style.display = "none";
+      document.getElementById("game-container").style.display = "flex";
+      startMenuMusic();
+    }
+    function showGameplay(){
+      document.getElementById("game-container").style.display = "none";
+      document.getElementById("phaser-container").style.display = "flex";
+      stopMenuMusic();
+    }
+
+    function loadMainMenu(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      const a = getActiveUser();
+      if (!a){ loadAuthGate(); return; }
+
+      container.innerHTML = `
+        <div class="menu-screen" id="main-menu">
+          <h1>GRIDRUN</h1>
+          <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
+          <button onclick="loadModeSelect()">PLAY</button>
+          <button onclick="loadAccount()">ACCOUNT</button>
+          <button onclick="loadLeaderboards()">LEADERBOARDS</button>
+          <button onclick="loadHowTo()">HOW TO PLAY</button>
+          <button onclick="loadSettings()">SETTINGS</button>
+        </div>
+      `;
+    }
+
+    function loadModeSelect() {
+      startMenuMusic();
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Select Mode</h1>
-          <button onclick="loadCampaignMenu()">Campaign</button>
-          <button onclick="loadEndlessIntro()">Endless</button>
+          <div class="panel">
+            <div class="panelTitle">
+              <strong>Choose your run</strong>
+              <span class="pill">Tip: <b>Campaign</b> unlocks Worlds</span>
+            </div>
+            <button onclick="loadCampaignMode()">Campaign</button>
+            <button onclick="loadEndlessIntro()">Endless</button>
+          </div>
           <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
-    };
+    }
 
-    const loadCampaignMenu = () => {
+    function loadCampaignMode() {
+      startMenuMusic();
+      progress = loadProgress();
       const container = document.getElementById("game-container");
-      const worlds = WORLDS.map((world, i) => `
-        <button onclick="loadWorld(${i})" ${i < progress.worldsUnlocked ? "" : "disabled"}>${world.name}</button>
-      `).join("");
-
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Campaign</h1>
-          <p>Choose a world:</p>
-          ${worlds}
-          <button onclick="loadModeSelect()">Back</button>
-        </div>
-      `;
-    };
-
-    const loadWorld = (worldIdx) => {
-      const container = document.getElementById("game-container");
-      const levels = LEVELS.map((level, i) => `
-        <button onclick="startPhaser(${worldIdx}, ${i}, 'campaign')" ${i < progress.levelsUnlocked[worldIdx] ? "" : "disabled"}>
-          Level ${i + 1} (Best: ${progress.bestScores[worldIdx][i]})
+      const worldButtons = worlds.map((world, i) => `
+        <button onclick="loadWorld(${i + 1})" ${progress.worldsUnlocked > i ? '' : 'disabled'}>
+          ${progress.worldsUnlocked > i ? world.name : 'Locked'}
         </button>
       `).join("");
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>${WORLDS[worldIdx].name}</h1>
-          <p>${WORLDS[worldIdx].description}</p>
-          ${levels}
-          <button onclick="loadCampaignMenu()">Back</button>
-        </div>
-      `;
-    };
-
-    const loadEndlessIntro = () => {
-      const container = document.getElementById("game-container");
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Endless Mode</h1>
-          <p>Survive as long as you can with increasing difficulty.</p>
-          <p>Best Score: ${progress.endlessBest}</p>
-          <button onclick="startPhaser(null, null, 'endless')">Start Endless</button>
+          <h1>Campaign</h1>
+          <p class="subhead">Survive each level to unlock the next. Your best scores build your Campaign Total.</p>
+          <div class="panel">
+            <div class="panelTitle"><strong>Select a World</strong><span class="pill">Unlocked: <b>${progress.worldsUnlocked}/3</b></span></div>
+            ${worldButtons}
+          </div>
           <button onclick="loadModeSelect()">Back</button>
         </div>
       `;
-    };
+    }
 
-    /***********************
-     * PHASER GAME FUNCTIONS
-     ***********************/
-    const startPhaser = (worldIdx, levelIdx, mode) => {
-      document.getElementById("game-container").style.display = "none";
-      document.getElementById("phaser-container").style.display = "flex";
-
-      if (!window.phaserGame) {
-        window.phaserGame = createPhaserGame();
-      }
-
-      window.phaserGame.scene.stop("Results"); // Ensure fresh start
-      window.phaserGame.scene.start("Play", { mode, worldIdx, levelIdx });
-    };
-
-    const createPhaserGame = () => {
-      return new Phaser.Game({
-        type: Phaser.AUTO,
-        width: 420,
-        height: 760,
-        parent: "phaser-container",
-        scene: [PlayScene, ResultsScene],
-        physics: { default: "arcade", arcade: { debug: false } },
-      });
-    };
-
-    /***********************
-     * MAIN MENU
-     ***********************/
-    const loadMainMenu = () => {
+    function loadWorld(worldNumber) {
+      startMenuMusic();
+      progress = loadProgress();
       const container = document.getElementById("game-container");
+      const worldIdx = worldNumber - 1;
+      const levelsUnlocked = progress.levelsUnlocked[worldIdx] || 0;
+
+      const levelButtons = Array.from({ length: 5 }, (_, i) => {
+        const unlocked = i < levelsUnlocked;
+        const best = progress.bestScores[worldIdx]?.[i] || 0;
+        const ld = levelData(worldIdx, i);
+        return `
+          <button onclick="loadLevelIntro(${worldNumber}, ${i + 1})" ${unlocked ? '' : 'disabled'}>
+            ${unlocked ? `Level ${i + 1} • ${ld.time}s • Best: ${best}` : 'Locked'}
+          </button>
+        `;
+      }).join("");
+
       container.innerHTML = `
-        <div id="main-menu" class="menu-screen">
-          <h1>GRIDRUN</h1>
-          <button onclick="loadModeSelect()">PLAY</button>
-          <button onclick="alert('Login Placeholder')">LOGIN</button>
-          <button onclick="alert('Settings Placeholder')">SETTINGS</button>
+        <div class="menu-screen">
+          <h1>${worlds[worldIdx].name}</h1>
+          <p class="subhead">${worlds[worldIdx].description}</p>
+          <div class="panel">
+            <div class="panelTitle"><strong>Levels</strong><span class="pill">Unlocked: <b>${levelsUnlocked}/5</b></span></div>
+            ${levelButtons}
+          </div>
+          <button onclick="loadCampaignMode()">Back</button>
         </div>
       `;
+    }
+
+    function loadLevelIntro(worldNumber, levelNumber) {
+      startMenuMusic();
+      progress = loadProgress();
+      const container = document.getElementById("game-container");
+      const w = worldNumber - 1;
+      const l = levelNumber - 1;
+      const ld = levelData(w, l);
+      const best = progress.bestScores[w]?.[l] || 0;
+
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Level ${levelNumber}</h1>
+          <p class="subhead">${worlds[w].name}</p>
+
+          <div class="panel">
+            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive: <b>${ld.time}s</b></span></div>
+            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85);">
+              Stay alive until the timer hits zero. More points = better tier.
+            </p>
+            <div style="height:10px"></div>
+            <div class="panelTitle"><strong>Your Best</strong><span class="pill"><b>${best}</b></span></div>
+            <div style="height:10px"></div>
+            <div class="panelTitle"><strong>Performance Tiers</strong><span class="pill">Targets</span></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
+              <span class="pill">Bronze <b>${ld.scores.bronze}</b></span>
+              <span class="pill">Silver <b>${ld.scores.silver}</b></span>
+              <span class="pill">Gold <b>${ld.scores.gold}</b></span>
+            </div>
+          </div>
+
+          <button onclick="playLevel(${worldNumber}, ${levelNumber})">Start</button>
+          <button onclick="loadWorld(${worldNumber})">Back</button>
+        </div>
+      `;
+    }
+
+    function loadEndlessIntro(){
+      startMenuMusic();
+      progress = loadProgress();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Endless</h1>
+          <p class="subhead">Difficulty ramps from <b>W1L1</b> → <b>W3L5</b> over ~120s, then plateaus.</p>
+          <div class="panel">
+            <div class="panelTitle"><strong>Local Best</strong><span class="pill"><b>${progress.endlessBest}</b></span></div>
+            <button onclick="startGameplay({ mode:'endless' })">Start Endless</button>
+          </div>
+          <button onclick="loadModeSelect()">Back</button>
+        </div>
+      `;
+    }
+
+    function loadSettings(){
+      startMenuMusic();
+      settings = loadSettingsState();
+      const container = document.getElementById("game-container");
+      const onOff = (v)=> v ? "ON" : "OFF";
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Settings</h1>
+          <div class="panel">
+            <div class="toggle-row">
+              <span>Menu Music</span>
+              <button onclick="toggleSetting('menuMusic')">${onOff(settings.menuMusic)}</button>
+            </div>
+            <div class="toggle-row">
+              <span>Gameplay Music</span>
+              <button onclick="toggleSetting('gameplayMusic')">${onOff(settings.gameplayMusic)}</button>
+            </div>
+            <div class="toggle-row">
+              <span>Sound Effects (SFX)</span>
+              <button onclick="toggleSetting('sfx')">${onOff(settings.sfx)}</button>
+            </div>
+
+            <p class="small-note" style="margin-top:10px">
+              Audio is optional. If you don’t add files in <b>/audio/</b>, the game still runs silently.
+            </p>
+          </div>
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+
+    function toggleSetting(key){
+      settings = loadSettingsState();
+      settings[key] = !settings[key];
+      saveSettingsState(settings);
+      updateMenuMusicState();
+      if (window.GRIDRUN_AUDIO && typeof window.GRIDRUN_AUDIO.applySettings === "function"){
+        window.GRIDRUN_AUDIO.applySettings(settings);
+      }
+      loadSettings();
+    }
+
+    function loadHowTo(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>How To Play</h1>
+          <p class="subhead">Everything you need — objective, scoring, worlds, and endless.</p>
+
+          <div class="panel" style="text-align:left;">
+            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive</span></div>
+            <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              Stay alive inside the grid. In <b>Campaign</b>, you must survive the full timer for each level to clear it and unlock progression.
+              In <b>Endless</b>, survive as long as you can while difficulty ramps up.
+            </p>
+
+            <div class="panelTitle"><strong>Controls</strong><span class="pill">Touch or WASD</span></div>
+            <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              <b>Mobile:</b> touch where you want to move — your runner follows.
+              <br><b>Desktop:</b> WASD / Arrow keys.
+            </p>
+
+            <div class="panelTitle"><strong>Scoring</strong><span class="pill">Climb ranks</span></div>
+            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              You gain points over time for staying alive, plus bonuses for clean survival and skillful dodges.
+              Clearing a level adds a <b>Clear Bonus</b>.
+            </p>
+
+            <p class="hint">
+              Your <b>Leaderboards</b> scores update automatically when you improve a best score (Campaign or Endless).
+            </p>
+          </div>
+
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+        /***********************
+     * AUTH SCREENS (forced before menu)
+     ***********************/
+    function loadAuthGate(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>GRIDRUN</h1>
+          <p class="subhead">When the site loads, login or create an account to enter.</p>
+
+          <div class="panel">
+            <div class="panelTitle">
+              <strong>Account Access</strong>
+              <span class="pill">Required</span>
+            </div>
+
+            <button onclick="loadLogin()">LOGIN</button>
+            <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
+
+            <p class="hint">Local-only for now (same device/browser). Email is unique.</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function loadLogin(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Login</h1>
+          <p class="subhead">Enter your email + password to enter GRIDRUN.</p>
+
+          <div class="panel" style="text-align:left;">
+            <div class="panelTitle"><strong>Email</strong><span class="pill">required</span></div>
+            <input id="loginEmail" placeholder="you@email.com" autocomplete="email"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <div style="height:10px"></div>
+
+            <div class="panelTitle"><strong>Password</strong><span class="pill">required</span></div>
+            <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <p class="hint">Local-only login for now. Global comes later.</p>
+            <button onclick="doLoginEmailPass()">Confirm</button>
+          </div>
+
+          <button onclick="loadAuthGate()">Back</button>
+        </div>
+      `;
+    }
+
+    async function doLoginEmailPass(){
+      const email = document.getElementById("loginEmail")?.value || "";
+      const pass = document.getElementById("loginPass")?.value || "";
+      try{
+        await loginLocalAccount({ email, password: pass });
+        progress = loadProgress();
+        updateLeaderboardsFromProgress();
+        loadMainMenu();
+      }catch(e){
+        alert(e?.message || "Login failed.");
+      }
+    }
+
+    function loadCreateAccount(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Create Account</h1>
+          <p class="subhead">Each email can only create one account.</p>
+
+          <div class="panel" style="text-align:left;">
+            <div class="panelTitle"><strong>Email</strong><span class="pill">unique</span></div>
+            <input id="signupEmail" placeholder="you@email.com" autocomplete="email"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <div style="height:10px"></div>
+
+            <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars</span></div>
+            <input id="signupUser" placeholder="Enter username..." autocomplete="nickname"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <div style="height:10px"></div>
+
+            <div class="panelTitle"><strong>Password</strong><span class="pill">min 6</span></div>
+            <input id="signupPass" type="password" placeholder="Create password..." autocomplete="new-password"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <div style="height:10px"></div>
+
+            <div class="panelTitle"><strong>Confirm Password</strong><span class="pill">match</span></div>
+            <input id="signupPass2" type="password" placeholder="Confirm password..." autocomplete="new-password"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <p class="hint">Local-only for now (same device/browser). Global comes later.</p>
+            <button onclick="doCreateAccount()">Create</button>
+          </div>
+
+          <button onclick="loadAuthGate()">Back</button>
+        </div>
+      `;
+    }
+
+    async function doCreateAccount(){
+      const email = document.getElementById("signupEmail")?.value || "";
+      const user = document.getElementById("signupUser")?.value || "";
+      const pass = document.getElementById("signupPass")?.value || "";
+      const pass2 = document.getElementById("signupPass2")?.value || "";
+      if (String(pass) !== String(pass2)){
+        alert("Passwords do not match.");
+        return;
+      }
+      try{
+        await createLocalAccount({ email, password: pass, username: user });
+        progress = loadProgress();
+        updateLeaderboardsFromProgress();
+        loadMainMenu();
+      }catch(e){
+        alert(e?.message || "Create account failed.");
+      }
+    }
+
+    function loadAccount(){
+      startMenuMusic();
+      const a = getActiveUser();
+      const container = document.getElementById("game-container");
+      if (!a){ loadAuthGate(); return; }
+
+      progress = loadProgress();
+      const totals = sumCampaignTotals(progress);
+
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Account</h1>
+          <p class="subhead">Logged in as <b>${a.username}</b><br><span style="font-size:12px;color:rgba(255,255,255,0.70)">${a.email}</span></p>
+
+          <div class="panel" style="text-align:left;">
+            <div class="panelTitle"><strong>Your Stats</strong><span class="pill">Local</span></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
+              <span class="pill">Endless Best <b>${progress.endlessBest}</b></span>
+              <span class="pill">Campaign Total <b>${totals.campaignTotal}</b></span>
+            </div>
+
+            <div style="height:12px"></div>
+            <div class="panelTitle"><strong>Edit Username</strong><span class="pill">profile</span></div>
+            <input id="usernameEdit" value="${a.username}" autocomplete="nickname"
+              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+              <button onclick="saveUsernameChange()">Save</button>
+              <button onclick="logout()">Logout</button>
+            </div>
+            <p class="hint">Email/password are local-only for now. Global later.</p>
+          </div>
+
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+
+    function saveUsernameChange(){
+      const el = document.getElementById("usernameEdit");
+      if (!el) return;
+      const newU = sanitizeUsername(el.value);
+      if (!newU){ alert("Invalid username."); return; }
+
+      const a = getActiveUser();
+      if (!a) return;
+
+      const accounts = loadAccounts();
+      const acc = accounts[a.email];
+      if (!acc){ alert("Account not found."); return; }
+
+      const oldUser = acc.username;
+      acc.username = newU;
+      accounts[a.email] = acc;
+      saveAccounts(accounts);
+
+      setActiveUser(a.email, newU);
+
+      // migrate leaderboard key (username-based)
+      const lb = loadLeaderboardsState();
+      const oldK = String(oldUser||"").toLowerCase();
+      const newK = String(newU||"").toLowerCase();
+      if (oldK && oldK !== newK && lb.users?.[oldK]){
+        const row = lb.users[oldK];
+        delete lb.users[oldK];
+        row.username = newU;
+        lb.users[newK] = row;
+        saveLeaderboardsState(lb);
+      }
+
+      progress = loadProgress();
+      updateLeaderboardsFromProgress();
+      loadAccount();
+    }
+
+    function logout(){
+      clearActiveUser();
+      progress = loadProgress();
+      loadAuthGate();
+    }
+
+    /***********************
+     * LEADERBOARDS (polished)
+     ***********************/
+    function buildRanking(metric){
+      const lb = loadLeaderboardsState();
+      const rows = Object.values(lb.users || {});
+      const cleaned = rows
+        .filter(r => r && r.username)
+        .map(r => ({
+          username: r.username,
+          endlessBest: Math.floor(r.endlessBest || 0),
+          campaignTotal: Math.floor(r.campaignTotal || 0),
+          worldTotals: [
+            Math.floor(r.worldTotals?.[0] || 0),
+            Math.floor(r.worldTotals?.[1] || 0),
+            Math.floor(r.worldTotals?.[2] || 0),
+          ],
+          updatedAt: Math.floor(r.updatedAt || 0)
+        }));
+
+      const scoreOf = (r)=>{
+        if (metric === "endless") return r.endlessBest;
+        if (metric === "campaign") return r.campaignTotal;
+        if (metric === "w1") return r.worldTotals[0];
+        if (metric === "w2") return r.worldTotals[1];
+        if (metric === "w3") return r.worldTotals[2];
+        return 0;
+      };
+
+      cleaned.sort((a,b)=>{
+        const da = scoreOf(a), db = scoreOf(b);
+        if (db !== da) return db - da;
+        return (b.updatedAt||0) - (a.updatedAt||0);
+      });
+
+      return { list: cleaned, scoreOf };
+    }
+
+    function renderLeaderboardList(metric){
+      const a = getActiveUser();
+      const myKey = a ? a.username.toLowerCase() : null;
+
+      const { list, scoreOf } = buildRanking(metric);
+      const top = list.slice(0, 25);
+
+      const header = `
+        <div class="lbHeader">
+          <div>RANK</div>
+          <div>PLAYER</div>
+          <div style="text-align:right">SCORE</div>
+        </div>
+      `;
+
+      const rows = top.map((r, idx)=>{
+        const isMe = (myKey && r.username.toLowerCase() === myKey);
+        const val = scoreOf(r);
+        return `
+          <div class="lbRow ${isMe ? "me" : ""}">
+            <div class="rank">#${idx+1}</div>
+            <div class="name">
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.username}</span>
+              ${isMe ? `<span class="badge">YOU</span>` : ``}
+            </div>
+            <div class="score">${val}</div>
+          </div>
+        `;
+      }).join("");
+
+      let myRankHtml = "";
+      if (myKey){
+        const i = list.findIndex(r => r.username.toLowerCase() === myKey);
+        if (i >= 0){
+          const me = list[i];
+          myRankHtml = `
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:10px 0 0 0">
+              <span class="pill">Your Rank <b>#${i+1}</b></span>
+              <span class="pill">Your Score <b>${scoreOf(me)}</b></span>
+            </div>
+          `;
+        } else {
+          myRankHtml = `<div class="hint" style="margin-top:10px">Play a run to appear here.</div>`;
+        }
+      } else {
+        myRankHtml = `<div class="hint" style="margin-top:10px">Login to post scores. You can still view the board.</div>`;
+      }
+
+      return `
+        <div class="lbWrap">
+          ${header}
+          ${rows || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
+        </div>
+        ${myRankHtml}
+      `;
+    }
+
+    function loadLeaderboards(){
+      startMenuMusic();
+      updateLeaderboardsFromProgress();
+      const container = document.getElementById("game-container");
+      const a = getActiveUser();
+
+      const tabs = [
+        { key:"endless", label:"Endless" },
+        { key:"campaign", label:"Campaign Total" },
+        { key:"w1", label:"World 1" },
+        { key:"w2", label:"World 2" },
+        { key:"w3", label:"World 3" },
+      ];
+
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Leaderboards</h1>
+          <p class="subhead">${a ? `Logged in as <b>${a.username}</b>. Scores update when you beat a personal best.` : `View rankings. Login to post scores.`}</p>
+
+          <div class="panel">
+            <div class="panelTitle">
+              <strong>Rankings</strong>
+              <span class="pill">Top <b>25</b> (local)</span>
+            </div>
+
+            <div class="tabs" id="lbTabs">
+              ${tabs.map((t,i)=>`<div class="tab ${i===0?"active":""}" onclick="switchLbTab('${t.key}', this)">${t.label}</div>`).join("")}
+            </div>
+
+            <div id="lbContent">
+              ${renderLeaderboardList("endless")}
+            </div>
+
+            <p class="hint">
+              Local leaderboards are stored on-device for now. Global leaderboards later.
+            </p>
+          </div>
+
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+
+    function switchLbTab(key, el){
+      document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+      el.classList.add("active");
+      document.getElementById("lbContent").innerHTML = renderLeaderboardList(key);
+    }
+
+    function playLevel(worldNumber, levelNumber) {
+      startGameplay({ mode:"campaign", world: worldNumber-1, level: levelNumber-1 });
+    }
+
+    /***********************
+     * GAME BRIDGE (menus <-> phaser)
+     ***********************/
+    window.GRIDRUN = {
+      completeCampaignLevel: (worldIdx, levelIdx, score) => {
+        const p = loadProgress();
+        p.bestScores[worldIdx][levelIdx] = Math.max(p.bestScores[worldIdx][levelIdx] || 0, score);
+
+        const currentUnlocked = p.levelsUnlocked[worldIdx] || 0;
+        if (currentUnlocked === (levelIdx + 1)) {
+          p.levelsUnlocked[worldIdx] = Math.min(5, currentUnlocked + 1);
+          if (levelIdx === 4 && worldIdx < 2) {
+            p.worldsUnlocked = Math.max(p.worldsUnlocked, worldIdx + 2);
+            p.levelsUnlocked[worldIdx + 1] = Math.max(p.levelsUnlocked[worldIdx + 1] || 0, 1);
+          }
+        }
+
+        saveProgress(p);
+        updateLeaderboardsFromProgress();
+      },
+
+      setEndlessBest: (score) => {
+        const p = loadProgress();
+        p.endlessBest = Math.max(p.endlessBest || 0, score);
+        saveProgress(p);
+        updateLeaderboardsFromProgress();
+      },
+
+      getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,
+
+      backToLevelSelect: (worldIdx) => { showMenus(); loadWorld(worldIdx + 1); },
+      backToMainMenu: () => { showMenus(); loadMainMenu(); }
     };
 
-    loadMainMenu();
+    /***********************
+     * PHASER GAMEPLAY
+     ***********************/
+    let phaserGame = null;
+
+    function startGameplay(payload){
+      showGameplay();
+      if (!phaserGame) phaserGame = createPhaserGame();
+      phaserGame.scene.stop("Results");
+      phaserGame.scene.stop("Play");
+      phaserGame.scene.start("Play", payload);
+    }
+        function createPhaserGame(){
+      const W = 420, H = 760;
+      const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+
+      // GRID
+      const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
+      const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
+      const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
+
+      // Movement
+      const PLAYER_SPEED = 320;
+      const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+      const FOLLOW_RADIUS = 7;
+      const FOLLOW_LERP = 0.40;
+      const FOLLOW_MAX_SPEED_MULT = 3.0;
+      const lerp = (a,b,t)=>a+(b-a)*t;
+
+      // WORLD THEMES + AUDIO keys
+      const WORLDS = [
+        {
+          id:0,
+          name:"Neon Bliss",
+          subtitle:"Neon pink & cyan. Lively glow.",
+          bg: 0x07001a,
+          border: 0xff2fd6,
+          gridLine: 0x55f7ff,
+          glowA: 0xff2fd6,
+          glowB: 0x55f7ff,
+          player: 0xffffff,
+          fx:"sparkle",
+          musicKey:"music_w1",
+          obstacleStyle:{ palette:[0xff2fd6,0x55f7ff,0xfff06a], shapes:["tri","hex","frame","rect"] },
+          hazardHotColumn:{ enabled:true, startAt:10, every:11.5, warn:0.9, active:1.1, alphaWarn:0.22, alphaActive:0.58 }
+        },
+        {
+          id:1,
+          name:"Techno Abyss",
+          subtitle:"Icy pulses. Faster and denser.",
+          bg: 0x00131f,
+          border: 0xa8e9ff,
+          gridLine: 0x44a3ff,
+          glowA: 0xa8e9ff,
+          glowB: 0x44a3ff,
+          player: 0xe9fbff,
+          fx:"pulse",
+          musicKey:"music_w2",
+          obstacleStyle:{ palette:[0xa8e9ff,0x44a3ff,0xffffff,0x7cffd2], shapes:["bar","plus","rect","frame","hex"] },
+          hazardEmp:{ enabled:true, startAt:14, every:12.5, warn:0.9, jam:0.55 }
+        },
+        {
+          id:2,
+          name:"Astral Surge",
+          subtitle:"Galaxy purples & greens. Glitch storms.",
+          bg: 0x050016,
+          border: 0xb45cff,
+          gridLine: 0x38ffb8,
+          glowA: 0xb45cff,
+          glowB: 0x38ffb8,
+          player: 0xf1e8ff,
+          fx:"astral",
+          musicKey:"music_w3",
+          obstacleStyle:{ palette:[0xb45cff,0x38ffb8,0xff4d7d,0xffd166], shapes:["hex","tri","bar","frame","plus","rect"] },
+          boss:{ enabled:true, cycleSeconds:5.7, warnSeconds:1.20, activeSeconds:1.12, thickness:16, warnThickness:6 }
+        }
+      ];
+
+      function mkLevelsForWorld(worldIndex){
+        const base = [
+          { baseScroll0: 78, baseScrollStep: 16, ramp0: 6.4, rampStep: 2.4, spawnStart0: 920, spawnStep: 120, spawnRamp0: 12.0, spawnRampStep: 3.1, spawnMin0: 480, spawnMinStep: 55, spawnMinFloor: 280, sizeMin0: 21, sizeMinStep: 1, sizeMax0: 33, sizeMaxStep: 1 },
+          { baseScroll0: 88, baseScrollStep: 18, ramp0: 7.2, rampStep: 2.7, spawnStart0: 860, spawnStep: 130, spawnRamp0: 13.2, spawnRampStep: 3.4, spawnMin0: 445, spawnMinStep: 60, spawnMinFloor: 260, sizeMin0: 20, sizeMinStep: 1, sizeMax0: 32, sizeMaxStep: 1 },
+          { baseScroll0: 96, baseScrollStep: 20, ramp0: 8.0, rampStep: 3.0, spawnStart0: 800, spawnStep: 140, spawnRamp0: 14.8, spawnRampStep: 3.9, spawnMin0: 415, spawnMinStep: 65, spawnMinFloor: 240, sizeMin0: 19, sizeMinStep: 1, sizeMax0: 31, sizeMaxStep: 1 },
+        ][worldIndex];
+
+        return Array.from({length:5}, (_,i) => ({
+          seconds: levelTimes[worldIndex][i],
+          baseScroll: base.baseScroll0 + base.baseScrollStep * i,
+          scrollRamp: base.ramp0 + base.rampStep * i,
+          spawnStart: base.spawnStart0 - base.spawnStep * i,
+          spawnRamp: base.spawnRamp0 + base.spawnRampStep * i,
+          spawnMin: Math.max(base.spawnMinFloor, base.spawnMin0 - base.spawnMinStep * i),
+          size: [base.sizeMin0 - base.sizeMinStep*i, base.sizeMax0 - base.sizeMaxStep*i],
+          driftChance: clamp(0.07 + worldIndex*0.09 + i*0.05, 0, 0.60),
+          chaseChance: (worldIndex >= 1) ? clamp(0.02 + worldIndex*0.02 + i*0.03, 0, 0.22) : 0
+        }));
+      }
+
+      WORLDS[0].levels = mkLevelsForWorld(0);
+      WORLDS[1].levels = mkLevelsForWorld(1);
+      WORLDS[2].levels = mkLevelsForWorld(2);
+
+      function buildBackdrop(scene, fxType, cA, cB) {
+        if (fxType === "sparkle") {
+          const dots = [];
+          for (let i=0;i<52;i++){
+            const d = scene.add.circle(Phaser.Math.Between(0,W), Phaser.Math.Between(0,H), Phaser.Math.Between(1,3), cB)
+              .setAlpha(Phaser.Math.FloatBetween(0.08, 0.22));
+            d._vx = Phaser.Math.FloatBetween(-18, 18);
+            d._vy = Phaser.Math.FloatBetween(30, 90);
+            dots.push(d);
+          }
+          scene.events.on("update", (_, dtMs) => {
+            const dt = dtMs/1000;
+            for (const d of dots){
+              d.x += d._vx*dt; d.y += d._vy*dt;
+              if (d.y > H+10){ d.y=-10; d.x=Phaser.Math.Between(0,W); }
+              if (d.x < -10) d.x = W+10;
+              if (d.x > W+10) d.x = -10;
+            }
+          });
+        }
+        if (fxType === "pulse") {
+          const waves = [];
+          for (let i=0;i<6;i++){
+            const r = scene.add.rectangle(W/2, Phaser.Math.Between(0,H), W*1.2, 6, cA).setAlpha(0.06);
+            r._vy = Phaser.Math.FloatBetween(30, 80);
+            waves.push(r);
+          }
+          scene.events.on("update", (_, dtMs)=>{
+            const dt=dtMs/1000;
+            for (const wv of waves){
+              wv.y += wv._vy*dt;
+              wv.setAlpha(0.05 + 0.03*Math.sin((wv.y/H)*Math.PI*2));
+              if (wv.y > H+20) wv.y = -20;
+            }
+          });
+        }
+        if (fxType === "astral") {
+          const stars = [];
+          for (let i=0;i<80;i++){
+            const s = scene.add.rectangle(Phaser.Math.Between(0,W), Phaser.Math.Between(0,H), 2, 2, cA)
+              .setAlpha(Phaser.Math.FloatBetween(0.06, 0.28));
+            s._vy = Phaser.Math.FloatBetween(14, 62);
+            stars.push(s);
+          }
+          scene.events.on("update", (_, dtMs)=>{
+            const dt=dtMs/1000;
+            for (const s of stars){
+              s.y += s._vy*dt;
+              if (s.y > H+10){ s.y=-10; s.x=Phaser.Math.Between(0,W); }
+            }
+          });
+        }
+      }
+
+      function ensureObstacleTextures(scene) {
+        const makeTex = (key, drawFn) => {
+          if (scene.textures.exists(key)) return;
+          const g = scene.make.graphics({ x:0, y:0, add:false });
+          drawFn(g); g.generateTexture(key, 64, 64); g.destroy();
+        };
+        makeTex("obs_rect", g=>{ g.fillStyle(0xffffff,1); g.fillRoundedRect(8,8,48,48,10); });
+        makeTex("obs_frame", g=>{
+          g.lineStyle(6,0xffffff,1); g.strokeRoundedRect(10,10,44,44,10);
+          g.lineStyle(2,0xffffff,0.7); g.strokeRoundedRect(16,16,32,32,8);
+        });
+        makeTex("obs_tri", g=>{
+          g.fillStyle(0xffffff,1); g.beginPath(); g.moveTo(32,8); g.lineTo(56,56); g.lineTo(8,56); g.closePath(); g.fillPath();
+          g.lineStyle(2,0xffffff,0.35); g.strokePath();
+        });
+        makeTex("obs_hex", g=>{
+          g.fillStyle(0xffffff,1);
+          const pts=[{x:32,y:6},{x:54,y:18},{x:54,y:46},{x:32,y:58},{x:10,y:46},{x:10,y:18}];
+          g.beginPath(); g.moveTo(pts[0].x,pts[0].y);
+          for (let i=1;i<pts.length;i++) g.lineTo(pts[i].x,pts[i].y);
+          g.closePath(); g.fillPath();
+          g.lineStyle(2,0xffffff,0.35); g.strokePath();
+        });
+        makeTex("obs_bar", g=>{
+          g.fillStyle(0xffffff,1); g.fillRoundedRect(6,24,52,16,8);
+          g.lineStyle(2,0xffffff,0.35); g.strokeRoundedRect(6,24,52,16,8);
+        });
+        makeTex("obs_plus", g=>{
+          g.fillStyle(0xffffff,1);
+          g.fillRoundedRect(26,10,12,44,5);
+          g.fillRoundedRect(10,26,44,12,5);
+          g.lineStyle(2,0xffffff,0.35);
+          g.strokeRoundedRect(26,10,12,44,5);
+          g.strokeRoundedRect(10,26,44,12,5);
+        });
+      }
+      const shapeToTex = { rect:"obs_rect", frame:"obs_frame", tri:"obs_tri", hex:"obs_hex", bar:"obs_bar", plus:"obs_plus" };
+
+      // SCORING
+      const SCORE_PPS = 7;
+      const NEAR_DIST = 36;
+      const NEAR_POINTS = 18;
+      const COMBO_DECAY_SEC = 1.30;
+      const COMBO_STEP = 0.11;
+      const COMBO_MAX = 3.10;
+
+      const DODGE_DIST = 74;
+      const DODGE_POINTS = 9;
+
+      const STREAK_EVERY = 12;
+      const STREAK_BONUS = 55;
+      const CLEAR_BONUS_BASE = 220;
+      const MAX_SCROLL_SPEED = 360;
+
+      function formatTime(sec){
+        const m=Math.floor(sec/60), s=Math.floor(sec%60);
+        return m>0?`${m}:${String(s).padStart(2,"0")}`:`${s}s`;
+      }
+
+      const ENDLESS = {
+        rampSeconds: 120,
+        t_blackout: 50,
+        t_laserWarn: 70,
+        t_laserActive: 90,
+        t_verticalLaser: 110
+      };
+
+      function lerpObj(a,b,t){
+        const o = {};
+        for (const k of Object.keys(a)) o[k] = a[k] + (b[k]-a[k])*t;
+        return o;
+      }
+      const BLACKOUT = { period: 10.5, active: 0.65, alpha: 0.35 };
+
+      function makePillButton(scene, label, y, onClick, accentColor, glowColor){
+        const container = scene.add.container(W/2, y).setDepth(210);
+        const g = scene.add.graphics();
+        const w = 250, h = 46, r = 23;
+
+        const draw = (hover=false) => {
+          g.clear();
+          g.fillStyle(glowColor, hover ? 0.22 : 0.16);
+          g.fillRoundedRect(-w/2 - 4, -h/2 - 3, w+8, h+6, r+4);
+          g.fillStyle(accentColor, hover ? 0.95 : 0.88);
+          g.fillRoundedRect(-w/2, -h/2, w, h, r);
+          g.fillStyle(0xffffff, hover ? 0.12 : 0.09);
+          g.fillRoundedRect(-w/2+10, -h/2+6, w-20, 14, 12);
+        };
+        draw(false);
+
+        const t = scene.add.text(0, 0, label, {
+          fontFamily: uiFont,
+          fontSize: "16px",
+          color: "#ffffff"
+        }).setOrigin(0.5);
+
+        const hit = scene.add.rectangle(0,0,w,h,0xffffff,0.001).setInteractive({useHandCursor:true});
+        hit.on("pointerdown", onClick);
+        hit.on("pointerover", ()=>draw(true));
+        hit.on("pointerout", ()=>draw(false));
+
+        container.add([g, t, hit]);
+        return container;
+      }
+
+      window.GRIDRUN_AUDIO = {
+        applySettings: (s) => {
+          const g = phaserGame;
+          if (!g) return;
+          g.sound.volume = s.volumeSfx;
+        }
+      };
+
+      class PlayScene extends Phaser.Scene {
+        constructor(){
+          super("Play");
+          this.mode="campaign"; this.world=0; this.level=0;
+          this.wcfg=WORLDS[0]; this.lcfg=WORLDS[0].levels[0];
+
+          this.t=0; this.score=0; this.paused=false;
+          this.canMove=false; this.spawnTimer=0;
+          this.combo=1; this.comboTimer=0; this.maxCombo=1;
+          this.survivalPts=0; this.nearPts=0; this.dodgePts=0; this._lastStreakTick=0;
+          this.scrollSpeed=0; this.baseScroll=0; this.spawnEvery=900;
+
+          this.gridGraphics=null; this.gridOffset=0;
+          this.obstacles=null; this.player=null;
+
+          this.touchTarget=null; this.touchDot=null;
+          this.pauseBtn=null; this.pauseOverlay=null;
+
+          this.flash=null; this.blackoutRect=null;
+          this.blackoutOn=false; this.blackoutEnabled=false;
+
+          this.hLaser=null; this.hLaserWarn=null; this.vLaser=null; this.vLaserWarn=null;
+          this.bossT=0; this.hLaserMode="off"; this.vLaserMode="off";
+
+          this.hotCol = { col:0, t:0 };
+          this.hotColWarnRect=null;
+          this.hotColActiveRect=null;
+
+          this.emp = { t:0, jamLeft:0 };
+          this.empText=null;
+
+          this.decor=[];
+          this.hudBg=null;
+
+          this.music=null;
+        }
+
+        init(data){
+          this.mode = data?.mode || "campaign";
+          if (this.mode === "campaign"){
+            this.world = clamp(data?.world ?? 0, 0, 2);
+            this.level = clamp(data?.level ?? 0, 0, 4);
+            this.wcfg = WORLDS[this.world];
+            this.lcfg = this.wcfg.levels[this.level];
+          } else {
+            this.world=0; this.level=0;
+            this.wcfg=WORLDS[0];
+            this.lcfg=WORLDS[0].levels[0];
+          }
+        }
+
+        preload(){
+          if (!this.cache.audio.exists("music_w1")) this.load.audio("music_w1", ["audio/world1.mp3"]);
+          if (!this.cache.audio.exists("music_w2")) this.load.audio("music_w2", ["audio/world2.mp3"]);
+          if (!this.cache.audio.exists("music_w3")) this.load.audio("music_w3", ["audio/world3.mp3"]);
+
+          if (!this.cache.audio.exists("sfx_hit")) this.load.audio("sfx_hit", ["audio/sfx_hit.mp3"]);
+          if (!this.cache.audio.exists("sfx_clear")) this.load.audio("sfx_clear", ["audio/sfx_clear.mp3"]);
+          if (!this.cache.audio.exists("sfx_click")) this.load.audio("sfx_click", ["audio/sfx_click.mp3"]);
+        }
+
+        create(){
+          settings = loadSettingsState();
+
+          ensureObstacleTextures(this);
+          this.cameras.main.setBackgroundColor(this.wcfg.bg);
+          buildBackdrop(this, this.wcfg.fx, this.wcfg.glowA, this.wcfg.glowB);
+
+          this.stopMusic();
+          if (settings.gameplayMusic){
+            try{
+              this.music = this.sound.add(this.wcfg.musicKey, { loop:true, volume: settings.volumeMusic });
+              this.music.play();
+            }catch(e){}
+          }
+          this.sound.volume = settings.volumeSfx;
+
+          this.gridGraphics = this.add.graphics();
+          this.obstacles = this.physics.add.group({ immovable:true, allowGravity:false });
+
+          const startX = GRID_X + GRID_W/2;
+          const startY = GRID_Y + GRID_H*0.72;
+
+          this.player = this.add.rectangle(startX, startY, 28, 28, this.wcfg.player);
+          this.physics.add.existing(this.player);
+          this.player.body.setAllowGravity(false);
+
+          this.physics.add.overlap(this.player, this.obstacles, ()=>this.endRun({reason:"OBSTACLE"}));
+
+          this.flash = this.add.rectangle(W/2,H/2,W,H,0xffffff).setAlpha(0).setDepth(200);
+          this.blackoutRect = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0).setDepth(180);
+
+          this.touchDot = this.add.circle(0,0,6,this.wcfg.glowB).setAlpha(0).setDepth(60);
+
+          this.hudBg = this.add.graphics().setDepth(65);
+          this.uiTop = this.add.text(18,12,"",{fontFamily:uiFont,fontSize:"14px",color:"#ffffff"}).setDepth(70).setAlpha(0.98);
+          this.uiSub = this.add.text(18,32,"",{fontFamily:uiFont,fontSize:"12px",color:"#eaeaff"}).setDepth(70).setAlpha(0.95);
+          this.uiCombo = this.add.text(W-18,12,"",{fontFamily:uiFont,fontSize:"12px",color:"#ffffff"}).setOrigin(1,0).setDepth(70).setAlpha(0.90);
+
+          this.pauseBtn = this.add.text(W-18,34,"PAUSE",{
+            fontFamily:uiFont,fontSize:"12px",color:"#ffffff",
+            backgroundColor:"rgba(0,0,0,0.35)", padding:{left:10,right:10,top:6,bottom:6}
+          }).setOrigin(1,0).setDepth(9999).setInteractive({useHandCursor:true});
+
+          this.input.topOnly = true;
+          const pb = this.pauseBtn.getBounds();
+          this.pauseBtn.input.hitArea.setTo(pb.x-24,pb.y-16,pb.width+38,pb.height+28);
+          this.pauseBtn.on("pointerdown",(p)=>{ p.event?.stopPropagation?.(); this.togglePause(!this.paused); });
+
+          this.uiNoTouchZone = { x: W-220, y: 0, w: 220, h: 110 };
+
+          this.input.on("pointerdown",(p)=>{
+            if (this.paused){ this.togglePause(false); return; }
+            if (this.isInNoTouchZone(p.x,p.y)) return;
+            this.touchTarget = {x:p.x,y:p.y};
+            this.touchDot.setPosition(p.x,p.y).setAlpha(0.85);
+          });
+          this.input.on("pointermove",(p)=>{
+            if (!p.isDown || this.paused) return;
+            if (this.isInNoTouchZone(p.x,p.y)) return;
+            this.touchTarget = {x:p.x,y:p.y};
+            this.touchDot.setPosition(p.x,p.y).setAlpha(0.85);
+          });
+          this.input.on("pointerup",()=>{
+            this.touchTarget=null; this.touchDot.setAlpha(0);
+          });
+
+          this.cursors = this.input.keyboard.createCursorKeys();
+          this.keys = this.input.keyboard.addKeys("W,A,S,D,ESC");
+          this.input.keyboard.on("keydown-ESC", ()=>this.togglePause(!this.paused));
+
+          this.hotColWarnRect = this.add.rectangle(GRID_X, GRID_Y, TILE, GRID_H, this.wcfg.glowB).setOrigin(0,0).setAlpha(0).setDepth(95);
+          this.hotColActiveRect = this.add.rectangle(GRID_X, GRID_Y, TILE, GRID_H, 0xff3b30).setOrigin(0,0).setAlpha(0).setDepth(96);
+
+          this.empText = this.add.text(W/2, H*0.58, "", { fontFamily:uiFont, fontSize:"18px", color:"#ffffff" })
+            .setOrigin(0.5).setAlpha(0).setDepth(170);
+
+          this.setupLasers();
+          this.setupDecor();
+
+          this.resetRun();
+          this.startCountdown(3);
+        }
+
+        stopMusic(){
+          try{
+            if (this.music){
+              this.music.stop();
+              this.music.destroy();
+              this.music = null;
+            }
+          }catch(e){}
+        }
+
+        isInNoTouchZone(x,y){
+          const z=this.uiNoTouchZone;
+          return x>=z.x && x<=z.x+z.w && y>=z.y && y<=z.y+z.h;
+        }
+
+        resetRun(){
+          this.t=0; this.score=0; this.paused=false; this.canMove=false;
+          this.spawnTimer=0;
+          this.combo=1; this.comboTimer=0; this.maxCombo=1;
+          this.survivalPts=0; this.nearPts=0; this.dodgePts=0; this._lastStreakTick=0;
+          this.blackoutOn=false; this.blackoutEnabled=false;
+
+          this.hotCol = { col: Phaser.Math.Between(0, GRID_COLS-1), t:0 };
+          this.emp = { t:0, jamLeft:0 };
+
+          this.obstacles.children.iterate(o=>{ if(o) o.destroy(); });
+
+          if (this.mode==="campaign"){
+            this.baseScroll=this.lcfg.baseScroll;
+            this.scrollSpeed=this.lcfg.baseScroll;
+            this.spawnEvery=this.lcfg.spawnStart;
+          } else {
+            const w1l1 = WORLDS[0].levels[0];
+            this.baseScroll=w1l1.baseScroll;
+            this.scrollSpeed=w1l1.baseScroll;
+            this.spawnEvery=w1l1.spawnStart;
+          }
+        }
+
+        startCountdown(n){
+          this.countdown=n;
+          this.countText = this.add.text(W/2,H*0.42,"",{fontFamily:uiFont,fontSize:"54px",color:"#ffffff"})
+            .setOrigin(0.5).setDepth(160).setAlpha(1);
+          this.countSub = this.add.text(W/2,H*0.50,"",{fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff"})
+            .setOrigin(0.5).setDepth(160).setAlpha(1);
+
+          const show=(t,sub)=>{
+            this.countText.setText(t);
+            this.countSub.setText(sub||"");
+            this.countText.setScale(1.0);
+            this.tweens.add({targets:this.countText,scale:1.10,yoyo:true,duration:180,ease:"Sine.easeInOut"});
+          };
+
+          show(String(this.countdown), this.mode==="endless" ? "ENDLESS" : `${this.wcfg.name} • LEVEL ${this.level+1}`);
+
+          this.time.addEvent({
+            delay:1000, repeat:n,
+            callback:()=>{
+              this.countdown--;
+              if (this.countdown>0) show(String(this.countdown),"");
+              else if (this.countdown===0){
+                show("GO","");
+                this.flash.setAlpha(0.10);
+                this.tweens.add({targets:this.flash,alpha:0,duration:180,ease:"Linear"});
+                this.time.addEvent({delay:450, callback:()=>{
+                  this.countText.destroy(); this.countSub.destroy();
+                  this.canMove=true;
+                }});
+              }
+            }
+          });
+        }
+
+        togglePause(on){
+          this.paused=on;
+          if (on){
+            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.55).setDepth(140).setInteractive();
+            const t = this.add.text(W/2,H*0.44,"PAUSED",{fontFamily:uiFont,fontSize:"28px",color:"#ffffff"}).setOrigin(0.5).setDepth(141);
+            const s = this.add.text(W/2,H*0.52,"Tap anywhere to resume",{fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff"})
+              .setOrigin(0.5).setDepth(141).setAlpha(0.9);
+            this.pauseOverlay.on("pointerdown", ()=>this.togglePause(false));
+            this._pauseText=t; this._pauseSub=s;
+          } else {
+            this.pauseOverlay?.destroy(); this._pauseText?.destroy(); this._pauseSub?.destroy();
+            this.pauseOverlay=null;
+          }
+        }
+
+        setupDecor(){
+          for (const d of this.decor) d.destroy();
+          this.decor=[];
+          for (let i=0;i<6;i++){
+            const r = this.add.rectangle(
+              Phaser.Math.Between(30,W-30),
+              Phaser.Math.Between(-H,H),
+              Phaser.Math.Between(90,180),
+              8,
+              this.wcfg.glowA
+            ).setAlpha(0.05);
+            r._vy = Phaser.Math.FloatBetween(18, 68);
+            this.decor.push(r);
+          }
+        }
+
+        setupLasers(){
+          const boss = WORLDS[2].boss;
+          if (!boss){
+            this.hLaserWarn = this.add.rectangle(0,0,0,0,0xffffff).setAlpha(0);
+            this.hLaser = this.add.rectangle(0,0,0,0,0xff4d7d).setAlpha(0);
+            this.vLaserWarn = this.add.rectangle(0,0,0,0,0xffffff).setAlpha(0);
+            this.vLaser = this.add.rectangle(0,0,0,0,0xff4d7d).setAlpha(0);
+            return;
+          }
+
+          this.hLaserWarn = this.add.rectangle(GRID_X+GRID_W/2,GRID_Y+GRID_H/2,GRID_W,boss.warnThickness,0xffffff).setAlpha(0).setDepth(90);
+          this.hLaser = this.add.rectangle(GRID_X+GRID_W/2,GRID_Y+GRID_H/2,GRID_W,boss.thickness,0xff4d7d).setAlpha(0).setDepth(91);
+
+          this.vLaserWarn = this.add.rectangle(GRID_X+GRID_W/2,GRID_Y+GRID_H/2,boss.warnThickness,GRID_H,0xffffff).setAlpha(0).setDepth(90);
+          this.vLaser = this.add.rectangle(GRID_X+GRID_W/2,GRID_Y+GRID_H/2,boss.thickness,GRID_H,0xff4d7d).setAlpha(0).setDepth(91);
+
+          this.bossT=0;
+          this.hLaserMode = (this.mode==="campaign" && this.world===2) ? "active" : "off";
+          this.vLaserMode = "off";
+        }
+
+        playSfx(key){
+          settings = loadSettingsState();
+          if (!settings.sfx) return;
+          try{ this.sound.play(key, { volume: settings.volumeSfx }); }catch(e){}
+        }
+
+        updateHotColumn(dt){
+          const hz = this.wcfg.hazardHotColumn;
+          if (!hz?.enabled) { this.hotColWarnRect.setAlpha(0); this.hotColActiveRect.setAlpha(0); return false; }
+          if (this.t < hz.startAt){ this.hotColWarnRect.setAlpha(0); this.hotColActiveRect.setAlpha(0); return false; }
+
+          this.hotCol.t += dt;
+          const phase = this.hotCol.t % hz.every;
+
+          const warnOn = phase < hz.warn;
+          const activeOn = phase >= hz.warn && phase < (hz.warn + hz.active);
+
+          if (phase < dt) this.hotCol.col = Phaser.Math.Between(0, GRID_COLS-1);
+
+          const x = GRID_X + this.hotCol.col * TILE;
+          this.hotColWarnRect.setPosition(x, GRID_Y);
+          this.hotColActiveRect.setPosition(x, GRID_Y);
+
+          this.hotColWarnRect.setAlpha(warnOn ? hz.alphaWarn : 0);
+          this.hotColActiveRect.setAlpha(activeOn ? hz.alphaActive : 0);
+
+          if (activeOn){
+            const colMin = x;
+            const colMax = x + TILE;
+            if (this.player.x >= colMin && this.player.x <= colMax){
+              this.playSfx("sfx_hit");
+              this.endRun({reason:"HOT COLUMN"});
+              return true;
+            }
+          }
+          return false;
+        }
+
+        updateEmp(dt){
+          const hz = this.wcfg.hazardEmp;
+          if (!hz?.enabled){ this.empText.setAlpha(0); return; }
+          if (this.t < hz.startAt){ this.empText.setAlpha(0); return; }
+
+          this.emp.t += dt;
+          const phase = this.emp.t % hz.every;
+
+          const warnOn = phase < hz.warn;
+          const jamOn = phase >= hz.warn && phase < (hz.warn + hz.jam);
+
+          if (warnOn){
+            this.empText.setText("EMP INCOMING");
+            this.empText.setAlpha(0.85);
+          } else if (jamOn){
+            this.empText.setText("EMP JAM");
+            this.empText.setAlpha(0.95);
+            this.emp.jamLeft = Math.max(this.emp.jamLeft, hz.jam);
+          } else {
+            this.empText.setAlpha(0);
+          }
+
+          if (this.emp.jamLeft > 0) this.emp.jamLeft -= dt;
+        }
+
+        update(_, deltaMs){
+          if (this.paused) return;
+          const dt = deltaMs/1000;
+
+          if (!this.canMove){
+            this.drawGrid(0.0001);
+            this.updateHud(0);
+            return;
+          }
+
+          this.t += dt;
+
+          this.comboTimer += dt;
+          if (this.comboTimer > COMBO_DECAY_SEC) this.combo = 1;
+
+          const tick = Math.floor(this.t / STREAK_EVERY);
+          if (tick > this._lastStreakTick){
+            this._lastStreakTick = tick;
+            this.score += STREAK_BONUS;
+            this.flash.setAlpha(0.05);
+            this.tweens.add({targets:this.flash,alpha:0,duration:120,ease:"Linear"});
+          }
+
+          let timeLeft = 0;
+
+          if (this.mode==="campaign"){
+            if (this.world === 0) { if (this.updateHotColumn(dt)) return; }
+            else { this.hotColWarnRect.setAlpha(0); this.hotColActiveRect.setAlpha(0); }
+
+            if (this.world === 1) this.updateEmp(dt);
+            else { this.empText.setAlpha(0); this.emp.jamLeft = 0; }
+          }
+
+          if (this.mode==="campaign"){
+            timeLeft = Math.max(0, this.lcfg.seconds - this.t);
+            if (this.t >= this.lcfg.seconds){
+              const clearBonus = CLEAR_BONUS_BASE + this.world*70 + this.level*40;
+              this.score += clearBonus;
+              this.playSfx("sfx_clear");
+              this.levelComplete();
+              return;
+            }
+
+            this.baseScroll = this.lcfg.baseScroll + this.t * this.lcfg.scrollRamp;
+            this.scrollSpeed = Math.min(MAX_SCROLL_SPEED, this.baseScroll);
+
+            const targetSpawn = this.lcfg.spawnStart - this.t * this.lcfg.spawnRamp;
+            this.spawnEvery = clamp(targetSpawn, this.lcfg.spawnMin, this.lcfg.spawnStart);
+
+            if (this.world===2){ this.hLaserMode="active"; this.vLaserMode="off"; }
+
+          } else {
+            const tNorm = clamp(this.t / ENDLESS.rampSeconds, 0, 1);
+            const a = WORLDS[0].levels[0];
+            const b = WORLDS[2].levels[4];
+            const d = lerpObj(
+              { baseScroll:a.baseScroll, scrollRamp:a.scrollRamp, spawnStart:a.spawnStart, spawnRamp:a.spawnRamp, spawnMin:a.spawnMin, driftChance:a.driftChance, chaseChance:a.chaseChance },
+              { baseScroll:b.baseScroll, scrollRamp:b.scrollRamp, spawnStart:b.spawnStart, spawnRamp:b.spawnRamp, spawnMin:b.spawnMin, driftChance:b.driftChance, chaseChance:b.chaseChance },
+              tNorm
+            );
+
+            this.baseScroll = d.baseScroll + this.t * d.scrollRamp;
+            this.scrollSpeed = Math.min(MAX_SCROLL_SPEED, this.baseScroll);
+
+            const targetSpawn = d.spawnStart - this.t * d.spawnRamp;
+            this.spawnEvery = clamp(targetSpawn, d.spawnMin, d.spawnStart);
+
+            this.blackoutEnabled = this.t >= ENDLESS.t_blackout;
+            if (this.blackoutEnabled){
+              const bp = (this.t % BLACKOUT.period);
+              this.blackoutOn = bp < BLACKOUT.active;
+              this.blackoutRect.setAlpha(this.blackoutOn ? BLACKOUT.alpha : 0);
+            } else {
+              this.blackoutRect.setAlpha(0);
+            }
+
+            this.hLaserMode = (this.t >= ENDLESS.t_laserWarn) ? ((this.t >= ENDLESS.t_laserActive) ? "active" : "warn") : "off";
+            this.vLaserMode = (this.t >= ENDLESS.t_verticalLaser) ? ((this.t >= ENDLESS.t_laserActive) ? "active" : "warn") : "off";
+          }
+
+          const add = SCORE_PPS * dt;
+          this.survivalPts += add;
+          this.score += add;
+
+          const jammed = (this.mode==="campaign" && this.world===1 && this.emp.jamLeft > 0);
+
+          if (!IS_TOUCH){
+            let vx=0, vy=0;
+            if (!jammed){
+              const left=this.cursors.left.isDown||this.keys.A.isDown;
+              const right=this.cursors.right.isDown||this.keys.D.isDown;
+              const up=this.cursors.up.isDown||this.keys.W.isDown;
+              const down=this.cursors.down.isDown||this.keys.S.isDown;
+              if (left) vx-=1; if (right) vx+=1; if (up) vy-=1; if (down) vy+=1;
+              const mag=Math.hypot(vx,vy);
+              if (mag>1){ vx/=mag; vy/=mag; }
+            }
+            this.player.body.setVelocity(vx*PLAYER_SPEED, vy*PLAYER_SPEED);
+          } else {
+            if (this.touchTarget && !jammed){
+              const tx=clamp(this.touchTarget.x, GRID_X+14, GRID_X+GRID_W-14);
+              const ty=clamp(this.touchTarget.y, GRID_Y+14, GRID_Y+GRID_H-14);
+              const dx=tx-this.player.x, dy=ty-this.player.y;
+              const dist=Math.hypot(dx,dy);
+              if (dist>FOLLOW_RADIUS){
+                const nx=this.player.x+dx*FOLLOW_LERP;
+                const ny=this.player.y+dy*FOLLOW_LERP;
+                const maxStep=PLAYER_SPEED*FOLLOW_MAX_SPEED_MULT*dt;
+                const stepDist=Math.hypot(nx-this.player.x, ny-this.player.y);
+                if (stepDist>maxStep){
+                  const s=maxStep/stepDist;
+                  this.player.x=this.player.x+(nx-this.player.x)*s;
+                  this.player.y=this.player.y+(ny-this.player.y)*s;
+                } else { this.player.x=nx; this.player.y=ny; }
+                this.player.body.reset(this.player.x,this.player.y);
+              } else {
+                this.player.body.setVelocity(0,0);
+              }
+            } else {
+              this.player.body.setVelocity(0,0);
+            }
+          }
+
+          const pad=14;
+          const px=clamp(this.player.x, GRID_X+pad, GRID_X+GRID_W-pad);
+          const py=clamp(this.player.y, GRID_Y+pad, GRID_Y+GRID_H-pad);
+          if (px!==this.player.x || py!==this.player.y){ this.player.x=px; this.player.y=py; this.player.body.reset(px,py); }
+
+          this.spawnTimer += deltaMs;
+          while (this.spawnTimer >= this.spawnEvery){
+            this.spawnTimer -= this.spawnEvery;
+            this.spawnObstacle();
+          }
+
+          this.obstacles.children.iterate((o)=>{
+            if (!o) return;
+            o.y += this.scrollSpeed * dt;
+
+            if (o._drift){
+              o.x += o._drift * dt;
+              const laneMin = GRID_X + 10;
+              const laneMax = GRID_X + GRID_W - 10;
+              if (o.x < laneMin || o.x > laneMax) o._drift *= -1;
+              o.body.reset(o.x,o.y);
+            }
+            if (o._chase){
+              const dx = this.player.x - o.x;
+              o.x += clamp(dx, -70, 70) * 0.35 * dt;
+              const laneMin = GRID_X + 10;
+              const laneMax = GRID_X + GRID_W - 10;
+              o.x = clamp(o.x, laneMin, laneMax);
+              o.body.reset(o.x,o.y);
+            }
+
+            if (o.y > GRID_Y + GRID_H + 140){ o.destroy(); return; }
+
+            this.checkNearMiss(o);
+            this.checkDodgeBonus(o);
+          });
+
+          this.updateLasers(dt);
+
+          for (const r of this.decor){
+            r.y += r._vy*dt;
+            if (r.y > H+30){ r.y=-30; r.x=Phaser.Math.Between(30,W-30); }
+          }
+
+          this.drawGrid(dt);
+          this.updateHud(timeLeft);
+        }
+
+        updateHud(timeLeft){
+          const panelX = 10, panelY = 8, panelW = W - 20, panelH = 64;
+          this.hudBg.clear();
+          this.hudBg.fillStyle(0x000000, 0.38);
+          this.hudBg.fillRoundedRect(panelX, panelY, panelW, panelH, 14);
+          this.hudBg.lineStyle(2, this.wcfg.border, 0.65);
+          this.hudBg.strokeRoundedRect(panelX, panelY, panelW, panelH, 14);
+          this.hudBg.lineStyle(1, this.wcfg.glowB, 0.28);
+          this.hudBg.strokeRoundedRect(panelX+4, panelY+4, panelW-8, panelH-8, 12);
+
+          const modeLabel = this.mode==="campaign" ? `Campaign • ${this.wcfg.name} L${this.level+1}` : "Endless";
+          const tLabel = this.mode==="campaign" ? `Time Left: ${Math.ceil(timeLeft)}s` : `Time: ${formatTime(this.t)}`;
+          const blackoutLabel = (this.blackoutOn) ? " • BLACKOUT" : "";
+
+          this.uiTop.setText(`${modeLabel} • Score: ${Math.floor(this.score)}${blackoutLabel}`);
+          this.uiSub.setText(`${tLabel} • +${STREAK_BONUS}/${STREAK_EVERY}s`);
+          const cm = Math.min(COMBO_MAX, this.combo);
+          this.uiCombo.setText(cm > 1.01 ? `x${cm.toFixed(2)}` : "");
+        }
+
+        drawGrid(dt){
+          this.gridOffset = (this.gridOffset + this.scrollSpeed*dt) % TILE;
+          const g=this.gridGraphics; g.clear();
+
+          g.lineStyle(4, this.wcfg.border, 0.55);
+          g.strokeRoundedRect(GRID_X-7, GRID_Y-7, GRID_W+14, GRID_H+14, 16);
+          g.lineStyle(2, this.wcfg.border, 0.95);
+          g.strokeRoundedRect(GRID_X-6, GRID_Y-6, GRID_W+12, GRID_H+12, 14);
+
+          g.lineStyle(1, this.wcfg.gridLine, 0.95);
+          for (let c=0;c<=GRID_COLS;c++){
+            const x=GRID_X+c*TILE;
+            g.beginPath(); g.moveTo(x,GRID_Y); g.lineTo(x,GRID_Y+GRID_H); g.strokePath();
+          }
+          for (let r=-1;r<=GRID_ROWS+1;r++){
+            const y=GRID_Y+r*TILE+this.gridOffset-TILE;
+            g.beginPath(); g.moveTo(GRID_X,y); g.lineTo(GRID_X+GRID_W,y); g.strokePath();
+          }
+
+          g.fillStyle(this.wcfg.glowB, 0.12);
+          for (let c=0;c<=GRID_COLS;c++){
+            for (let r=0;r<=GRID_ROWS;r++){
+              if ((c+r)%3!==0) continue;
+              g.fillCircle(GRID_X+c*TILE, GRID_Y+r*TILE, 2.2);
+            }
+          }
+        }
+
+        spawnObstacle(){
+          const col = Phaser.Math.Between(0, GRID_COLS-1);
+          const x = GRID_X + col*TILE + TILE/2;
+          const y = GRID_Y - 70;
+
+          const style=this.wcfg.obstacleStyle;
+          const shapes=style.shapes;
+          const shape=shapes[Phaser.Math.Between(0,shapes.length-1)];
+          const tex=shapeToTex[shape] || "obs_rect";
+          const palette=style.palette;
+          const color=palette[Phaser.Math.Between(0,palette.length-1)];
+
+          let smin=20,smax=32;
+          if (this.mode==="campaign"){
+            const [a,b]=this.lcfg.size; smin=a; smax=b;
+          }
+
+          let w=Phaser.Math.Between(smin,smax);
+          let h=Phaser.Math.Between(smin,smax);
+          if (shape==="bar"){ w=Phaser.Math.Between(smax+8,smax+26); h=Phaser.Math.Between(14,22); }
+          if (shape==="tri"){ w=Phaser.Math.Between(smin,smax+4); h=Phaser.Math.Between(smin,smax+8); }
+          if (shape==="frame"){ w=Phaser.Math.Between(smin+2,smax+10); h=Phaser.Math.Between(smin+2,smax+10); }
+          if (shape==="plus"){ w=Phaser.Math.Between(smin,smax+10); h=Phaser.Math.Between(smin,smax+10); }
+
+          const o = this.add.image(x,y,tex).setTint(color).setAlpha(0.95);
+          o.displayWidth=w; o.displayHeight=h;
+
+          this.physics.add.existing(o);
+          o.body.setAllowGravity(false);
+          o.body.setImmovable(true);
+          o.body.setSize(w*0.88,h*0.88,true);
+
+          o._nearAwarded=false;
+          o._dodgeAwarded=false;
+
+          let driftChance=this.lcfg.driftChance;
+          let chaseChance=this.lcfg.chaseChance;
+
+          if (Math.random() < driftChance) o._drift = Phaser.Math.FloatBetween(-40, 40);
+          if (Math.random() < chaseChance && this.t > 12) o._chase = true;
+
+          this.obstacles.add(o);
+        }
+
+        checkNearMiss(o){
+          if (!o || o._nearAwarded) return;
+          const dy=Math.abs(o.y-this.player.y);
+          if (dy>30) return;
+          const dx=Math.abs(o.x-this.player.x);
+          const dist=Math.hypot(dx,dy);
+          if (dist <= NEAR_DIST){
+            o._nearAwarded=true;
+            this.comboTimer=0;
+            this.combo = Math.min(COMBO_MAX, this.combo + COMBO_STEP);
+            this.maxCombo = Math.max(this.maxCombo, this.combo);
+            const award = NEAR_POINTS * this.combo;
+            this.nearPts += award;
+            this.score += award;
+          }
+        }
+
+        checkDodgeBonus(o){
+          if (!o || o._dodgeAwarded || o._nearAwarded) return;
+          const dy=Math.abs(o.y-this.player.y);
+          if (dy>30) return;
+          const dx=Math.abs(o.x-this.player.x);
+          const dist=Math.hypot(dx,dy);
+          if (dist <= DODGE_DIST && dist > (NEAR_DIST + 3)){
+            o._dodgeAwarded = true;
+            this.dodgePts += DODGE_POINTS;
+            this.score += DODGE_POINTS;
+          }
+        }
+
+        updateLasers(dt){
+          const boss=WORLDS[2].boss;
+          if (!boss) return;
+
+          if (this.hLaserMode==="off" && this.vLaserMode==="off"){
+            this.hLaserWarn.setAlpha(0); this.hLaser.setAlpha(0);
+            this.vLaserWarn.setAlpha(0); this.vLaser.setAlpha(0);
+            return;
+          }
+
+          this.bossT += dt;
+          const cycle=boss.cycleSeconds;
+          const t=(this.bossT%cycle);
+
+          const warnOn = t < boss.warnSeconds;
+          const activeOn = (t >= boss.warnSeconds) && (t < boss.warnSeconds + boss.activeSeconds);
+
+          const driftY=(this.bossT*0.22)%1;
+          const yPos=GRID_Y+20+(GRID_H-40)*((t/cycle+driftY)%1);
+          this.hLaserWarn.setPosition(GRID_X+GRID_W/2,yPos);
+          this.hLaser.setPosition(GRID_X+GRID_W/2,yPos);
+
+          const driftX=(this.bossT*0.19+0.37)%1;
+          const xPos=GRID_X+20+(GRID_W-40)*((t/cycle+driftX)%1);
+          this.vLaserWarn.setPosition(xPos,GRID_Y+GRID_H/2);
+          this.vLaser.setPosition(xPos,GRID_Y+GRID_H/2);
+
+          const applyBeam=(mode,warnRect,activeRect)=>{
+            if (mode==="off"){ warnRect.setAlpha(0); activeRect.setAlpha(0); return; }
+            if (mode==="warn"){ warnRect.setAlpha(warnOn ? 0.30 : 0); activeRect.setAlpha(0); return; }
+            warnRect.setAlpha(warnOn ? 0.30 : 0);
+            activeRect.setAlpha(activeOn ? 0.85 : 0);
+          };
+
+          applyBeam(this.hLaserMode, this.hLaserWarn, this.hLaser);
+          applyBeam(this.vLaserMode, this.vLaserWarn, this.vLaser);
+
+          if (activeOn){
+            const pr=this.player.getBounds();
+            if (this.hLaserMode==="active"){
+              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, this.hLaser.getBounds())) { this.playSfx("sfx_hit"); this.endRun({reason:"H-LASER"}); }
+            }
+            if (this.vLaserMode==="active"){
+              if (Phaser.Geom.Intersects.RectangleToRectangle(pr, this.vLaser.getBounds())) { this.playSfx("sfx_hit"); this.endRun({reason:"V-LASER"}); }
+            }
+          }
+        }
+
+        levelComplete(){
+          const score=Math.floor(this.score);
+          window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
+          this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason:"CLEAR"});
+        }
+
+        endRun({reason}){
+          const score=Math.floor(this.score);
+          this.flash.setAlpha(0.10);
+          this.tweens.add({targets:this.flash,alpha:0,duration:170,ease:"Linear"});
+          this.stopMusic();
+
+          if (this.mode==="endless"){
+            window.GRIDRUN.setEndlessBest(score);
+            this.scene.start("Results",{mode:"endless",score,reason});
+            return;
+          }
+          this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason});
+        }
+      }
+
+      class ResultsScene extends Phaser.Scene {
+        constructor(){ super("Results"); }
+        create(data){
+          const mode=data?.mode||"campaign";
+          const score=data?.score||0;
+          const reason=data?.reason||"";
+
+          const theme = (mode==="campaign") ? WORLDS[data.world] : WORLDS[2];
+          const bg = theme.bg;
+          const accent = theme.glowB;
+          const glow = theme.border;
+
+          this.cameras.main.setBackgroundColor(bg);
+
+          this.add.text(W/2,H*0.18, mode==="endless"?"ENDLESS RESULT":"LEVEL RESULT",{
+            fontFamily:uiFont,fontSize:"30px",color:"#ffffff"
+          }).setOrigin(0.5);
+
+          let subtitle = "";
+          if (mode==="campaign"){
+            subtitle = `${WORLDS[data.world].name} • Level ${data.level+1} • ${reason==="CLEAR"?"CLEARED":"FAILED"}`;
+          } else {
+            subtitle = `Reason: ${reason}`;
+          }
+
+          this.add.text(W/2,H*0.24,subtitle,{
+            fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff",align:"center"
+          }).setOrigin(0.5).setAlpha(0.95);
+
+          this.add.text(W/2,H*0.38,`Score: ${score}`,{
+            fontFamily:uiFont,fontSize:"26px",color:"#ffffff"
+          }).setOrigin(0.5).setAlpha(0.98);
+
+          const cleared = (mode==="campaign" && reason==="CLEAR");
+
+          if (mode==="campaign"){
+            const tiers = window.GRIDRUN.getTierTargets(data.world, data.level);
+            let tier = "—";
+            if (score >= tiers.gold) tier = "GOLD";
+            else if (score >= tiers.silver) tier = "SILVER";
+            else if (score >= tiers.bronze) tier = "BRONZE";
+
+            this.add.text(W/2,H*0.46,`Tier: ${tier}`,{
+              fontFamily:uiFont,fontSize:"16px",color:"#ffffff"
+            }).setOrigin(0.5).setAlpha(0.95);
+
+            this.add.text(W/2,H*0.52,`Bronze ${tiers.bronze}  •  Silver ${tiers.silver}  •  Gold ${tiers.gold}`,{
+              fontFamily:uiFont,fontSize:"12px",color:"rgba(255,255,255,0.80)",align:"center"
+            }).setOrigin(0.5);
+          }
+
+          const nextFor = (w,l) => {
+            let nw=w, nl=l+1;
+            if (nl>=5){ nl=0; nw=w+1; }
+            if (nw>=3) return null;
+            return { world:nw, level:nl };
+          };
+
+          const y0 = H*0.62;
+
+          if (mode==="campaign"){
+            makePillButton(this, "RETRY", y0, () => this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}), accent, glow);
+
+            const nxt = cleared ? nextFor(data.world, data.level) : null;
+            if (nxt){
+              makePillButton(this, "NEXT LEVEL", y0 + 62, () => this.scene.start("Play",{mode:"campaign",world:nxt.world,level:nxt.level}), theme.glowA, glow);
+              makePillButton(this, "BACK TO LEVELS", y0 + 124, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
+              makePillButton(this, "MAIN MENU", y0 + 186, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+            } else {
+              makePillButton(this, "BACK TO LEVELS", y0 + 62, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
+              makePillButton(this, "MAIN MENU", y0 + 124, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+            }
+          } else {
+            makePillButton(this, "RETRY ENDLESS", y0, () => this.scene.start("Play",{mode:"endless"}), accent, glow);
+            makePillButton(this, "MAIN MENU", y0 + 72, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+          }
+        }
+      }
+
+      return new Phaser.Game({
+        type: Phaser.AUTO,
+        width: W,
+        height: H,
+        parent: "phaser-container",
+        physics: { default:"arcade", arcade:{ debug:false } },
+        scene: [PlayScene, ResultsScene]
+      });
+    }
+
+    // Boot: ALWAYS show auth gate on load
+    window.addEventListener("load", () => {
+      showMenus();
+      loadAuthGate();
+    });
   </script>
 </body>
 </html>

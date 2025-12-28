@@ -1,278 +1,1402 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<title>GRIDRUN (DEV)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1,user-scalable=no" />
+  <title>GRIDRUN</title>
+  <style>
+    : root{
+      --bgA:#1a1c30;
+      --bgB:#292942;
+      --accentA:#ff5733;
+      --accentB:#ff8b3d;
+      --glass: rgba(0,0,0,0.22);
+      --glass2:rgba(0,0,0,0.30);
+      --stroke: rgba(255,255,255,0.12);
+      --stroke2:rgba(255,255,255,0.18);
+      --text: rgba(255,255,255,0.92);
+      --muted:rgba(255,255,255,0.72);
+      --muted2:rgba(255,255,255,0.58);
+    }
 
-<style>
-body{
-  margin:0;
-  background:linear-gradient(135deg,#1a1c30,#292942);
-  color:white;
-  font-family:Verdana,sans-serif;
-  height:100vh;
-  overflow:hidden;
-}
-#game-container{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  height:100%;
-  text-align:center;
-}
-.menu{
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-  max-width:420px;
-  width:100%;
-  padding:20px;
-}
-button{
-  padding:14px;
-  font-size:16px;
-  border:none;
-  border-radius:40px;
-  background:linear-gradient(45deg,#ff5733,#ff8b3d);
-  color:white;
-  font-weight:bold;
-}
-button:disabled{opacity:.4}
-input{
-  padding:12px;
-  font-size:16px;
-  width:100%;
-  border-radius:12px;
-  border:none;
-}
-.lbRow{
-  display:flex;
-  justify-content:space-between;
-  padding:6px 0;
-}
-.lbRow.me{font-weight:bold;color:#ff8b3d}
-</style>
+    body{
+      margin:0;padding:0;
+      font-family: Verdana,sans-serif;
+      background: linear-gradient(135deg,var(--bgA),var(--bgB),var(--bgA));
+      animation:backgroundMove 10s infinite alternate;
+      height:100vh; overflow:hidden; color: white;
+    }
+    @keyframes backgroundMove {0%{background-position:0% 50%}100%{background-position:100% 50%}}
+
+    #game-container{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100%;
+      text-align:center;
+    }
+    #phaser-container{
+      display:none;
+      width:100%;
+      height:100%;
+      justify-content:center;
+      align-items:center;
+    }
+    canvas{display:block;margin:0 auto;}
+
+    h1{font-size:3rem;font-weight:bold;color:#fff;text-shadow:0 0 20px var(--accentA),0 0 30px var(--accentA); margin: 0 0 8px 0;}
+    p{font-size:18px;margin:10px 0;}
+    button{
+      margin:8px;padding:15px 30px;font-size:1rem;font-weight:bold;color: white;
+      background:linear-gradient(45deg,var(--accentA),var(--accentB));
+      border:none;border-radius:50px;cursor:pointer;
+      box-shadow:0 4px 10px rgba(0,0,0,. 4),0 0 15px rgba(255,87,51,. 7);
+      transition:transform .2s,box-shadow .3s,opacity .2s;
+    }
+    button:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 25px rgba(255,110,60,1)}
+    button:active{transform: translateY(2px);box-shadow:0 2px 5px rgba(0,0,0,.3),0 0 10px rgba(255,79,40,. 9)}
+    button:disabled{opacity:. 35;cursor:not-allowed;filter:grayscale(. 25);box-shadow:none;transform:none}
+
+    . menu-screen{
+      display:flex;flex-direction:column;align-items:center;gap:10px;
+      padding:20px;max-width:560px;width:100%;
+    }
+
+    .subhead{
+      font-size:14px;
+      color:var(--muted);
+      margin:0 0 14px 0;
+      line-height:1.4;
+      max-width:520px;
+    }
+
+    .panel{
+      width:100%;
+      background:var(--glass);
+      border: 1px solid var(--stroke);
+      border-radius:18px;
+      padding:14px;
+      box-shadow:0 10px 26px rgba(0,0,0,0.28);
+      backdrop-filter:  blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    .panelTitle{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .panelTitle strong{
+      font-size:14px;
+      color:var(--text);
+      letter-spacing:0.3px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(0,0,0,0.25);
+      border:1px solid var(--stroke);
+      color:var(--muted);
+      font-size:12px;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .pill b{color:#fff; font-weight:700;}
+
+    .toggle-row{
+      width:100%;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:10px 12px;
+      border-radius: 14px;
+      background:rgba(0,0,0,0.22);
+      border:1px solid rgba(255,255,255,0.12);
+    }
+    .toggle-row span{font-size:14px;opacity:0.95}
+    .small-note{font-size:12px;opacity:0.75;max-width:520px;line-height:1.35}
+
+    /* Leaderboards UI */
+    .tabs{
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin:10px 0 12px 0;
+    }
+    .tab{
+      padding:10px 14px;
+      border-radius:999px;
+      background:rgba(0,0,0,0.28);
+      border:1px solid var(--stroke);
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
+      cursor:pointer;
+      transition:transform .15s, border-color .2s, background . 2s, color .2s;
+      user-select:none;
+    }
+    .tab:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,0.22); }
+    .tab.active{
+      background:linear-gradient(45deg,rgba(255,87,51,0.35),rgba(255,139,61,0.28));
+      border-color:rgba(255,140,80,0.55);
+      color:#fff;
+      box-shadow:0 0 20px rgba(255,110,60,0.25);
+    }
+
+    .lbWrap{
+      width:100%;
+      max-height:52vh;
+      overflow:auto;
+      border-radius:14px;
+      border:1px solid var(--stroke);
+      background:rgba(0,0,0,0.22);
+    }
+    .lbHeader, .lbRow{
+      display:grid;
+      grid-template-columns:  70px 1fr 110px;
+      gap:10px;
+      align-items:center;
+      padding:12px 12px;
+    }
+    .lbHeader{
+      position:sticky;
+      top:0;
+      z-index:2;
+      background:rgba(0,0,0,0.45);
+      border-bottom:1px solid rgba(255,255,255,0.10);
+      font-size:12px;
+      color:var(--muted);
+      letter-spacing:0.3px;
+      backdrop-filter:  blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .lbRow{
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      font-size:14px;
+      color:var(--text);
+    }
+    .lbRow:last-child{border-bottom: none;}
+    .rank{
+      font-weight:900;
+      color:#fff;
+      opacity:0.92;
+    }
+    .name{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .badge{
+      font-size:11px;
+      padding:6px 10px;
+      border-radius: 999px;
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.10);
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .score{
+      text-align:right;
+      font-weight:900;
+      color:#fff;
+      letter-spacing:0.3px;
+    }
+    .me{
+      background:linear-gradient(90deg,rgba(255,87,51,0.16),rgba(0,0,0,0));
+      border-left:3px solid rgba(255,87,51,0.65);
+    }
+    .hint{
+      font-size:12px;
+      color:var(--muted2);
+      line-height:1.4;
+      margin-top:10px;
+    }
+
+    .lbWrap{ -webkit-overflow-scrolling: touch; }
+  </style>
 </head>
-
 <body>
-<div id="game-container"></div>
+  <div id="game-container"></div>
+  <div id="phaser-container"></div>
 
-<!-- LIBS -->
-<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min. js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/dist/module.min.js" type="module"></script>
 
-<script>
-/*********************************************************
- * SAFETY NET
- *********************************************************/
-window.onerror=(m,s,l,c)=>alert("JS ERROR:\n"+m+"\n"+s+":"+l);
-window.onunhandledrejection=e=>alert("PROMISE ERROR:\n"+(e.reason?.message||e.reason));
+  <script type="module">
+    /***********************
+     * SUPABASE CONFIG
+     * Replace with YOUR project URL + anon key
+     ***********************/
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
 
-/*********************************************************
- * SUPABASE
- *********************************************************/
-const SUPABASE_URL="https://pgoeyzhnrafupqvfrdnn.supabase.co";
-const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnb2V5emhucmFmdXBxdmZyZG5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3OTQzNTMsImV4cCI6MjA4MjM3MDM1M30.Nh7Q3VKna6eQcaqRozccFKEaSHIG0t18h6Pw37hQ4i8";
-const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+    const SUPABASE_URL = "https://YOUR_PROJECT. supabase.co";
+    const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";
 
-/*********************************************************
- * GLOBAL STATE
- *********************************************************/
-let currentUser=null;
-let profile=null;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/*********************************************************
- * HELPERS
- *********************************************************/
-function sanitizeUsername(v){
-  return String(v||"").trim().replace(/\s+/g,"_").replace(/[^a-z0-9_]/gi,"").slice(0,18);
-}
-function show(html){
-  document.getElementById("game-container").innerHTML=html;
-}
+    /***********************
+     * AUTH STATE (Supabase)
+     ***********************/
+    let currentUser = null;
+    let currentSession = null;
 
-/*********************************************************
- * AUTH
- *********************************************************/
-async function initAuth(){
-  const {data}=await supabase.auth.getSession();
-  currentUser=data?.session?.user||null;
+    async function initAuth(){
+      const { data:  { session } } = await supabase. auth.getSession();
+      if (session){
+        currentSession = session;
+        currentUser = session.user;
+        return true;
+      }
+      return false;
+    }
 
-  supabase.auth.onAuthStateChange(async(_,session)=>{
-    currentUser=session?.user||null;
-    if(currentUser){await ensureProfile();loadMainMenu();}
-    else loadAuthGate();
-  });
+    supabase.auth.onAuthStateChange((event, session) => {
+      currentSession = session;
+      currentUser = session?. user || null;
+      console.log("Auth state changed:", event, !!currentUser);
+    });
 
-  if(!currentUser) loadAuthGate();
-  else{await ensureProfile();loadMainMenu();}
-}
+    function getActiveUser(){
+      if (!currentUser) return null;
+      return {
+        id: currentUser.id,
+        email: currentUser.email
+      };
+    }
 
-async function ensureProfile(){
-  const {data}=await supabase.from("profiles").select("*").eq("id",currentUser.id).maybeSingle();
-  if(data){profile=data;return;}
-  const uname=sanitizeUsername("player_"+currentUser.id.slice(0,4));
-  await supabase.from("profiles").insert({id:currentUser.id,username:uname});
-  const res=await supabase.from("profiles").select("*").eq("id",currentUser.id).single();
-  profile=res.data;
-}
+    async function signupWithEmail(email, password, username){
+      email = String(email || "").trim().toLowerCase();
+      username = sanitizeUsername(username);
 
-/*********************************************************
- * AUTH UI
- *********************************************************/
-function loadAuthGate(){
-  show(`
-  <div class="menu">
-    <h1>GRIDRUN</h1>
-    <button onclick="loadLogin()">LOGIN</button>
-    <button onclick="loadSignup()">CREATE ACCOUNT</button>
-  </div>
-  `);
-}
+      if (! isValidEmail(email)) throw new Error("Please enter a valid email.");
+      if (!username) throw new Error("Please enter a username.");
+      if (!isValidPassword(password)) throw new Error("Password must be at least 6 characters.");
 
-function loadLogin(){
-  show(`
-  <div class="menu">
-    <h2>Login</h2>
-    <input id="le" placeholder="Email"/>
-    <input id="lp" type="password" placeholder="Password"/>
-    <button onclick="doLogin()">Confirm</button>
-    <button onclick="loadAuthGate()">Back</button>
-  </div>
-  `);
-}
+      // Check username uniqueness
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("username", username)
+        .limit(1);
 
-async function doLogin(){
-  const email=le.value,password=lp.value;
-  const {error}=await supabase.auth.signInWithPassword({email,password});
-  if(error) return alert(error.message);
-}
+      if (existing && existing.length > 0){
+        throw new Error("That username is taken. Choose another.");
+      }
 
-function loadSignup(){
-  show(`
-  <div class="menu">
-    <h2>Create</h2>
-    <input id="se" placeholder="Email"/>
-    <input id="su" placeholder="Username"/>
-    <input id="sp" type="password" placeholder="Password"/>
-    <button onclick="doSignup()">Create</button>
-    <button onclick="loadAuthGate()">Back</button>
-  </div>
-  `);
-}
+      // Sign up with Supabase Auth
+      const { data, error } = await supabase. auth.signUp({
+        email,
+        password,
+        options: {
+          data: { username }
+        }
+      });
 
-async function doSignup(){
-  const email=se.value,password=sp.value,username=sanitizeUsername(su.value);
-  const {data,error}=await supabase.auth.signUp({email,password});
-  if(error) return alert(error.message);
-  await supabase.from("profiles").insert({id:data.user.id,username});
-}
+      if (error) throw new Error(error.message);
 
-async function logout(){
-  await supabase.auth.signOut();
-}
+      // Create profile (will be auto-created by trigger, but we ensure it exists)
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: data.user.id,
+          username: username,
+          email: email,
+          created_at: new Date().toISOString()
+        }, { onConflict: "id" });
 
-/*********************************************************
- * MAIN MENU
- *********************************************************/
-function loadMainMenu(){
-  show(`
-  <div class="menu">
-    <h1>GRIDRUN</h1>
-    <button onclick="loadEndless()">ENDLESS</button>
-    <button onclick="loadLeaderboards()">LEADERBOARDS</button>
-    <button onclick="loadAccount()">ACCOUNT</button>
-    <button onclick="logout()">LOGOUT</button>
-  </div>
-  `);
-}
+      if (profileError) throw new Error(profileError.message);
 
-/*********************************************************
- * ENDLESS MODE (GLOBAL SCORE)
- *********************************************************/
-let endlessBest=0;
+      return { id: data.user.id, email, username };
+    }
 
-async function loadEndless(){
-  show(`
-  <div class="menu">
-    <h2>Endless</h2>
-    <p>Best: ${endlessBest}</p>
-    <button onclick="finishEndless()">Finish Run (+${Math.floor(Math.random()*1000)})</button>
-    <button onclick="loadMainMenu()">Back</button>
-  </div>
-  `);
-}
+    async function loginWithEmail(email, password){
+      email = String(email || "").trim().toLowerCase();
 
-async function finishEndless(){
-  const score=Math.floor(Math.random()*1000);
-  endlessBest=Math.max(endlessBest,score);
+      if (!isValidEmail(email)) throw new Error("Please enter a valid email.");
+      if (!password) throw new Error("Please enter your password.");
 
-  await supabase.from("scores").upsert({
-    user_id:currentUser.id,
-    mode:"endless",
-    score:endlessBest
-  },{onConflict:"user_id,mode"});
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-  loadEndless();
-}
+      if (error) throw new Error(error.message || "Login failed.");
 
-/*********************************************************
- * LEADERBOARDS
- *********************************************************/
-async function loadLeaderboards(){
-  const {data}=await supabase
-    .from("scores")
-    .select("user_id,score")
-    .eq("mode","endless")
-    .order("score",{ascending:false})
-    .limit(25);
+      return { id: data.user.id, email };
+    }
 
-  let rows="";
-  for(let i=0;i<(data||[]).length;i++){
-    const r=data[i];
-    const {data:p}=await supabase.from("profiles").select("username").eq("id",r.user_id).single();
-    rows+=`<div class="lbRow ${r.user_id===currentUser.id?"me":""}">
-      <div>#${i+1}</div><div>${p?.username||"?"}</div><div>${r.score}</div>
-    </div>`;
-  }
+    async function logout(){
+      await supabase.auth.signOut();
+      currentUser = null;
+      currentSession = null;
+    }
 
-  show(`
-  <div class="menu">
-    <h2>Leaderboard</h2>
-    ${rows||"<p>No scores yet</p>"}
-    <button onclick="loadMainMenu()">Back</button>
-  </div>
-  `);
-}
+    async function sendPasswordResetEmail(email){
+      email = String(email || "").trim().toLowerCase();
+      if (!isValidEmail(email)) throw new Error("Please enter a valid email.");
 
-/*********************************************************
- * ACCOUNT
- *********************************************************/
-function loadAccount(){
-  show(`
-  <div class="menu">
-    <h2>Account</h2>
-    <p>${profile.username}</p>
-    <input id="ue" value="${profile.username}"/>
-    <button onclick="saveUsername()">Save</button>
-    <button onclick="loadMainMenu()">Back</button>
-  </div>
-  `);
-}
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}? resetToken=true`
+      });
 
-async function saveUsername(){
-  const u=sanitizeUsername(ue.value);
-  const {error}=await supabase.from("profiles").update({username:u}).eq("id",currentUser.id);
-  if(error) return alert("Username taken");
-  await ensureProfile();
-  loadAccount();
-}
+      if (error) throw new Error(error. message);
+    }
 
-/*********************************************************
- * BOOT
- *********************************************************/
-window.addEventListener("load",initAuth);
-</script>
-</body>
-</html>
+    async function updatePasswordWithToken(newPassword, token){
+      if (!isValidPassword(newPassword)) throw new Error("Password must be at least 6 characters.");
+      if (!token) throw new Error("Invalid reset token.");
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw new Error(error.message);
+    }
+
+    async function updateUsername(newUsername){
+      const u = getActiveUser();
+      if (!u) throw new Error("Not logged in.");
+
+      newUsername = sanitizeUsername(newUsername);
+      if (!newUsername) throw new Error("Invalid username.");
+
+      // Check uniqueness
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("username", newUsername)
+        .neq("id", u.id)
+        .limit(1);
+
+      if (existing && existing.length > 0){
+        throw new Error("That username is taken.");
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ username: newUsername })
+        .eq("id", u.id);
+
+      if (error) throw new Error(error.message);
+      return newUsername;
+    }
+
+    /***********************
+     * PROGRESS (LOCAL + ACCOUNT-SCOPED)
+     ***********************/
+    const SAVE_KEY_PREFIX = "gridrun_progress_";
+
+    function progressKey(){
+      const u = getActiveUser();
+      return u ? `${SAVE_KEY_PREFIX}${u.id}` : null;
+    }
+
+    function defaultProgress(){
+      return {
+        worldsUnlocked: 1,
+        levelsUnlocked: [1, 0, 0],
+        bestScores: [
+          [0,0,0,0,0],
+          [0,0,0,0,0],
+          [0,0,0,0,0],
+        ],
+        endlessBest: 0
+      };
+    }
+
+    function loadProgress(){
+      const key = progressKey();
+      if (!key) return defaultProgress();
+
+      try{
+        const raw = localStorage.getItem(key);
+        if (!raw) return defaultProgress();
+
+        const p = JSON.parse(raw);
+        const d = defaultProgress();
+        const out = { ...d, ...p };
+
+        if (! Array.isArray(out.levelsUnlocked) || out.levelsUnlocked.length !== 3) out.levelsUnlocked = d.levelsUnlocked. slice();
+        if (!Array.isArray(out.bestScores) || out.bestScores.length !== 3) out.bestScores = d.bestScores.map(r=>r.slice());
+
+        for (let w=0; w<3; w++){
+          if (!Array.isArray(out.bestScores[w]) || out.bestScores[w].length !== 5) out.bestScores[w] = [0,0,0,0,0];
+          for (let l=0; l<5; l++) out.bestScores[w][l] = Math.max(0, Math.floor(out.bestScores[w][l] || 0));
+        }
+
+        out.worldsUnlocked = Math.max(1, Math.min(3, Math.floor(out.worldsUnlocked || 1)));
+        out.levelsUnlocked = out.levelsUnlocked.map((x)=>Math.max(0, Math.min(5, Math.floor(x || 0))));
+        out.endlessBest = Math.max(0, Math.floor(out.endlessBest || 0));
+        return out;
+      }catch{
+        return defaultProgress();
+      }
+    }
+
+    function saveProgress(p){
+      const key = progressKey();
+      if (key) localStorage.setItem(key, JSON.stringify(p));
+    }
+
+    let progress = defaultProgress();
+
+    function defaultSettings(){
+      return {
+        menuMusic: true,
+        gameplayMusic: true,
+        sfx: true,
+        volumeMusic: 0.75,
+        volumeSfx: 0.85
+      };
+    }
+
+    function loadSettingsState(){
+      try{
+        const raw = localStorage. getItem("gridrun_audio_settings_v1");
+        if (!raw) return defaultSettings();
+        const s = { ...defaultSettings(), ...JSON.parse(raw) };
+        s.menuMusic = !!s.menuMusic;
+        s.gameplayMusic = !! s.gameplayMusic;
+        s.sfx = !!s.sfx;
+        s. volumeMusic = Math.max(0, Math.min(1, Number(s.volumeMusic ??  0.75)));
+        s.volumeSfx = Math. max(0, Math.min(1, Number(s.volumeSfx ?? 0.85)));
+        return s;
+      }catch{
+        return defaultSettings();
+      }
+    }
+
+    function saveSettingsState(s){ localStorage.setItem("gridrun_audio_settings_v1", JSON.stringify(s)); }
+    let settings = loadSettingsState();
+
+    /***********************
+     * LEADERBOARDS (Supabase)
+     ***********************/
+    async function uploadScoreToLeaderboard(endlessBest, campaignTotal, worldTotals){
+      const u = getActiveUser();
+      if (!u) return;
+
+      const { error } = await supabase
+        .from("scores")
+        .upsert({
+          user_id: u.id,
+          endless_best: endlessBest,
+          campaign_total: campaignTotal,
+          world_1_total: worldTotals[0],
+          world_2_total: worldTotals[1],
+          world_3_total:  worldTotals[2],
+          updated_at: new Date().toISOString()
+        }, { onConflict: "user_id" });
+
+      if (error) console.error("Failed to upload score:", error);
+    }
+
+    function sumCampaignTotals(p){
+      const worldTotals = [0,0,0];
+      for (let w=0; w<3; w++){
+        let t=0;
+        for (let l=0; l<5; l++) t += Math.max(0, Math.floor(p.bestScores? .[w]?.[l] || 0));
+        worldTotals[w]=t;
+      }
+      const campaignTotal = worldTotals[0] + worldTotals[1] + worldTotals[2];
+      return { campaignTotal, worldTotals };
+    }
+
+    async function updateLeaderboardsFromProgress(){
+      const u = getActiveUser();
+      if (!u) return;
+
+      const p = loadProgress();
+      const totals = sumCampaignTotals(p);
+      await uploadScoreToLeaderboard(p.endlessBest, totals.campaignTotal, totals. worldTotals);
+    }
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+    /***********************
+     * UTILITY FUNCTIONS
+     ***********************/
+    function normalizeEmail(email){ return String(email || "").trim().toLowerCase(); }
+
+    function sanitizeUsername(u){
+      u = String(u || "").trim();
+      u = u.replace(/\s+/g," ");
+      u = u.replace(/[^\w\s\-\. ]/g,"");
+      u = u.slice(0, 18);
+      return u;
+    }
+
+    function isValidEmail(email){
+      const e = String(email || "").trim();
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+    }
+
+    function isValidPassword(pw){
+      return String(pw || "").length >= 6;
+    }
+
+    /***********************
+     * SIMPLE MENU AUDIO
+     ***********************/
+    const MENU_MUSIC_SRC = "audio/menu. mp3";
+    let menuMusic = null;
+
+    function ensureMenuMusic(){
+      if (!menuMusic){
+        menuMusic = new Audio(MENU_MUSIC_SRC);
+        menuMusic.loop = true;
+        menuMusic.volume = settings.volumeMusic;
+      }
+    }
+    function startMenuMusic(){
+      ensureMenuMusic();
+      if (! settings.menuMusic) return;
+      menuMusic.volume = settings.volumeMusic;
+      menuMusic.play().catch(()=>{});
+    }
+    function stopMenuMusic(){
+      if (! menuMusic) return;
+      menuMusic.pause();
+      menuMusic.currentTime = 0;
+    }
+    function updateMenuMusicState(){
+      ensureMenuMusic();
+      menuMusic.volume = settings.volumeMusic;
+      if (settings.menuMusic) startMenuMusic();
+      else stopMenuMusic();
+    }
+
+    /***********************
+     * WORLD THEMES
+     ***********************/
+    const worlds = [
+      { name: "Neon Bliss", description: "Lively neon glow.  Learn the flow." },
+      { name: "Techno Abyss", description: "Icy pulses.  Faster and denser." },
+      { name: "Astral Surge", description: "Cosmic chaos. Hazards online." },
+    ];
+
+    /***********************
+     * LEVEL TIMES + TIER TARGETS
+     ***********************/
+    const levelTimes = [
+      [30, 40, 50, 60, 70],
+      [45, 60, 75, 90, 100],
+      [60, 80, 95, 105, 115],
+    ];
+
+    const TIER_MODEL = {
+      pps: 7,
+      streakEvery: 12,
+      streakBonus: 55,
+      expectedNearPer10s: [0.45, 0.70, 0.90],
+      expectedNearPoints: 18,
+      expectedAvgCombo: [1.18, 1.30, 1.45],
+      expectedDodgePer10s: [1.10, 1.35, 1.60],
+      expectedDodgePoints: 9,
+      clearBonusBase: 220
+    };
+
+    function computeTierTargets(worldIdx, levelIdx){
+      const t = levelTimes[worldIdx][levelIdx];
+      const survival = t * TIER_MODEL.pps;
+      const streaks = Math.floor(t / TIER_MODEL.streakEvery);
+      const streakScore = streaks * TIER_MODEL.streakBonus;
+
+      const expectedNear = Math.floor((t/10) * TIER_MODEL.expectedNearPer10s[worldIdx]);
+      const nearScore = expectedNear * TIER_MODEL. expectedNearPoints * TIER_MODEL.expectedAvgCombo[worldIdx];
+
+      const expectedDodge = Math.floor((t/10) * TIER_MODEL.expectedDodgePer10s[worldIdx]);
+      const dodgeScore = expectedDodge * TIER_MODEL.expectedDodgePoints;
+
+      const clearBonus = TIER_MODEL.clearBonusBase + worldIdx*60 + levelIdx*35;
+      const expected = survival + streakScore + dodgeScore + nearScore + clearBonus;
+
+      const bronze = Math.floor(expected * (0.78 + 0.015*levelIdx));
+      const silver = Math.floor(expected * (0.98 + 0.02*levelIdx));
+      const gold   = Math.floor(expected * (1.18 + 0.03*levelIdx));
+      return { time: t, scores: { bronze, silver, gold } };
+    }
+
+    function levelData(worldIdx, levelIdx){ return computeTierTargets(worldIdx, levelIdx); }
+
+    /***********************
+     * MENUS
+     ***********************/
+    function showMenus(){
+      document.getElementById("phaser-container").style.display = "none";
+      document.getElementById("game-container").style.display = "flex";
+      startMenuMusic();
+    }
+
+    function showGameplay(){
+      document.getElementById("game-container").style.display = "none";
+      document.getElementById("phaser-container").style.display = "flex";
+      stopMenuMusic();
+    }
+
+    function loadMainMenu(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      const u = getActiveUser();
+      if (!u){ loadAuthGate(); return; }
+
+      container.innerHTML = `
+        <div class="menu-screen" id="main-menu">
+          <h1>GRIDRUN</h1>
+          <p class="subhead">Fast.  Skill-based. Survive the grid and climb the ranks.</p>
+          <button onclick="loadModeSelect()">PLAY</button>
+          <button onclick="loadAccount()">ACCOUNT</button>
+          <button onclick="loadLeaderboards()">LEADERBOARDS</button>
+          <button onclick="loadHowTo()">HOW TO PLAY</button>
+          <button onclick="loadSettings()">SETTINGS</button>
+        </div>
+      `;
+    }
+
+    function loadModeSelect(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Select Mode</h1>
+          <div class="panel">
+            <div class="panelTitle">
+              <strong>Choose your run</strong>
+              <span class="pill">Tip: <b>Campaign</b> unlocks Worlds</span>
+            </div>
+            <button onclick="loadCampaignMode()">Campaign</button>
+            <button onclick="loadEndlessIntro()">Endless</button>
+          </div>
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+
+    function loadCampaignMode(){
+      startMenuMusic();
+      progress = loadProgress();
+      const container = document.getElementById("game-container");
+      const worldButtons = worlds.map((world, i) => `
+        <button onclick="loadWorld(${i + 1})" ${progress.worldsUnlocked > i ? '' : 'disabled'}>
+          ${progress.worldsUnlocked > i ? world.name : 'Locked'}
+        </button>
+      `).join("");
+
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Campaign</h1>
+          <p class="subhead">Survive each level to unlock the next.  Your best scores build your Campaign Total.</p>
+          <div class="panel">
+            <div class="panelTitle"><strong>Select a World</strong><span class="pill">Unlocked: <b>${progress.worldsUnlocked}/3</b></span></div>
+            ${worldButtons}
+          </div>
+          <button onclick="loadModeSelect()">Back</button>
+        </div>
+      `;
+    }
+
+    function loadWorld(worldNumber){
+      startMenuMusic();
+      progress = loadProgress();
+      const container = document.getElementById("game-container");
+      const worldIdx = worldNumber - 1;
+      const levelsUnlocked = progress.levelsUnlocked[worldIdx] || 0;
+
+      const levelButtons = Array. from({ length: 5 }, (_, i) => {
+        const unlocked = i < levelsUnlocked;
+        const best = progress.bestScores[worldIdx]?.[i] || 0;
+        const ld = levelData(worldIdx, i);
+        return `
+          <button onclick="loadLevelIntro(${worldNumber}, ${i + 1})" ${unlocked ? '' : 'disabled'}>
+            ${unlocked ? `Level ${i + 1} • ${ld.time}s • Best: ${best}` : 'Locked'}
+          </button>
+        `;
+      }).join("");
+
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>${worlds[worldIdx].name}</h1>
+          <p class="subhead">${worlds[worldIdx].description}</p>
+          <div class="panel">
+            <div class="panelTitle"><strong>Levels</strong><span class="pill">Unlocked: <b>${levelsUnlocked}/5</b></span></div>
+            ${levelButtons}
+          </div>
+          <button onclick="loadCampaignMode()">Back</button>
+        </div>
+      `;
+    }
+
+    function loadLevelIntro(worldNumber, levelNumber){
+      startMenuMusic();
+      progress = loadProgress();
+      const container = document.getElementById("game-container");
+      const w = worldNumber - 1;
+      const l = levelNumber - 1;
+      const ld = levelData(w, l);
+      const best = progress.bestScores[w]?.[l] || 0;
+
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Level ${levelNumber}</h1>
+          <p class="subhead">${worlds[w].name}</p>
+
+          <div class="panel">
+            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive:  <b>${ld.time}s</b></span></div>
+            <p style="margin: 6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85);">
+              Stay alive until the timer hits zero. More points = better tier.
+            </p>
+            <div style="height:10px"></div>
+            <div class="panelTitle"><strong>Your Best</strong><span class="pill"><b>${best}</b></span></div>
+            <div style="height:10px"></div>
+            <div class="panelTitle"><strong>Performance Tiers</strong><span class="pill">Targets</span></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
+              <span class="pill">Bronze <b>${ld.scores.bronze}</b></span>
+              <span class="pill">Silver <b>${ld.scores. silver}</b></span>
+              <span class="pill">Gold <b>${ld.scores.gold}</b></span>
+            </div>
+          </div>
+
+          <button onclick="playLevel(${worldNumber}, ${levelNumber})">Start</button>
+          <button onclick="loadWorld(${worldNumber})">Back</button>
+        </div>
+      `;
+    }
+
+    function loadEndlessIntro(){
+      startMenuMusic();
+      progress = loadProgress();
+      const container = document. getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Endless</h1>
+          <p class="subhead">Difficulty ramps from <b>W1L1</b> → <b>W3L5</b> over ~120s, then plateaus.</p>
+          <div class="panel">
+            <div class="panelTitle"><strong>Local Best</strong><span class="pill"><b>${progress.endlessBest}</b></span></div>
+            <button onclick="startGameplay({ mode:'endless' })">Start Endless</button>
+          </div>
+          <button onclick="loadModeSelect()">Back</button>
+        </div>
+      `;
+    }
+
+    function loadSettings(){
+      startMenuMusic();
+      settings = loadSettingsState();
+      const container = document.getElementById("game-container");
+      const onOff = (v)=> v ? "ON" : "OFF";
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Settings</h1>
+          <div class="panel">
+            <div class="toggle-row">
+              <span>Menu Music</span>
+              <button onclick="toggleSetting('menuMusic')">${onOff(settings.menuMusic)}</button>
+            </div>
+            <div class="toggle-row">
+              <span>Gameplay Music</span>
+              <button onclick="toggleSetting('gameplayMusic')">${onOff(settings.gameplayMusic)}</button>
+            </div>
+            <div class="toggle-row">
+              <span>Sound Effects (SFX)</span>
+              <button onclick="toggleSetting('sfx')">${onOff(settings.sfx)}</button>
+            </div>
+
+            <p class="small-note" style="margin-top:10px">
+              Audio is optional. If you don't add files in <b>/audio/</b>, the game still runs silently.
+            </p>
+          </div>
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+
+    function toggleSetting(key){
+      settings = loadSettingsState();
+      settings[key] = !settings[key];
+      saveSettingsState(settings);
+      updateMenuMusicState();
+      if (window. GRIDRUN_AUDIO && typeof window.GRIDRUN_AUDIO.applySettings === "function"){
+        window.GRIDRUN_AUDIO.applySettings(settings);
+      }
+      loadSettings();
+    }
+
+    function loadHowTo(){
+      startMenuMusic();
+      const container = document. getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>How To Play</h1>
+          <p class="subhead">Everything you need — objective, scoring, worlds, and endless. </p>
+
+          <div class="panel" style="text-align:left;">
+            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive</span></div>
+            <p style="margin:6px 0 14px 0; font-size: 14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              Stay alive inside the grid. In <b>Campaign</b>, you must survive the full timer for each level to clear it and unlock progression.
+              In <b>Endless</b>, survive as long as you can while difficulty ramps up.
+            </p>
+
+            <div class="panelTitle"><strong>Controls</strong><span class="pill">Touch or WASD</span></div>
+            <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              <b>Mobile: </b> touch where you want to move — your runner follows. 
+              <br><b>Desktop:</b> WASD / Arrow keys. 
+            </p>
+
+            <div class="panelTitle"><strong>Scoring</strong><span class="pill">Climb ranks</span></div>
+            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              You gain points over time for staying alive, plus bonuses for clean survival and skillful dodges.
+              Clearing a level adds a <b>Clear Bonus</b>. 
+            </p>
+
+            <p class="hint">
+              Your <b>Leaderboards</b> scores update automatically when you improve a best score (Campaign or Endless).
+            </p>
+          </div>
+
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+
+    /***********************
+     * AUTH SCREENS (SUPABASE)
+     ***********************/
+    function loadAuthGate(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>GRIDRUN</h1>
+          <p class="subhead">Login or create an account to play.</p>
+
+          <div class="panel">
+            <div class="panelTitle">
+              <strong>Account Access</strong>
+              <span class="pill">Global</span>
+            </div>
+
+            <button onclick="loadLogin()">LOGIN</button>
+            <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
+
+            <p class="hint">Powered by Supabase. One account per email.  Play anywhere.</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function loadLogin(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Login</h1>
+          <p class="subhead">Enter your email + password to access GRIDRUN.</p>
+
+          <div class="panel" style="text-align:left;">
+            <div class="panelTitle"><strong>Email</strong><span class="pill">required</span></div>
+            <input id="loginEmail" placeholder="you@email.com" autocomplete="email"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background: rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <div style="height:10px"></div>
+
+            <div class="panelTitle"><strong>Password</strong><span class="pill">required</span></div>
+            <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size: 16px;outline:none;box-sizing:border-box;" />
+
+            <p class="hint">Global account.  Access from any device.</p>
+            <button onclick="doLoginEmailPass()">Confirm</button>
+            <button onclick="loadForgotPassword()">Forgot Password?</button>
+          </div>
+
+          <button onclick="loadAuthGate()">Back</button>
+        </div>
+      `;
+    }
+
+    async function doLoginEmailPass(){
+      const email = document.getElementById("loginEmail")?.value || "";
+      const pass = document.getElementById("loginPass")?.value || "";
+      try{
+        await loginWithEmail(email, pass);
+        progress = loadProgress();
+        await updateLeaderboardsFromProgress();
+        loadMainMenu();
+      }catch(e){
+        alert(e?. message || "Login failed.");
+      }
+    }
+
+    function loadCreateAccount(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Create Account</h1>
+          <p class="subhead">Each email can only create one account.</p>
+
+          <div class="panel" style="text-align:left;">
+            <div class="panelTitle"><strong>Email</strong><span class="pill">unique</span></div>
+            <input id="signupEmail" placeholder="you@email.com" autocomplete="email"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing: border-box;" />
+
+            <div style="height:10px"></div>
+
+            <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars, unique</span></div>
+            <input id="signupUser" placeholder="Enter username..." autocomplete="nickname"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <div style="height:10px"></div>
+
+            <div class="panelTitle"><strong>Password</strong><span class="pill">min 6</span></div>
+            <input id="signupPass" type="password" placeholder="Create password..." autocomplete="new-password"
+              style="width:100%;padding:14px;border-radius: 14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+
+            <div style="height:10px"></div>
+
+            <div class="panelTitle"><strong>Confirm Password</strong><span class="pill">match</span></div>
+            <input id="signupPass2" type="password" placeholder="Confirm password..." autocomplete="new-password"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size: 16px;outline:none;box-sizing:border-box;" />
+
+            <p class="hint">Global account. Play from any device worldwide.</p>
+            <button onclick="doCreateAccount()">Create</button>
+          </div>
+
+          <button onclick="loadAuthGate()">Back</button>
+        </div>
+      `;
+    }
+
+    async function doCreateAccount(){
+      const email = document.getElementById("signupEmail")?.value || "";
+      const user = document.getElementById("signupUser")?.value || "";
+      const pass = document. getElementById("signupPass")?.value || "";
+      const pass2 = document.getElementById("signupPass2")?.value || "";
+
+      if (String(pass) !== String(pass2)){
+        alert("Passwords do not match.");
+        return;
+      }
+
+      try{
+        await signupWithEmail(email, pass, user);
+        progress = loadProgress();
+        await updateLeaderboardsFromProgress();
+        alert("Account created!  Please check your email to confirm.");
+        loadAuthGate();
+      }catch(e){
+        alert(e?.message || "Create account failed.");
+      }
+    }
+
+    function loadForgotPassword(){
+      startMenuMusic();
+      const container = document.getElementById("game-container");
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Reset Password</h1>
+          <p class="subhead">Enter your email address.  We'll send a reset link. </p>
+
+          <div class="panel" style="text-align: left;">
+            <div class="panelTitle"><strong>Email</strong><span class="pill">required</span></div>
+            <input id="resetEmail" placeholder="you@email.com" autocomplete="email"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size: 16px;outline:none;box-sizing:border-box;" />
+
+            <p class="hint">Check your email for the reset link.  It expires in 24 hours.</p>
+            <button onclick="doSendResetEmail()">Send Reset Link</button>
+          </div>
+
+          <button onclick="loadLogin()">Back to Login</button>
+        </div>
+      `;
+    }
+
+    async function doSendResetEmail(){
+      const email = document.getElementById("resetEmail")?.value || "";
+      try{
+        await sendPasswordResetEmail(email);
+        alert("Reset link sent! Check your email.");
+        loadLogin();
+      }catch(e){
+        alert(e?.message || "Failed to send reset email.");
+      }
+    }
+
+    async function loadAccount(){
+      startMenuMusic();
+      const u = getActiveUser();
+      const container = document.getElementById("game-container");
+      if (!u){ loadAuthGate(); return; }
+
+      // Fetch profile with username
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", u.id)
+        .single();
+
+      const username = profile?.username || "Unknown";
+      progress = loadProgress();
+      const totals = sumCampaignTotals(progress);
+
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Account</h1>
+          <p class="subhead">Logged in as <b>${username}</b><br><span style="font-size:12px;color: rgba(255,255,255,0.70)">${u.email}</span></p>
+
+          <div class="panel" style="text-align:left;">
+            <div class="panelTitle"><strong>Your Stats</strong><span class="pill">Local</span></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top: 8px">
+              <span class="pill">Endless Best <b>${progress.endlessBest}</b></span>
+              <span class="pill">Campaign Total <b>${totals.campaignTotal}</b></span>
+            </div>
+
+            <div style="height:12px"></div>
+            <div class="panelTitle"><strong>Edit Username</strong><span class="pill">profile</span></div>
+            <input id="usernameEdit" value="${username}" autocomplete="nickname"
+              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size: 16px;outline:none;box-sizing:border-box;" />
+
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+              <button onclick="saveUsernameChange()">Save</button>
+              <button onclick="doLogout()">Logout</button>
+            </div>
+            <p class="hint">Username must be unique. Password changes are on Supabase dashboard for now.</p>
+          </div>
+
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+    }
+
+    async function saveUsernameChange(){
+      const el = document.getElementById("usernameEdit");
+      if (! el) return;
+      const newU = sanitizeUsername(el.value);
+      if (! newU){ alert("Invalid username. "); return; }
+
+      try{
+        await updateUsername(newU);
+        progress = loadProgress();
+        await updateLeaderboardsFromProgress();
+        loadAccount();
+      }catch(e){
+        alert(e?.message || "Failed to update username.");
+      }
+    }
+
+    async function doLogout(){
+      await logout();
+      progress = loadProgress();
+      loadAuthGate();
+    }
+
+    /***********************
+     * LEADERBOARDS UI
+     ***********************/
+    async function fetchLeaderboardData(metric){
+      const columnMap = {
+        endless: "endless_best",
+        campaign: "campaign_total",
+        w1: "world_1_total",
+        w2: "world_2_total",
+        w3: "world_3_total"
+      };
+
+      const column = columnMap[metric] || "campaign_total";
+
+      const { data, error } = await supabase
+        .from("scores")
+        .select(`
+          user_id,
+          endless_best,
+          campaign_total,
+          world_1_total,
+          world_2_total,
+          world_3_total,
+          updated_at,
+          profiles(username)
+        `)
+        .order(column, { ascending: false })
+        .limit(25);
+
+      if (error){
+        console.error("Failed to fetch leaderboard:", error);
+        return [];
+      }
+
+      return (data || []).map(row => ({
+        user_id: row.user_id,
+        username: row.profiles?. username || "Unknown",
+        endless_best: Math.floor(row.endless_best || 0),
+        campaign_total: Math.floor(row.campaign_total || 0),
+        world_totals: [
+          Math.floor(row. world_1_total || 0),
+          Math.floor(row.world_2_total || 0),
+          Math.floor(row.world_3_total || 0)
+        ],
+        updated_at: row.updated_at
+      }));
+    }
+
+    function renderLeaderboardList(list, metric){
+      const u = getActiveUser();
+      const myId = u?.id || null;
+
+      const scoreOf = (r) => {
+        if (metric === "endless") return r.endless_best;
+        if (metric === "campaign") return r.campaign_total;
+        if (metric === "w1") return r.world_totals[0];
+        if (metric === "w2") return r.world_totals[1];
+        if (metric === "w3") return r.world_totals[2];
+        return 0;
+      };
+
+      const header = `
+        <div class="lbHeader">
+          <div>RANK</div>
+          <div>PLAYER</div>
+          <div style="text-align:right">SCORE</div>
+        </div>
+      `;
+
+      const rows = list.map((r, idx) => {
+        const isMe = (myId && r.user_id === myId);
+        const val = scoreOf(r);
+        return `
+          <div class="lbRow ${isMe ? "me" : ""}">
+            <div class="rank">#${idx + 1}</div>
+            <div class="name">
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.username}</span>
+              ${isMe ? `<span class="badge">YOU</span>` : ``}
+            </div>
+            <div class="score">${val}</div>
+          </div>
+        `;
+      }).join("");
+
+      let myRankHtml = "";
+      if (myId){
+        const myIdx = list.findIndex(r => r.user_id === myId);
+        if (myIdx >= 0){
+          const me = list[myIdx];
+          myRankHtml = `
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin: 10px 0 0 0">
+              <span class="pill">Your Rank <b>#${myIdx + 1}</b></span>
+              <span class="pill">Your Score <b>${scoreOf(me)}</b></span>
+            </div>
+          `;
+        } else {
+          myRankHtml = `<div class="hint" style="margin-top:10px">Play a run to appear here.</div>`;
+        }
+      } else {
+        myRankHtml = `<div class="hint" style="margin-top:10px">Login to post scores.</div>`;
+      }
+
+      return `
+        <div class="lbWrap">
+          ${header}
+          ${rows || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet. </div>`}
+        </div>
+        ${myRankHtml}
+      `;
+    }
+
+    async function loadLeaderboards(){
+      startMenuMusic();
+      await updateLeaderboardsFromProgress();
+      const container = document.getElementById("game-container");
+      const u = getActiveUser();
+
+      const tabs = [
+        { key: "endless", label: "Endless" },
+        { key: "campaign", label: "Campaign Total" },
+        { key: "w1", label: "World 1" },
+        { key:  "w2", label: "World 2" },
+        { key: "w3", label: "World 3" },
+      ];
+
+      container.innerHTML = `
+        <div class="menu-screen">
+          <h1>Leaderboards</h1>
+          <p class="subhead">${u ?  `Logged in as <b>${u.email}</b>.  Scores update when you beat a personal best.` : `View global rankings.  Login to post scores.`}</p>
+
+          <div class="panel">
+            <div class="panelTitle">
+              <strong>Global Rankings</strong>
+              <span class="pill">Top <b>25</b></span>
+            </div>
+
+            <div class="tabs" id="lbTabs">
+              ${tabs.map((t, i) => `<div class="tab ${i === 0 ? "active" : ""}" onclick="switchLbTab('${t.key}', this)">${t.label}</div>`).join("")}
+            </div>
+
+            <div id="lbContent" style="text-align:center;padding:20px;">
+              <p>Loading... </p>
+            </div>
+
+            <p class="hint">
+              Global leaderboards powered by Supabase. Updated in real-time.
+            </p>
+          </div>
+
+          <button onclick="loadMainMenu()">Back</button>
+        </div>
+      `;
+
+      // Fetch and render initial leaderboard
+      const data = await fetchLeaderboardData("endless");
+      const content = renderLeaderboardList(data, "endless");
+      const el = document.getElementById("lbContent");
+      if (el) el.innerHTML = content;
+    }
+
+    async function switchLbTab(key, el){
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      el.classList. add("active");
+      document.getElementById("lbContent").innerHTML = "<p>Loading...</p>";
+
+      const data = await fetchLeaderboardData(key);
+      const content = renderLeaderboardList(data, key);
+      document.getElementById("lbContent").innerHTML = content;
+    }
+
+    function playLevel(worldNumber, levelNumber){
+      startGameplay({ mode: "campaign", world: worldNumber - 1, level: levelNumber - 1 });
+    }
+
+    /***********************
+     * GAME BRIDGE (menus <-> phaser)
+     ***********************/
+    window. GRIDRUN = {
+      completeCampaignLevel: (worldIdx, levelIdx, score) => {
+        const p = loadProgress();
+        p.bestScores[worldIdx][levelIdx] = Math.max(p.bestScores[worldIdx][levelIdx] || 0, score);
+
+        const currentUnlocked = p.levelsUnlocked[worldIdx] || 0;
+        if (currentUnlocked === (levelIdx + 1)){
+          p.levelsUnlocked[worldIdx] = Math.min(5, currentUnlocked + 1);
+          if (levelIdx === 4 && worldIdx < 2){
+            p.worldsUnlocked = Math.max(p.worldsUnlocked, worldIdx + 2);
+            p.levelsUnlocked[worldIdx + 1] = Math.max(p.levelsUnlocked[worldIdx + 1] || 0, 1);
+          }
+        }
+
+        saveProgress(p);
+        updateLeaderboardsFromProgress();
+      },
+
+      setEndlessBest: (score) => {
+        const p = loadProgress();
+        p.endlessBest = Math.max(p.endlessBest || 0, score);
+        saveProgress(p);
+        updateLeaderboardsFromProgress();
+      },
+
+      getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,
+
+      backToLevelSelect: (worldIdx) => { showMenus(); loadWorld(worldIdx + 1); },
+      backToMainMenu: () => { showMenus(); loadMainMenu(); }
+    };
+
+    /***********************
+     * PHASER GAMEPLAY (IDENTICAL TO LOCAL VERSION)
+     ***********************/
+    let phaserGame = null;
+
+    function startGameplay(payload){
+      showGameplay();
+      if (! phaserGame) phaserGame = createPhaserGame();
+      phaserGame.scene.stop("Results");
+      phaserGame.scene.stop("Play");
+      phaserGame.scene.start("Play", payload);
+    }
+
+    function createPhaserGame(){
+      const W = 420, H = 760;
+      const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+
+      // GRID
+      const GRID_COLS = 7, GRID_ROWS = 13, TILE = 52;
+      const GRID_W = GRID_COLS * TILE, GRID_H = GRID_ROWS * TILE;
+      const GRID_X = (W - GRID_W) / 2, GRID_Y = (H - GRID_H) / 2;
+
+      // Movement
+      const PLAYER_SPEED = 320;
+      const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+      const FOLLOW_RADIUS = 7;
+      const FOLLOW_LERP = 0.40;
+      const FOLLOW_MAX_SPEED_MULT = 3. 0;
+      const lerp = (a, b, t) => a + (b - a) * t;
+
+      // WORLD THEMES + AUDIO keys
+      const WORLDS = [
+        {
+          id: 0,
+          name: "Neon Bliss",
+          subtitle: "Neon pink & cyan.  Lively glow.",
+          bg: 0x07001a,
+          border: 0xff2fd6,
+          gridLine: 0x55f7ff,
+          glowA: 0xff2fd6,
+          glowB: 0x55f7ff,
+          player: 0xffffff,
+          fx: "sparkle",
+          musicKey: "music_w1",
+          obstacleStyle: { palette: [0xff2fd6, 0x55f7ff, 0xfff06a], shapes: ["tri", "hex", "frame", "rect"] },
+          hazardHotColumn: { enabled: true, startAt: 10, every: 11. 5, warn: 0.9, active: 1. 1, alphaWarn: 0.22, alphaActive: 0.58 }
+        },
+        {
+          id: 1,
+          name: "Techno Abyss",
+          subtitle: "Icy pulses.  Faster and denser.",
+          bg: 0x00131f,
+          border: 0xa8e9ff,
+          gridLine: 0x44a3ff,
+          glowA:  0xa8e9ff,
+          glowB: 0x44a3ff,
+          player: 0xe9fbff,
+          fx: "pulse",
+          musicKey: "music_w2",
+          obstacleStyle: { palette: [0xa8e9ff, 0x44a3ff, 0xffffff, 0x7cffd2], shapes: ["bar", "plus", "rect", "frame", "hex"] },
+          hazardEmp: { enabled: true, startAt: 14, every: 12.5, warn: 0.9, jam: 0.55 }
+        },
+        {
+          id: 2,
+          name: "Astral Surge",
+          subtitle: "Galaxy purples & greens. Glitch storms.",
+          bg: 0x050016,
+          border: 0xb45cff,
+          gridLine: 0x38ffb8,
+          glowA: 0xb45cff,
+          glowB: 0x38ffb8,
+          player: 0xf1e8ff,
+          fx: "astral",
+          musicKey: "music_w3",
+          obstacleStyle: { palette: [0xb45cff, 0x38ffb8, 0xff4d7d, 0xffd166], shapes: ["hex", "tri", "bar", "frame", "plus", "rect"] },
+          boss: { enabled: true, cycleSeconds: 5. 7, warnSeconds: 1.20, activeSeconds: 1.12, thickness: 16, warnThickness: 6 }
+        }
+      ];
+
+      function mkLevelsForWorld(worldIndex){
+        const base = [
+          { baseScroll0: 78, baseScrollStep:  16, ramp0: 6. 4, rampStep: 2.4, spawnStart0: 920, spawnStep:  120, spawnRamp0: 12. 0, spawnRampStep: 3.1, spawnMin0: 480, spawnMinStep: 55, spawnMinFloor: 280, sizeMin0: 21, sizeMinStep: 1, sizeMax0: 33, sizeMaxStep: 1 },
+          { baseScroll0: 88, baseScrollStep: 18, ramp0: 7.2, rampStep: 2.7, spawnStart0: 860, spawnStep: 130, spawnRamp0: 13.2, spawnRampStep: 3.4, spawnMin0: 445, spawnMinStep: 60, spawnMinFloor: 260, sizeMin0: 20, sizeMinStep: 1, sizeMax0: 32, sizeMaxStep: 1 },
+          { baseScroll0: 96, baseScrollStep: 20, ramp0: 8.0, rampStep: 3.0, spawnStart0: 800, spawnStep: 140, spawnRamp0: 14.8, spawnRampStep: 3.9, spawnMin0: 415, spawnMinStep: 65, spawnMinFloor: 240, sizeMin0: 19, sizeMinStep: 1, sizeMax0: 31, sizeMaxStep: 1 },
+        ][

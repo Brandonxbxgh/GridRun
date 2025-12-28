@@ -768,7 +768,147 @@
         leaderboardSubscription = null;
       }
     }
+/***********************
+ * LEADERBOARDS SCREEN (UI)
+ ***********************/
+async function renderLeaderboardList(metric){
+  const a = await getActiveUser();
+  const myKey = a?.username ? a.username.toLowerCase() : null;
 
+  const { list, scoreOf } = await buildRanking(metric);
+  const top = (list || []).slice(0, 25);
+
+  const header = `
+    <div class="lbHeader">
+      <div>RANK</div>
+      <div>PLAYER</div>
+      <div style="text-align:right">SCORE</div>
+    </div>
+  `;
+
+  const rows = top.map((r, idx)=>{
+    const isMe = (myKey && r.username && r.username.toLowerCase() === myKey);
+    const val = Math.floor(scoreOf(r) || 0);
+    return `
+      <div class="lbRow ${isMe ? "me" : ""}">
+        <div class="rank">#${idx+1}</div>
+        <div class="name">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.username || "—"}</span>
+          ${isMe ? `<span class="badge">YOU</span>` : ``}
+        </div>
+        <div class="score">${val}</div>
+      </div>
+    `;
+  }).join("");
+
+  let myRankHtml = "";
+  if (myKey){
+    const i = (list || []).findIndex(r => (r.username || "").toLowerCase() === myKey);
+    if (i >= 0){
+      const me = list[i];
+      myRankHtml = `
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:10px 0 0 0">
+          <span class="pill">Your Rank <b>#${i+1}</b></span>
+          <span class="pill">Your Score <b>${Math.floor(scoreOf(me) || 0)}</b></span>
+        </div>
+      `;
+    } else {
+      myRankHtml = `<div class="hint" style="margin-top:10px">Play a run to appear here.</div>`;
+    }
+  } else {
+    myRankHtml = `<div class="hint" style="margin-top:10px">Login to post scores. You can still view the board.</div>`;
+  }
+
+  return `
+    <div class="lbWrap">
+      ${header}
+      ${rows || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
+    </div>
+    ${myRankHtml}
+  `;
+}
+
+async function loadLeaderboards(){
+  startMenuMusic();
+
+  // IMPORTANT: make sure menus container is visible
+  showMenus();
+
+  // If not logged in, send to auth gate
+  const a = await getActiveUser();
+  if (!a){ await loadAuthGate(); return; }
+
+  // Push latest PB -> leaderboard (best effort)
+  await updateLeaderboardsFromProgress();
+
+  const container = document.getElementById("game-container");
+
+  const tabs = [
+    { key:"endless", label:"Endless" },
+    { key:"campaign", label:"Campaign Total" },
+    { key:"w1", label:"World 1" },
+    { key:"w2", label:"World 2" },
+    { key:"w3", label:"World 3" },
+  ];
+
+  // initial
+  const initialContent = await renderLeaderboardList("endless");
+
+  container.innerHTML = `
+    <div class="menu-screen">
+      <h1>Leaderboards</h1>
+      <p class="subhead">${a ? `Logged in as <b>${a.username}</b>. Scores update in real-time when anyone beats a personal best.` : `View rankings. Login to post scores.`}</p>
+
+      <div class="panel">
+        <div class="panelTitle">
+          <strong>Rankings</strong>
+          <span class="pill">Top <b>25</b> (global • live)</span>
+        </div>
+
+        <div class="tabs" id="lbTabs">
+          ${tabs.map((t,i)=>`<div class="tab ${i===0?"active":""}" data-metric="${t.key}" onclick="switchLbTab('${t.key}', this)">${t.label}</div>`).join("")}
+        </div>
+
+        <div id="lbContent">
+          ${initialContent}
+        </div>
+
+        <p class="hint">
+          Global leaderboards with real-time updates via Supabase. 🔴 LIVE
+        </p>
+      </div>
+
+      <button onclick="leaveLeaderboards()">Back</button>
+    </div>
+  `;
+
+  // Subscribe to realtime updates AFTER UI exists
+  subscribeToLeaderboardUpdates(async () => {
+    const activeTab = document.querySelector(".tab.active");
+    const metric = activeTab?.getAttribute("data-metric") || "endless";
+    const content = await renderLeaderboardList(metric);
+    const lbContent = document.getElementById("lbContent");
+    if (lbContent) lbContent.innerHTML = content;
+  });
+}
+
+async function switchLbTab(key, el){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  el.classList.add("active");
+  const content = await renderLeaderboardList(key);
+  const lbContent = document.getElementById("lbContent");
+  if (lbContent) lbContent.innerHTML = content;
+}
+
+async function leaveLeaderboards(){
+  unsubscribeFromLeaderboardUpdates();
+  await loadMainMenu();
+}
+
+// Make sure inline onclick can find these
+window.loadLeaderboards = loadLeaderboards;
+window.switchLbTab = switchLbTab;
+window.leaveLeaderboards = leaveLeaderboards;
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
         /***********************
      * SIMPLE MENU AUDIO (HTMLAudioElement)

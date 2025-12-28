@@ -230,7 +230,7 @@
   <div id="phaser-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
 
   <script>
     /***********************
@@ -240,8 +240,25 @@
     const SUPABASE_URL = "YOUR_SUPABASE_URL";
     const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
     
-    // Initialize Supabase client
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Initialize Supabase client with error handling
+    let supabase = null;
+    let supabaseEnabled = false;
+    
+    try {
+      if (SUPABASE_URL && SUPABASE_ANON_KEY && 
+          SUPABASE_URL !== "YOUR_SUPABASE_URL" && 
+          SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabaseEnabled = true;
+        console.log("✅ Supabase initialized - Cloud sync enabled");
+      } else {
+        console.log("ℹ️ Supabase not configured - Using localStorage mode");
+      }
+    } catch (e) {
+      console.warn("⚠️ Supabase initialization failed - Falling back to localStorage:", e);
+      supabase = null;
+      supabaseEnabled = false;
+    }
     
     /***********************
      * LEGACY KEYS (for migration fallback)
@@ -275,6 +292,8 @@
      ***********************/
     async function getActiveUser(){
       try{
+        if (!supabaseEnabled || !supabase) return null;
+        
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return null;
         
@@ -300,6 +319,10 @@
       if (!u) throw new Error("Please enter a username.");
       if (!isValidPassword(pw)) throw new Error("Password must be at least 6 characters.");
 
+      if (!supabaseEnabled || !supabase) {
+        throw new Error("Supabase is not configured. Cannot create account.");
+      }
+
       // Create account with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: e,
@@ -324,6 +347,10 @@
       if (!isValidEmail(e)) throw new Error("Please enter a valid email.");
       if (!pw) throw new Error("Please enter your password.");
 
+      if (!supabaseEnabled || !supabase) {
+        throw new Error("Supabase is not configured. Cannot login.");
+      }
+
       // Sign in with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email: e,
@@ -338,7 +365,9 @@
     }
 
     async function clearActiveUser(){
-      await supabase.auth.signOut();
+      if (supabaseEnabled && supabase) {
+        await supabase.auth.signOut();
+      }
     }
 
     /***********************
@@ -363,8 +392,8 @@
     async function loadProgress() {
       try {
         const user = await getActiveUser();
-        if (!user || !user.userId) {
-          // Fallback to legacy localStorage if not logged in
+        if (!user || !user.userId || !supabaseEnabled || !supabase) {
+          // Fallback to legacy localStorage if not logged in or Supabase not available
           return loadProgressLegacy();
         }
 
@@ -452,8 +481,8 @@
     async function saveProgress(p) {
       try {
         const user = await getActiveUser();
-        if (!user || !user.userId) {
-          // Fallback to legacy localStorage if not logged in
+        if (!user || !user.userId || !supabaseEnabled || !supabase) {
+          // Fallback to legacy localStorage if not logged in or Supabase not available
           localStorage.setItem(SAVE_KEY_LEGACY, JSON.stringify(p));
           return;
         }
@@ -506,8 +535,8 @@
     async function loadSettingsState(){
       try{
         const user = await getActiveUser();
-        if (!user || !user.userId) {
-          // Fallback to legacy localStorage if not logged in
+        if (!user || !user.userId || !supabaseEnabled || !supabase) {
+          // Fallback to legacy localStorage if not logged in or Supabase not available
           return loadSettingsLegacy();
         }
 
@@ -568,8 +597,8 @@
     async function saveSettingsState(s){
       try {
         const user = await getActiveUser();
-        if (!user || !user.userId) {
-          // Fallback to legacy localStorage if not logged in
+        if (!user || !user.userId || !supabaseEnabled || !supabase) {
+          // Fallback to legacy localStorage if not logged in or Supabase not available
           localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
           return;
         }
@@ -624,7 +653,7 @@
     async function updateLeaderboardsFromProgress(){
       try {
         const user = await getActiveUser();
-        if (!user || !user.userId) return;
+        if (!user || !user.userId || !supabaseEnabled || !supabase) return;
         
         const username = user.username;
         const p = await loadProgress();
@@ -656,6 +685,11 @@
 
     async function buildRanking(metric){
       try {
+        if (!supabaseEnabled || !supabase) {
+          // Return empty leaderboard if Supabase not available
+          return { list: [], scoreOf: () => 0 };
+        }
+
         // Determine which field to order by
         let orderBy = 'endless_best';
         if (metric === 'campaign') orderBy = 'campaign_total';
@@ -705,6 +739,11 @@
     }
 
     function subscribeToLeaderboardUpdates(callback) {
+      if (!supabaseEnabled || !supabase) {
+        console.log("ℹ️ Realtime leaderboards not available (Supabase not configured)");
+        return;
+      }
+
       // Unsubscribe from previous subscription if exists
       if (leaderboardSubscription) {
         leaderboardSubscription.unsubscribe();
@@ -1056,22 +1095,32 @@
      ***********************/
     function loadAuthGate(){
       startMenuMusic();
+      
+      // If Supabase is not configured, skip authentication and go straight to main menu
+      if (!supabaseEnabled) {
+        loadMainMenu();
+        return;
+      }
+      
       const container = document.getElementById("game-container");
+      const supabaseStatus = supabaseEnabled ? 
+        "Cloud sync enabled via Supabase." : 
+        "⚠️ Supabase not configured - Using offline mode.";
+      
       container.innerHTML = `
         <div class="menu-screen">
           <h1>GRIDRUN</h1>
-          <p class="subhead">When the site loads, login or create an account to enter.</p>
+          <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
 
           <div class="panel">
             <div class="panelTitle">
               <strong>Account Access</strong>
-              <span class="pill">Required</span>
+              <span class="pill">Cloud Sync</span>
             </div>
 
             <button onclick="loadLogin()">LOGIN</button>
             <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
-
-            <p class="hint">Local-only for now (same device/browser). Email is unique.</p>
+            <p class="hint">${supabaseStatus}</p>
           </div>
         </div>
       `;
@@ -1421,9 +1470,9 @@
       document.getElementById("lbContent").innerHTML = content;
     }
 
-    function leaveLeaderboards(){
+    async function leaveLeaderboards(){
       unsubscribeFromLeaderboardUpdates();
-      loadMainMenu();
+      await loadMainMenu();
     }
 
     function playLevel(worldNumber, levelNumber) {
@@ -1460,8 +1509,8 @@
 
       getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,
 
-      backToLevelSelect: (worldIdx) => { showMenus(); loadWorld(worldIdx + 1); },
-      backToMainMenu: () => { showMenus(); loadMainMenu(); }
+      backToLevelSelect: async (worldIdx) => { showMenus(); await loadWorld(worldIdx + 1); },
+      backToMainMenu: async () => { showMenus(); await loadMainMenu(); }
     };
 
     /***********************
@@ -2405,20 +2454,20 @@
           }
         }
 
-        levelComplete(){
+        async levelComplete(){
           const score=Math.floor(this.score);
-          window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
+          await window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
           this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason:"CLEAR"});
         }
 
-        endRun({reason}){
+        async endRun({reason}){
           const score=Math.floor(this.score);
           this.flash.setAlpha(0.10);
           this.tweens.add({targets:this.flash,alpha:0,duration:170,ease:"Linear"});
           this.stopMusic();
 
           if (this.mode==="endless"){
-            window.GRIDRUN.setEndlessBest(score);
+            await window.GRIDRUN.setEndlessBest(score);
             this.scene.start("Results",{mode:"endless",score,reason});
             return;
           }

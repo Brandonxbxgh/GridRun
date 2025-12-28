@@ -666,11 +666,7 @@
             username: username,
             endless_best: Math.floor(p.endlessBest || 0),
             campaign_total: Math.floor(totals.campaignTotal || 0),
-            world_totals: [
-              Math.floor(totals.worldTotals[0] || 0),
-              Math.floor(totals.worldTotals[1] || 0),
-              Math.floor(totals.worldTotals[2] || 0)
-            ],
+            world_totals: totals.worldTotals.map(total => Math.floor(total || 0)),
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'user_id'
@@ -706,11 +702,9 @@
           username: r.username,
           endlessBest: Math.floor(r.endless_best || 0),
           campaignTotal: Math.floor(r.campaign_total || 0),
-          worldTotals: Array.isArray(r.world_totals) ? [
-            Math.floor(r.world_totals[0] || 0),
-            Math.floor(r.world_totals[1] || 0),
-            Math.floor(r.world_totals[2] || 0)
-          ] : [0, 0, 0],
+          worldTotals: Array.isArray(r.world_totals) 
+            ? r.world_totals.map(total => Math.floor(total || 0))
+            : [0, 0, 0],
           updatedAt: new Date(r.updated_at).getTime()
         }));
 

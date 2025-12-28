@@ -683,64 +683,93 @@ async function writeLeaderboardRowFromProgress(p){
   console.log("✅ Leaderboards updated:", data);
 }
     async function updateLeaderboardsFromProgress(){
-      try {
-        const user = await getActiveUser();
-        if (!user || !user.userId || !supabaseEnabled || !supabase) return;
-        
-        const username = user.username;
-        const p = await loadProgress();
-        const totals = sumCampaignTotals(p);
+  try {
+    const user = await getActiveUser();
+    if (!user || !user.userId || !supabaseEnabled || !supabase) return;
 
-        // Update leaderboard in Supabase
-        const { error } = await supabase
-          .from('leaderboards')
-          .upsert({
-            user_id: user.userId,
-            username: username,
-            endless_best: Math.floor(p.endlessBest || 0),
-            campaign_total: Math.floor(totals.campaignTotal || 0),
-            world_1_total: Math.floor(totals.worldTotals[0] || 0),
-            world_2_total: Math.floor(totals.worldTotals[1] || 0),
-            world_3_total: Math.floor(totals.worldTotals[2] || 0),
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id'
-          });
+    const username = user.username;
+    const p = await loadProgress();
+    const totals = sumCampaignTotals(p); // returns { campaignTotal, worldTotals }
 
-        if (error) {
-          console.error("Error updating leaderboards:", error);
-        }
-      } catch (e) {
-        console.error("Error in updateLeaderboardsFromProgress:", e);
-      }
+    const payload = {
+      user_id: user.userId,
+      username: username,
+      endless_best: Math.floor(p.endlessBest || 0),
+      campaign_total: Math.floor(totals.campaignTotal || 0),
+      world_totals: [
+        Math.floor(totals.worldTotals?.[0] || 0),
+        Math.floor(totals.worldTotals?.[1] || 0),
+        Math.floor(totals.worldTotals?.[2] || 0),
+      ],
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from("leaderboards")
+      .upsert(payload, { onConflict: "user_id" });
+
+    if (error) {
+      console.error("Leaderboards update failed:", error);
+      // optional popup if you want to see it immediately:
+      // alert("Leaderboards update failed: " + error.message);
     }
+  } catch (e) {
+    console.error("Error in updateLeaderboardsFromProgress:", e);
+  }
+}
 
     async function buildRanking(metric){
-      try {
-        if (!supabaseEnabled || !supabase) {
-          // Return empty leaderboard if Supabase not available
-          return { list: [], scoreOf: () => 0 };
-        }
+  try {
+    if (!supabaseEnabled || !supabase) {
+      return { list: [], scoreOf: () => 0 };
+    }
 
-        // Determine which field to order by
-        let orderBy = 'endless_best';
-        if (metric === 'campaign') orderBy = 'campaign_total';
-        else if (metric === 'w1') orderBy = 'world_1_total';
-        else if (metric === 'w2') orderBy = 'world_2_total';
-        else if (metric === 'w3') orderBy = 'world_3_total';
+    // Pull a batch and sort in JS (needed because world scores are inside world_totals[])
+    const { data, error } = await supabase
+      .from("leaderboards")
+      .select("username,endless_best,campaign_total,world_totals,updated_at")
+      .limit(1000);
 
-        // Fetch leaderboard data from Supabase
-        const { data, error } = await supabase
-          .from('leaderboards')
-          .select('*')
-          .order(orderBy, { ascending: false })
-          .order('updated_at', { ascending: false })
-          .limit(100);
+    if (error) {
+      console.error("Error fetching leaderboards:", error);
+      return { list: [], scoreOf: () => 0 };
+    }
 
-        if (error) {
-          console.error("Error fetching leaderboards:", error);
-          return { list: [], scoreOf: () => 0 };
-        }
+    const cleaned = (data || [])
+      .filter(r => r && r.username)
+      .map(r => ({
+        username: r.username,
+        endlessBest: Math.floor(r.endless_best || 0),
+        campaignTotal: Math.floor(r.campaign_total || 0),
+        worldTotals: [
+          Math.floor((r.world_totals?.[0]) || 0),
+          Math.floor((r.world_totals?.[1]) || 0),
+          Math.floor((r.world_totals?.[2]) || 0),
+        ],
+        updatedAt: new Date(r.updated_at).getTime() || 0
+      }));
+
+    const scoreOf = (r)=>{
+      if (metric === "endless") return r.endlessBest;
+      if (metric === "campaign") return r.campaignTotal;
+      if (metric === "w1") return r.worldTotals[0];
+      if (metric === "w2") return r.worldTotals[1];
+      if (metric === "w3") return r.worldTotals[2];
+      return 0;
+    };
+
+    cleaned.sort((a,b)=>{
+      const da = scoreOf(a), db = scoreOf(b);
+      if (db !== da) return db - da;
+      return (b.updatedAt||0) - (a.updatedAt||0);
+    });
+
+    return { list: cleaned, scoreOf };
+  } catch (e) {
+    console.error("Error in buildRanking:", e);
+    return { list: [], scoreOf: () => 0 };
+  }
+}
 
         const cleaned = (data || []).map(r => ({
           username: r.username,

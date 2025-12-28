@@ -28,20 +28,8 @@
     }
     @keyframes backgroundMove {0%{background-position:0% 50%}100%{background-position:100% 50%}}
 
-    #game-container{
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      height:100%;
-      text-align:center;
-    }
-    #phaser-container{
-      display:none;
-      width:100%;
-      height:100%;
-      justify-content:center;
-      align-items:center;
-    }
+    #game-container{display:flex;justify-content:center;align-items:center;height:100%;text-align:center;}
+    #phaser-container{display:none;width:100%;height:100%;justify-content:center;align-items:center;}
     canvas{display:block;margin:0 auto;}
 
     h1{font-size:3rem;font-weight:bold;color:#fff;text-shadow:0 0 20px var(--accentA),0 0 30px var(--accentA); margin:0 0 8px 0;}
@@ -222,160 +210,60 @@
       margin-top:10px;
     }
 
+    /* Smooth scroll on iOS */
     .lbWrap{ -webkit-overflow-scrolling: touch; }
   </style>
 </head>
 <body>
-  <div id="game-container"></div>
+  <div id="game-container">
+    <div class="menu-screen" id="main-menu">
+      <h1>GRIDRUN</h1>
+      <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
+      <button onclick="loadModeSelect()">PLAY</button>
+      <button onclick="loadAuthGate()">LOGIN</button>
+      <button onclick="loadLeaderboards()">LEADERBOARDS</button>
+      <button onclick="loadHowTo()">HOW TO PLAY</button>
+      <button onclick="loadSettings()">SETTINGS</button>
+    </div>
+  </div>
+
   <div id="phaser-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
     /***********************
-     * SUPABASE CONFIGURATION
-     * - Replace with your actual Supabase credentials
+     * SUPABASE (authoritative data source)
+     * - NO localStorage (REMOVE)
+     * - matches your SQL guide exactly:
+     *   profiles(id,email,username)
+     *   progress(user_id UNIQUE ...)
+     *   settings(user_id UNIQUE ...)
+     *   leaderboards(user_id UNIQUE, public read)
      ***********************/
-    const SUPABASE_URL = "https://uhpqmliygxbplgiencud.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_X7cuvFLmNRJv07zpdzcX_w_v3Agfx5M";
-    
-    // Initialize Supabase client with error handling
-    let supabase = null;
-    let supabaseEnabled = false;
-    
-    try {
-      if (SUPABASE_URL && SUPABASE_ANON_KEY && 
-          SUPABASE_URL !== "YOUR_SUPABASE_URL" && 
-          SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        supabaseEnabled = true;
-        console.log("✅ Supabase initialized - Cloud sync enabled");
-      } else {
-        console.log("ℹ️ Supabase not configured - Using localStorage mode");
-      }
-    } catch (e) {
-      console.warn("⚠️ Supabase initialization failed - Falling back to localStorage:", e);
-      supabase = null;
-      supabaseEnabled = false;
-    }
-    
-    /***********************
-     * LEGACY KEYS (for migration fallback)
-     ***********************/
-    const AUTH_KEY = "gridrun_auth_v2";           // active session: { email, username }
-    const ACCOUNTS_KEY = "gridrun_accounts_v1";   // accounts map by emailLower
+    const SUPABASE_URL = "YOUR_SUPABASE_URL";       // e.g. https://xxxxx.supabase.co
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Global auth + cached rows (single source of truth in runtime)
+    window.GRIDRUN_AUTH = {
+      session: null,
+      user: null,
+      profile: null,      // { id, email, username }
+      progress: null,     // mapped to game shape
+      settings: null      // mapped to game shape
+    };
+
+    // Cached leaderboards fetched from DB (public read)
+    window.GRIDRUN_LB_CACHE = {
+      fetchedAt: 0,
+      rows: [] // DB rows: { user_id, username, endless_best, campaign_total, world_totals, updated_at }
+    };
 
     /***********************
-     * UTILITY FUNCTIONS
+     * DEFAULTS (match guide)
      ***********************/
-    function normalizeEmail(email){ return String(email || "").trim().toLowerCase(); }
-
-    function sanitizeUsername(u){
-      u = String(u || "").trim();
-      u = u.replace(/\s+/g," ");
-      u = u.replace(/[^\w\s\-\.]/g,"");
-      u = u.slice(0, 18);
-      return u;
-    }
-
-    function isValidEmail(email){
-      const e = String(email || "").trim();
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-    }
-    function isValidPassword(pw){
-      return String(pw || "").length >= 6;
-    }
-
-    /***********************
-     * SUPABASE AUTH FUNCTIONS
-     ***********************/
-    async function getActiveUser(){
-      try{
-        if (!supabaseEnabled || !supabase) return null;
-        
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return null;
-        
-        const email = normalizeEmail(session.user.email);
-        
-        // Get username from user metadata
-        const username = session.user.user_metadata?.username || session.user.email.split('@')[0];
-        
-        if (!email || !username) return null;
-        return { email, username, userId: session.user.id };
-      }catch(e){
-        console.error("Error getting active user:", e);
-        return null;
-      }
-    }
-
-    async function createLocalAccount({ email, password, username }){
-      const e = normalizeEmail(email);
-      const u = sanitizeUsername(username);
-      const pw = String(password || "");
-
-      if (!isValidEmail(e)) throw new Error("Please enter a valid email.");
-      if (!u) throw new Error("Please enter a username.");
-      if (!isValidPassword(pw)) throw new Error("Password must be at least 6 characters.");
-
-      if (!supabaseEnabled || !supabase) {
-        throw new Error("Supabase is not configured. Cannot create account.");
-      }
-
-      // Create account with Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
-        email: e,
-        password: pw,
-        options: {
-          data: {
-            username: u
-          }
-        }
-      });
-
-      if (error) throw new Error(error.message);
-      if (!data.user) throw new Error("Account creation failed.");
-
-      return { email: e, username: u, userId: data.user.id };
-    }
-
-    async function loginLocalAccount({ email, password }){
-      const e = normalizeEmail(email);
-      const pw = String(password || "");
-
-      if (!isValidEmail(e)) throw new Error("Please enter a valid email.");
-      if (!pw) throw new Error("Please enter your password.");
-
-      if (!supabaseEnabled || !supabase) {
-        throw new Error("Supabase is not configured. Cannot login.");
-      }
-
-      // Sign in with Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: e,
-        password: pw
-      });
-
-      if (error) throw new Error(error.message);
-      if (!data.user) throw new Error("Login failed.");
-
-      const username = data.user.user_metadata?.username || data.user.email.split('@')[0];
-      return { email: e, username, userId: data.user.id };
-    }
-
-    async function clearActiveUser(){
-      if (supabaseEnabled && supabase) {
-        await supabase.auth.signOut();
-      }
-    }
-
-    /***********************
-     * PROGRESS STORAGE (Supabase)
-     * - Stores per-user progress in Supabase database
-     ***********************/
-    const SAVE_KEY_LEGACY = "gridrun_dom_progress_v2";
-
     function defaultProgress() {
       return {
         worldsUnlocked: 1,
@@ -389,139 +277,6 @@
       };
     }
 
-    async function loadProgress() {
-      try {
-        const user = await getActiveUser();
-        if (!user || !user.userId || !supabaseEnabled || !supabase) {
-          // Fallback to legacy localStorage if not logged in or Supabase not available
-          return loadProgressLegacy();
-        }
-
-        // Load from Supabase
-        const { data, error } = await supabase
-          .from('progress')
-          .select('*')
-          .eq('user_id', user.userId)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error("Error loading progress:", error);
-          return defaultProgress();
-        }
-
-        if (!data) {
-          // No progress yet, return default
-          return defaultProgress();
-        }
-
-        // Map database fields to app format
-        const p = {
-          worldsUnlocked: data.worlds_unlocked || 1,
-          levelsUnlocked: data.levels_unlocked || [1, 0, 0],
-          bestScores: data.best_scores || [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],
-          endlessBest: data.endless_best || 0
-        };
-
-        // Validate structure
-        const d = defaultProgress();
-        const out = { ...d, ...p };
-
-        if (!Array.isArray(out.levelsUnlocked) || out.levelsUnlocked.length !== 3) 
-          out.levelsUnlocked = d.levelsUnlocked.slice();
-        if (!Array.isArray(out.bestScores) || out.bestScores.length !== 3) 
-          out.bestScores = d.bestScores.map(r=>r.slice());
-
-        for (let w=0; w<3; w++){
-          if (!Array.isArray(out.bestScores[w]) || out.bestScores[w].length !== 5) 
-            out.bestScores[w] = [0,0,0,0,0];
-          for (let l=0; l<5; l++) 
-            out.bestScores[w][l] = Math.max(0, Math.floor(out.bestScores[w][l] || 0));
-        }
-
-        out.worldsUnlocked = Math.max(1, Math.min(3, Math.floor(out.worldsUnlocked || 1)));
-        out.levelsUnlocked = out.levelsUnlocked.map((x)=>Math.max(0, Math.min(5, Math.floor(x || 0))));
-        out.endlessBest = Math.max(0, Math.floor(out.endlessBest || 0));
-        return out;
-      } catch (e) {
-        console.error("Error in loadProgress:", e);
-        return defaultProgress();
-      }
-    }
-
-    function loadProgressLegacy() {
-      try {
-        const raw = localStorage.getItem(SAVE_KEY_LEGACY);
-        if (!raw) return defaultProgress();
-
-        const p = JSON.parse(raw);
-        const d = defaultProgress();
-        const out = { ...d, ...p };
-
-        if (!Array.isArray(out.levelsUnlocked) || out.levelsUnlocked.length !== 3) 
-          out.levelsUnlocked = d.levelsUnlocked.slice();
-        if (!Array.isArray(out.bestScores) || out.bestScores.length !== 3) 
-          out.bestScores = d.bestScores.map(r=>r.slice());
-
-        for (let w=0; w<3; w++){
-          if (!Array.isArray(out.bestScores[w]) || out.bestScores[w].length !== 5) 
-            out.bestScores[w] = [0,0,0,0,0];
-          for (let l=0; l<5; l++) 
-            out.bestScores[w][l] = Math.max(0, Math.floor(out.bestScores[w][l] || 0));
-        }
-
-        out.worldsUnlocked = Math.max(1, Math.min(3, Math.floor(out.worldsUnlocked || 1)));
-        out.levelsUnlocked = out.levelsUnlocked.map((x)=>Math.max(0, Math.min(5, Math.floor(x || 0))));
-        out.endlessBest = Math.max(0, Math.floor(out.endlessBest || 0));
-        return out;
-      } catch {
-        return defaultProgress();
-      }
-    }
-
-    async function saveProgress(p) {
-      try {
-        const user = await getActiveUser();
-        if (!user || !user.userId || !supabaseEnabled || !supabase) {
-          // Fallback to legacy localStorage if not logged in or Supabase not available
-          localStorage.setItem(SAVE_KEY_LEGACY, JSON.stringify(p));
-          return;
-        }
-
-        // Save to Supabase
-        const { error } = await supabase
-          .from('progress')
-          .upsert({
-            user_id: user.userId,
-            worlds_unlocked: p.worldsUnlocked,
-            levels_unlocked: p.levelsUnlocked,
-            best_scores: p.bestScores,
-            endless_best: p.endlessBest,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id'
-          });
-
-        if (error) {
-          console.error("Error saving progress:", error);
-        }
-      } catch (e) {
-        console.error("Error in saveProgress:", e);
-      }
-    }
-
-    let progress = defaultProgress();
-    
-    // Initialize progress asynchronously
-    (async () => {
-      progress = await loadProgress();
-    })();
-
-    /***********************
-     * SETTINGS STORAGE (Supabase)
-     * - Stores per-user settings in Supabase database
-     ***********************/
-    const SETTINGS_KEY = "gridrun_audio_settings_v1";
-
     function defaultSettings(){
       return {
         menuMusic: true,
@@ -532,112 +287,15 @@
       };
     }
 
-    async function loadSettingsState(){
-      try{
-        const user = await getActiveUser();
-        if (!user || !user.userId || !supabaseEnabled || !supabase) {
-          // Fallback to legacy localStorage if not logged in or Supabase not available
-          return loadSettingsLegacy();
-        }
-
-        // Load from Supabase
-        const { data, error } = await supabase
-          .from('settings')
-          .select('*')
-          .eq('user_id', user.userId)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error("Error loading settings:", error);
-          return defaultSettings();
-        }
-
-        if (!data) {
-          return defaultSettings();
-        }
-
-        const s = { ...defaultSettings(), ...data };
-        s.menuMusic = !!s.menu_music;
-        s.gameplayMusic = !!s.gameplay_music;
-        s.sfx = !!s.sfx;
-        s.volumeMusic = Math.max(0, Math.min(1, Number(s.volume_music ?? 0.75)));
-        s.volumeSfx = Math.max(0, Math.min(1, Number(s.volume_sfx ?? 0.85)));
-        
-        // Clean up snake_case keys for app use
-        delete s.menu_music;
-        delete s.gameplay_music;
-        delete s.volume_music;
-        delete s.volume_sfx;
-        delete s.user_id;
-        delete s.updated_at;
-        
-        return s;
-      }catch(e){
-        console.error("Error in loadSettingsState:", e);
-        return defaultSettings();
-      }
+    function sanitizeUsername(u){
+      u = String(u || "").trim();
+      u = u.replace(/\s+/g," ");
+      u = u.replace(/[^\w\s\-\.]/g,""); // keep letters/numbers/_/-/.
+      u = u.slice(0, 18);
+      return u;
     }
 
-    function loadSettingsLegacy(){
-      try{
-        const raw = localStorage.getItem(SETTINGS_KEY);
-        if (!raw) return defaultSettings();
-        const s = { ...defaultSettings(), ...JSON.parse(raw) };
-        s.menuMusic = !!s.menuMusic;
-        s.gameplayMusic = !!s.gameplayMusic;
-        s.sfx = !!s.sfx;
-        s.volumeMusic = Math.max(0, Math.min(1, Number(s.volumeMusic ?? 0.75)));
-        s.volumeSfx = Math.max(0, Math.min(1, Number(s.volumeSfx ?? 0.85)));
-        return s;
-      }catch{
-        return defaultSettings();
-      }
-    }
-
-    async function saveSettingsState(s){
-      try {
-        const user = await getActiveUser();
-        if (!user || !user.userId || !supabaseEnabled || !supabase) {
-          // Fallback to legacy localStorage if not logged in or Supabase not available
-          localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-          return;
-        }
-
-        // Save to Supabase
-        const { error } = await supabase
-          .from('settings')
-          .upsert({
-            user_id: user.userId,
-            menu_music: s.menuMusic,
-            gameplay_music: s.gameplayMusic,
-            sfx: s.sfx,
-            volume_music: s.volumeMusic,
-            volume_sfx: s.volumeSfx,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id'
-          });
-
-        if (error) {
-          console.error("Error saving settings:", error);
-        }
-      } catch (e) {
-        console.error("Error in saveSettingsState:", e);
-      }
-    }
-
-    let settings = defaultSettings();
-    
-    // Initialize settings asynchronously
-    (async () => {
-      settings = await loadSettingsState();
-    })();
-
-    /***********************
-     * LEADERBOARDS (Supabase with Realtime)
-     ***********************/
-    const LB_KEY = "gridrun_leaderboards_local_v1";
-    let leaderboardSubscription = null;
+    function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 
     function sumCampaignTotals(p){
       const worldTotals = [0,0,0];
@@ -650,127 +308,308 @@
       return { campaignTotal, worldTotals };
     }
 
-    async function updateLeaderboardsFromProgress(){
-      try {
-        const user = await getActiveUser();
-        if (!user || !user.userId || !supabaseEnabled || !supabase) return;
-        
-        const username = user.username;
-        const p = await loadProgress();
-        const totals = sumCampaignTotals(p);
+    /***********************
+     * SUPABASE HELPERS
+     ***********************/
+    async function supaRefreshSession(){
+      const { data, error } = await supabase.auth.getSession();
+      if (error) console.warn("getSession error:", error.message);
+      window.GRIDRUN_AUTH.session = data?.session || null;
+      window.GRIDRUN_AUTH.user = data?.session?.user || null;
+      return window.GRIDRUN_AUTH.session;
+    }
 
-        // Update leaderboard in Supabase
-        const { error } = await supabase
-          .from('leaderboards')
-          .upsert({
-            user_id: user.userId,
-            username: username,
+    function isAuthed(){
+      return !!window.GRIDRUN_AUTH.user?.id;
+    }
+
+    function getActiveUser(){
+      // Return username (like your old API) but sourced from Supabase profile
+      return window.GRIDRUN_AUTH.profile?.username || null;
+    }
+
+    async function supaEnsureCoreRows(){
+      // Ensure profiles/progress/settings/leaderboards exist for this user.
+      // (RLS allows owner insert.)
+      if (!isAuthed()) return;
+
+      const user = window.GRIDRUN_AUTH.user;
+      const user_id = user.id;
+      const email = user.email || "";
+
+      // ---- profiles ----
+      // Try read profile
+      {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id,email,username")
+          .eq("id", user_id)
+          .maybeSingle();
+
+        if (error) console.warn("profiles select error:", error.message);
+
+        if (!data){
+          // Create a placeholder username from email prefix
+          const fallback = sanitizeUsername((email.split("@")[0] || "Player")) || "Player";
+          const { error: insErr } = await supabase
+            .from("profiles")
+            .insert([{ id: user_id, email, username: fallback, updated_at: new Date().toISOString() }]);
+          if (insErr) console.warn("profiles insert error:", insErr.message);
+
+          window.GRIDRUN_AUTH.profile = { id: user_id, email, username: fallback };
+        } else {
+          window.GRIDRUN_AUTH.profile = data;
+        }
+      }
+
+      // ---- progress ----
+      {
+        const { data, error } = await supabase
+          .from("progress")
+          .select("user_id,worlds_unlocked,levels_unlocked,best_scores,endless_best")
+          .eq("user_id", user_id)
+          .maybeSingle();
+
+        if (error) console.warn("progress select error:", error.message);
+
+        if (!data){
+          const d = defaultProgress();
+          const row = {
+            user_id,
+            worlds_unlocked: d.worldsUnlocked,
+            levels_unlocked: d.levelsUnlocked,
+            best_scores: d.bestScores,
+            endless_best: d.endlessBest,
+            updated_at: new Date().toISOString()
+          };
+          const { error: insErr } = await supabase.from("progress").insert([row]);
+          if (insErr) console.warn("progress insert error:", insErr.message);
+          window.GRIDRUN_AUTH.progress = d;
+        } else {
+          window.GRIDRUN_AUTH.progress = mapDbProgressToGame(data);
+        }
+      }
+
+      // ---- settings ----
+      {
+        const { data, error } = await supabase
+          .from("settings")
+          .select("user_id,menu_music,gameplay_music,sfx,volume_music,volume_sfx")
+          .eq("user_id", user_id)
+          .maybeSingle();
+
+        if (error) console.warn("settings select error:", error.message);
+
+        if (!data){
+          const d = defaultSettings();
+          const row = {
+            user_id,
+            menu_music: d.menuMusic,
+            gameplay_music: d.gameplayMusic,
+            sfx: d.sfx,
+            volume_music: d.volumeMusic,
+            volume_sfx: d.volumeSfx,
+            updated_at: new Date().toISOString()
+          };
+          const { error: insErr } = await supabase.from("settings").insert([row]);
+          if (insErr) console.warn("settings insert error:", insErr.message);
+          window.GRIDRUN_AUTH.settings = d;
+        } else {
+          window.GRIDRUN_AUTH.settings = mapDbSettingsToGame(data);
+        }
+      }
+
+      // ---- leaderboards (owner insert, public read) ----
+      {
+        const username = window.GRIDRUN_AUTH.profile?.username || "Player";
+        const { data, error } = await supabase
+          .from("leaderboards")
+          .select("user_id,username,endless_best,campaign_total,world_totals")
+          .eq("user_id", user_id)
+          .maybeSingle();
+
+        if (error) console.warn("leaderboards select error:", error.message);
+
+        if (!data){
+          const p = window.GRIDRUN_AUTH.progress || defaultProgress();
+          const totals = sumCampaignTotals(p);
+
+          const row = {
+            user_id,
+            username,
             endless_best: Math.floor(p.endlessBest || 0),
             campaign_total: Math.floor(totals.campaignTotal || 0),
-            world_1_total: Math.floor(totals.worldTotals[0] || 0),
-            world_2_total: Math.floor(totals.worldTotals[1] || 0),
-            world_3_total: Math.floor(totals.worldTotals[2] || 0),
+            world_totals: totals.worldTotals,
             updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id'
-          });
-
-        if (error) {
-          console.error("Error updating leaderboards:", error);
+          };
+          const { error: insErr } = await supabase.from("leaderboards").insert([row]);
+          if (insErr) console.warn("leaderboards insert error:", insErr.message);
         }
-      } catch (e) {
-        console.error("Error in updateLeaderboardsFromProgress:", e);
       }
     }
 
-    async function buildRanking(metric){
-      try {
-        if (!supabaseEnabled || !supabase) {
-          // Return empty leaderboard if Supabase not available
-          return { list: [], scoreOf: () => 0 };
-        }
+    function mapDbProgressToGame(db){
+      const d = defaultProgress();
+      const out = { ...d };
 
-        // Determine which field to order by
-        let orderBy = 'endless_best';
-        if (metric === 'campaign') orderBy = 'campaign_total';
-        else if (metric === 'w1') orderBy = 'world_1_total';
-        else if (metric === 'w2') orderBy = 'world_2_total';
-        else if (metric === 'w3') orderBy = 'world_3_total';
+      out.worldsUnlocked = clamp(Math.floor(db?.worlds_unlocked ?? 1), 1, 3);
 
-        // Fetch leaderboard data from Supabase
-        const { data, error } = await supabase
-          .from('leaderboards')
-          .select('*')
-          .order(orderBy, { ascending: false })
-          .order('updated_at', { ascending: false })
-          .limit(100);
+      const lu = Array.isArray(db?.levels_unlocked) ? db.levels_unlocked : d.levelsUnlocked.slice();
+      out.levelsUnlocked = [
+        clamp(Math.floor(lu[0] ?? 1), 0, 5),
+        clamp(Math.floor(lu[1] ?? 0), 0, 5),
+        clamp(Math.floor(lu[2] ?? 0), 0, 5),
+      ];
 
-        if (error) {
-          console.error("Error fetching leaderboards:", error);
-          return { list: [], scoreOf: () => 0 };
-        }
+      const bs = Array.isArray(db?.best_scores) ? db.best_scores : d.bestScores.map(r=>r.slice());
+      // ensure 3x5 ints
+      out.bestScores = d.bestScores.map((row,w)=>{
+        const src = Array.isArray(bs[w]) ? bs[w] : row;
+        return row.map((_,l)=>Math.max(0, Math.floor(src[l] || 0)));
+      });
 
-        const cleaned = (data || []).map(r => ({
-          username: r.username,
-          endlessBest: Math.floor(r.endless_best || 0),
-          campaignTotal: Math.floor(r.campaign_total || 0),
-          worldTotals: [
-            Math.floor(r.world_1_total || 0),
-            Math.floor(r.world_2_total || 0),
-            Math.floor(r.world_3_total || 0),
-          ],
-          updatedAt: new Date(r.updated_at).getTime()
-        }));
-
-        const scoreOf = (r)=>{
-          if (metric === "endless") return r.endlessBest;
-          if (metric === "campaign") return r.campaignTotal;
-          if (metric === "w1") return r.worldTotals[0];
-          if (metric === "w2") return r.worldTotals[1];
-          if (metric === "w3") return r.worldTotals[2];
-          return 0;
-        };
-
-        return { list: cleaned, scoreOf };
-      } catch (e) {
-        console.error("Error in buildRanking:", e);
-        return { list: [], scoreOf: () => 0 };
-      }
+      out.endlessBest = Math.max(0, Math.floor(db?.endless_best ?? 0));
+      return out;
     }
 
-    function subscribeToLeaderboardUpdates(callback) {
-      if (!supabaseEnabled || !supabase) {
-        console.log("ℹ️ Realtime leaderboards not available (Supabase not configured)");
-        return;
-      }
-
-      // Unsubscribe from previous subscription if exists
-      if (leaderboardSubscription) {
-        leaderboardSubscription.unsubscribe();
-      }
-
-      // Subscribe to realtime changes
-      leaderboardSubscription = supabase
-        .channel('leaderboard_changes')
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'leaderboards' },
-          (payload) => {
-            console.log('Leaderboard update received:', payload);
-            if (callback) callback(payload);
-          }
-        )
-        .subscribe();
+    function mapGameProgressToDb(p){
+      return {
+        worlds_unlocked: clamp(Math.floor(p.worldsUnlocked ?? 1), 1, 3),
+        levels_unlocked: (Array.isArray(p.levelsUnlocked) && p.levelsUnlocked.length===3) ? p.levelsUnlocked.map(x=>clamp(Math.floor(x||0),0,5)) : [1,0,0],
+        best_scores: normalizeBestScores(p?.bestScores),
+        endless_best: Math.max(0, Math.floor(p.endlessBest ?? 0)),
+        updated_at: new Date().toISOString()
+      };
     }
 
-    function unsubscribeFromLeaderboardUpdates() {
-      if (leaderboardSubscription) {
-        leaderboardSubscription.unsubscribe();
-        leaderboardSubscription = null;
-      }
+    function normalizeBestScores(bs){
+      const d = defaultProgress().bestScores;
+      if (!Array.isArray(bs) || bs.length!==3) return d.map(r=>r.slice());
+      return d.map((row,w)=>{
+        const src = Array.isArray(bs[w]) ? bs[w] : row;
+        return row.map((_,l)=>Math.max(0, Math.floor(src[l] || 0)));
+      });
     }
 
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-        /***********************
+    function mapDbSettingsToGame(db){
+      const d = defaultSettings();
+      const out = { ...d };
+      out.menuMusic = !!db?.menu_music;
+      out.gameplayMusic = !!db?.gameplay_music;
+      out.sfx = !!db?.sfx;
+      out.volumeMusic = clamp(Number(db?.volume_music ?? d.volumeMusic), 0, 1);
+      out.volumeSfx = clamp(Number(db?.volume_sfx ?? d.volumeSfx), 0, 1);
+      return out;
+    }
+
+    function mapGameSettingsToDb(s){
+      return {
+        menu_music: !!s.menuMusic,
+        gameplay_music: !!s.gameplayMusic,
+        sfx: !!s.sfx,
+        volume_music: clamp(Number(s.volumeMusic ?? 0.75), 0, 1),
+        volume_sfx: clamp(Number(s.volumeSfx ?? 0.85), 0, 1),
+        updated_at: new Date().toISOString()
+      };
+    }
+
+    async function supaLoadAllForUser(){
+      if (!isAuthed()) return false;
+      await supaEnsureCoreRows(); // also loads caches for profile/progress/settings
+      // Mirror to legacy globals used throughout your code:
+      progress = window.GRIDRUN_AUTH.progress || defaultProgress();
+      settings = window.GRIDRUN_AUTH.settings || defaultSettings();
+      return true;
+    }
+
+    async function supaSaveProgress(p){
+      if (!isAuthed()) return;
+      const user_id = window.GRIDRUN_AUTH.user.id;
+      const row = { user_id, ...mapGameProgressToDb(p) };
+      const { error } = await supabase
+        .from("progress")
+        .upsert(row, { onConflict: "user_id" });
+      if (error) console.warn("progress upsert error:", error.message);
+      window.GRIDRUN_AUTH.progress = p;
+    }
+
+    async function supaSaveSettings(s){
+      if (!isAuthed()) return;
+      const user_id = window.GRIDRUN_AUTH.user.id;
+      const row = { user_id, ...mapGameSettingsToDb(s) };
+      const { error } = await supabase
+        .from("settings")
+        .upsert(row, { onConflict: "user_id" });
+      if (error) console.warn("settings upsert error:", error.message);
+      window.GRIDRUN_AUTH.settings = s;
+    }
+
+    async function supaUpsertLeaderboardsFromProgress(){
+      if (!isAuthed()) return;
+      const user_id = window.GRIDRUN_AUTH.user.id;
+      const username = window.GRIDRUN_AUTH.profile?.username || "Player";
+      const p = window.GRIDRUN_AUTH.progress || progress || defaultProgress();
+      const totals = sumCampaignTotals(p);
+
+      const row = {
+        user_id,
+        username,
+        endless_best: Math.floor(p.endlessBest || 0),
+        campaign_total: Math.floor(totals.campaignTotal || 0),
+        world_totals: totals.worldTotals,
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from("leaderboards")
+        .upsert(row, { onConflict: "user_id" });
+
+      if (error) console.warn("leaderboards upsert error:", error.message);
+    }
+
+    async function supaFetchLeaderboardsFresh(){
+      // Public read; login not required.
+      // For world totals sorting, we fetch a reasonable pool and sort client-side.
+      const { data, error } = await supabase
+        .from("leaderboards")
+        .select("user_id,username,endless_best,campaign_total,world_totals,updated_at")
+        .limit(500);
+
+      if (error){
+        console.warn("leaderboards fetch error:", error.message);
+        window.GRIDRUN_LB_CACHE.rows = [];
+        window.GRIDRUN_LB_CACHE.fetchedAt = Date.now();
+        return [];
+      }
+      window.GRIDRUN_LB_CACHE.rows = Array.isArray(data) ? data : [];
+      window.GRIDRUN_LB_CACHE.fetchedAt = Date.now();
+      return window.GRIDRUN_LB_CACHE.rows;
+    }
+
+    /***********************
+     * RUNTIME GLOBALS (same names as your original code)
+     ***********************/
+    let progress = defaultProgress();
+    let settings = defaultSettings();
+
+    // These remain synchronous to avoid breaking Phaser timing;
+    // they now read from in-memory caches (loaded from Supabase on login).
+    function loadProgress(){ return window.GRIDRUN_AUTH.progress || progress || defaultProgress(); }
+    function saveProgress(p){
+      progress = p;
+      window.GRIDRUN_AUTH.progress = p;
+      // Fire-and-forget (don’t block gameplay loop)
+      supaSaveProgress(p).then(()=>supaUpsertLeaderboardsFromProgress()).catch(()=>{});
+    }
+
+    function loadSettingsState(){ return window.GRIDRUN_AUTH.settings || settings || defaultSettings(); }
+    function saveSettingsState(s){
+      settings = s;
+      window.GRIDRUN_AUTH.settings = s;
+      supaSaveSettings(s).catch(()=>{});
+    }
+
+    /***********************
      * SIMPLE MENU AUDIO (HTMLAudioElement)
      ***********************/
     const MENU_MUSIC_SRC = "audio/menu.mp3"; // optional
@@ -869,16 +708,15 @@
 
     async function loadMainMenu(){
       startMenuMusic();
+      const u = getActiveUser();
       const container = document.getElementById("game-container");
-      const a = await getActiveUser();
-      if (!a){ loadAuthGate(); return; }
 
       container.innerHTML = `
         <div class="menu-screen" id="main-menu">
           <h1>GRIDRUN</h1>
           <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
           <button onclick="loadModeSelect()">PLAY</button>
-          <button onclick="loadAccount()">ACCOUNT</button>
+          <button onclick="${u ? "loadAccount()" : "loadAuthGate()"}">${u ? "ACCOUNT" : "LOGIN"}</button>
           <button onclick="loadLeaderboards()">LEADERBOARDS</button>
           <button onclick="loadHowTo()">HOW TO PLAY</button>
           <button onclick="loadSettings()">SETTINGS</button>
@@ -886,8 +724,21 @@
       `;
     }
 
-    function loadModeSelect() {
+    async function requireAuthOrRedirect(){
+      await supaRefreshSession();
+      if (!isAuthed()){
+        loadAuthGate("You must login to play. Your Progress/Settings/Leaderboards are stored in Supabase.");
+        return false;
+      }
+      await supaLoadAllForUser();
+      return true;
+    }
+
+    async function loadModeSelect() {
       startMenuMusic();
+      const ok = await requireAuthOrRedirect();
+      if (!ok) return;
+
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
@@ -907,7 +758,10 @@
 
     async function loadCampaignMode() {
       startMenuMusic();
-      progress = await loadProgress();
+      const ok = await requireAuthOrRedirect();
+      if (!ok) return;
+
+      progress = loadProgress();
       const container = document.getElementById("game-container");
       const worldButtons = worlds.map((world, i) => `
         <button onclick="loadWorld(${i + 1})" ${progress.worldsUnlocked > i ? '' : 'disabled'}>
@@ -930,7 +784,10 @@
 
     async function loadWorld(worldNumber) {
       startMenuMusic();
-      progress = await loadProgress();
+      const ok = await requireAuthOrRedirect();
+      if (!ok) return;
+
+      progress = loadProgress();
       const container = document.getElementById("game-container");
       const worldIdx = worldNumber - 1;
       const levelsUnlocked = progress.levelsUnlocked[worldIdx] || 0;
@@ -961,7 +818,10 @@
 
     async function loadLevelIntro(worldNumber, levelNumber) {
       startMenuMusic();
-      progress = await loadProgress();
+      const ok = await requireAuthOrRedirect();
+      if (!ok) return;
+
+      progress = loadProgress();
       const container = document.getElementById("game-container");
       const w = worldNumber - 1;
       const l = levelNumber - 1;
@@ -997,14 +857,17 @@
 
     async function loadEndlessIntro(){
       startMenuMusic();
-      progress = await loadProgress();
+      const ok = await requireAuthOrRedirect();
+      if (!ok) return;
+
+      progress = loadProgress();
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Endless</h1>
           <p class="subhead">Difficulty ramps from <b>W1L1</b> → <b>W3L5</b> over ~120s, then plateaus.</p>
           <div class="panel">
-            <div class="panelTitle"><strong>Local Best</strong><span class="pill"><b>${progress.endlessBest}</b></span></div>
+            <div class="panelTitle"><strong>Best</strong><span class="pill"><b>${progress.endlessBest}</b></span></div>
             <button onclick="startGameplay({ mode:'endless' })">Start Endless</button>
           </div>
           <button onclick="loadModeSelect()">Back</button>
@@ -1014,7 +877,10 @@
 
     async function loadSettings(){
       startMenuMusic();
-      settings = await loadSettingsState();
+      const ok = await requireAuthOrRedirect();
+      if (!ok) return;
+
+      settings = loadSettingsState();
       const container = document.getElementById("game-container");
       const onOff = (v)=> v ? "ON" : "OFF";
       container.innerHTML = `
@@ -1044,9 +910,9 @@
     }
 
     async function toggleSetting(key){
-      settings = await loadSettingsState();
+      settings = loadSettingsState();
       settings[key] = !settings[key];
-      await saveSettingsState(settings);
+      saveSettingsState(settings);
       updateMenuMusicState();
       if (window.GRIDRUN_AUDIO && typeof window.GRIDRUN_AUDIO.applySettings === "function"){
         window.GRIDRUN_AUDIO.applySettings(settings);
@@ -1090,158 +956,143 @@
         </div>
       `;
     }
-        /***********************
-     * AUTH SCREENS (forced before menu)
+
+    /***********************
+     * AUTH SCREENS (Supabase Email Auth)
      ***********************/
-    async function loadAuthGate(){
-      startMenuMusic();
-      
-      // If Supabase is not configured, skip authentication and go straight to main menu
-      if (!supabaseEnabled) {
-        await loadMainMenu();
-        return;
-      }
-      
-      const container = document.getElementById("game-container");
-      
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>GRIDRUN</h1>
-          <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
-
-          <div class="panel">
-            <div class="panelTitle">
-              <strong>Account Access</strong>
-              <span class="pill">Cloud Sync</span>
-            </div>
-
-            <button onclick="loadLogin()">LOGIN</button>
-            <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
-            <p class="hint">Cloud sync enabled via Supabase.</p>
-          </div>
-        </div>
-      `;
-    }
-
-    function loadLogin(){
+    function loadAuthGate(message){
       startMenuMusic();
       const container = document.getElementById("game-container");
+      const msg = message ? `<p class="hint" style="margin-top:0">${message}</p>` : ``;
+
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Login</h1>
-          <p class="subhead">Enter your email + password to enter GRIDRUN.</p>
+          <p class="subhead">Use email login. Your Progress, Settings, and Leaderboards are stored in Supabase.</p>
+          ${msg}
 
           <div class="panel" style="text-align:left;">
             <div class="panelTitle"><strong>Email</strong><span class="pill">required</span></div>
-            <input id="loginEmail" placeholder="you@email.com" autocomplete="email"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+            <input id="emailInput" placeholder="you@email.com" autocomplete="email"
+              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
               background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
 
             <div style="height:10px"></div>
-
-            <div class="panelTitle"><strong>Password</strong><span class="pill">required</span></div>
-            <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
-
-            <p class="hint">Local-only login for now. Global comes later.</p>
-            <button onclick="doLoginEmailPass()">Confirm</button>
-          </div>
-
-          <button onclick="loadAuthGate()">Back</button>
-        </div>
-      `;
-    }
-
-    async function doLoginEmailPass(){
-      const email = document.getElementById("loginEmail")?.value || "";
-      const pass = document.getElementById("loginPass")?.value || "";
-      try{
-        await loginLocalAccount({ email, password: pass });
-        progress = await loadProgress();
-        await updateLeaderboardsFromProgress();
-        await loadMainMenu();
-      }catch(e){
-        alert(e?.message || "Login failed.");
-      }
-    }
-
-    function loadCreateAccount(){
-      startMenuMusic();
-      const container = document.getElementById("game-container");
-      container.innerHTML = `
-        <div class="menu-screen">
-          <h1>Create Account</h1>
-          <p class="subhead">Each email can only create one account.</p>
-
-          <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Email</strong><span class="pill">unique</span></div>
-            <input id="signupEmail" placeholder="you@email.com" autocomplete="email"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
-
-            <div style="height:10px"></div>
-
-            <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars</span></div>
-            <input id="signupUser" placeholder="Enter username..." autocomplete="nickname"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
-
-            <div style="height:10px"></div>
-
             <div class="panelTitle"><strong>Password</strong><span class="pill">min 6</span></div>
-            <input id="signupPass" type="password" placeholder="Create password..." autocomplete="new-password"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+            <input id="passInput" type="password" placeholder="Password" autocomplete="current-password"
+              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
               background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
 
             <div style="height:10px"></div>
-
-            <div class="panelTitle"><strong>Confirm Password</strong><span class="pill">match</span></div>
-            <input id="signupPass2" type="password" placeholder="Confirm password..." autocomplete="new-password"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+            <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars</span></div>
+            <input id="usernameInput" placeholder="Display name (for leaderboards)" autocomplete="nickname"
+              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
               background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
 
-            <p class="hint">Local-only for now (same device/browser). Global comes later.</p>
-            <button onclick="doCreateAccount()">Create</button>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px">
+              <button onclick="doLogin()">Login</button>
+              <button onclick="doSignup()">Create Account</button>
+            </div>
+
+            <p class="hint">Create Account will also create your Profile/Progress/Settings/Leaderboard rows automatically.</p>
           </div>
 
-          <button onclick="loadAuthGate()">Back</button>
+          <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
     }
 
-    async function doCreateAccount(){
-      const email = document.getElementById("signupEmail")?.value || "";
-      const user = document.getElementById("signupUser")?.value || "";
-      const pass = document.getElementById("signupPass")?.value || "";
-      const pass2 = document.getElementById("signupPass2")?.value || "";
-      if (String(pass) !== String(pass2)){
-        alert("Passwords do not match.");
+    async function doLogin(){
+      const email = String(document.getElementById("emailInput")?.value || "").trim();
+      const password = String(document.getElementById("passInput")?.value || "").trim();
+      if (!email || !password){ alert("Email + password required."); return; }
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error){ alert("Login failed: " + error.message); return; }
+
+      window.GRIDRUN_AUTH.session = data.session;
+      window.GRIDRUN_AUTH.user = data.user;
+
+      await supaLoadAllForUser();
+
+      // If user typed a username, apply it (optional)
+      const desired = sanitizeUsername(String(document.getElementById("usernameInput")?.value || ""));
+      if (desired){
+        await setUsername(desired);
+      }
+
+      await supaUpsertLeaderboardsFromProgress();
+      await loadMainMenu();
+    }
+
+    async function doSignup(){
+      const email = String(document.getElementById("emailInput")?.value || "").trim();
+      const password = String(document.getElementById("passInput")?.value || "").trim();
+      const username = sanitizeUsername(String(document.getElementById("usernameInput")?.value || ""));
+      if (!email || !password){ alert("Email + password required."); return; }
+      if (password.length < 6){ alert("Password must be at least 6 characters."); return; }
+
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error){ alert("Signup failed: " + error.message); return; }
+
+      // Some projects require email confirmation; session may be null.
+      // We still guide user correctly.
+      await supaRefreshSession();
+      if (!isAuthed()){
+        alert("Account created. Please check your email to confirm, then login.");
+        await loadMainMenu();
         return;
       }
-      try{
-        await createLocalAccount({ email, password: pass, username: user });
-        progress = await loadProgress();
-        await updateLeaderboardsFromProgress();
-        await loadMainMenu();
-      }catch(e){
-        alert(e?.message || "Create account failed.");
+
+      await supaLoadAllForUser();
+      if (username){
+        await setUsername(username);
       }
+
+      await supaUpsertLeaderboardsFromProgress();
+      await loadMainMenu();
+    }
+
+    async function setUsername(newUsername){
+      if (!isAuthed()) return false;
+      const user_id = window.GRIDRUN_AUTH.user.id;
+      const email = window.GRIDRUN_AUTH.user.email || "";
+
+      const u = sanitizeUsername(newUsername);
+      if (!u) return false;
+
+      const { error } = await supabase
+        .from("profiles")
+        .upsert({ id: user_id, email, username: u, updated_at: new Date().toISOString() }, { onConflict: "id" });
+
+      if (error){ console.warn("profiles upsert error:", error.message); return false; }
+
+      window.GRIDRUN_AUTH.profile = { id: user_id, email, username: u };
+
+      // Keep leaderboards username in sync
+      const { error: lbErr } = await supabase
+        .from("leaderboards")
+        .upsert({ user_id, username: u, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+
+      if (lbErr) console.warn("leaderboards username upsert error:", lbErr.message);
+      return true;
     }
 
     async function loadAccount(){
       startMenuMusic();
-      const a = await getActiveUser();
-      const container = document.getElementById("game-container");
-      if (!a){ loadAuthGate(); return; }
+      const ok = await requireAuthOrRedirect();
+      if (!ok) return;
 
-      progress = await loadProgress();
+      const u = getActiveUser();
+      const container = document.getElementById("game-container");
+
+      progress = loadProgress();
       const totals = sumCampaignTotals(progress);
 
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Account</h1>
-          <p class="subhead">Logged in as <b>${a.username}</b><br><span style="font-size:12px;color:rgba(255,255,255,0.70)">${a.email}</span></p>
+          <p class="subhead">Logged in as <b>${u}</b></p>
 
           <div class="panel" style="text-align:left;">
             <div class="panelTitle"><strong>Your Stats</strong><span class="pill">Supabase</span></div>
@@ -1251,16 +1102,15 @@
             </div>
 
             <div style="height:12px"></div>
-            <div class="panelTitle"><strong>Edit Username</strong><span class="pill">profile</span></div>
-            <input id="usernameEdit" value="${a.username}" autocomplete="nickname"
+            <div class="panelTitle"><strong>Edit Username</strong><span class="pill">updates profile</span></div>
+            <input id="usernameEdit" value="${u || ""}" autocomplete="nickname"
               style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
               background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
-
             <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
               <button onclick="saveUsernameChange()">Save</button>
               <button onclick="logout()">Logout</button>
             </div>
-            <p class="hint">Your data is synced globally via Supabase.</p>
+            <p class="hint">This is a global account. Username updates your Profile and Leaderboards name.</p>
           </div>
 
           <button onclick="loadMainMenu()">Back</button>
@@ -1273,59 +1123,41 @@
       if (!el) return;
       const newU = sanitizeUsername(el.value);
       if (!newU){ alert("Invalid username."); return; }
-
-      const a = await getActiveUser();
-      if (!a || !a.userId) return;
-
-      try {
-        // Update username in user metadata
-        const { error } = await supabase.auth.updateUser({
-          data: { username: newU }
-        });
-
-        if (error) {
-          alert("Failed to update username: " + error.message);
-          return;
-        }
-
-        // Update leaderboard username
-        await supabase
-          .from('leaderboards')
-          .update({ username: newU })
-          .eq('user_id', a.userId);
-
-        progress = await loadProgress();
-        await updateLeaderboardsFromProgress();
-        await loadAccount();
-      } catch (e) {
-        alert("Error updating username: " + (e?.message || "Unknown error"));
-      }
+      const ok = await setUsername(newU);
+      if (!ok){ alert("Failed to save username."); return; }
+      await loadAccount();
     }
 
     async function logout(){
-      await clearActiveUser();
-      progress = await loadProgress();
-      loadAuthGate();
+      try{ await supabase.auth.signOut(); }catch(e){}
+      window.GRIDRUN_AUTH.session = null;
+      window.GRIDRUN_AUTH.user = null;
+      window.GRIDRUN_AUTH.profile = null;
+      window.GRIDRUN_AUTH.progress = null;
+      window.GRIDRUN_AUTH.settings = null;
+
+      progress = defaultProgress();
+      settings = defaultSettings();
+      await loadMainMenu();
     }
 
     /***********************
-     * LEADERBOARDS (polished)
+     * LEADERBOARDS (Supabase)
      ***********************/
-    function buildRanking(metric){
-      const lb = loadLeaderboardsState();
-      const rows = Object.values(lb.users || {});
-      const cleaned = rows
+    function buildRankingFromRows(metric, rows){
+      const cleaned = (rows||[])
         .filter(r => r && r.username)
         .map(r => ({
+          user_id: r.user_id,
           username: r.username,
-          endlessBest: Math.floor(r.endlessBest || 0),
-          campaignTotal: Math.floor(r.campaignTotal || 0),
+          endlessBest: Math.floor(r.endless_best || 0),
+          campaignTotal: Math.floor(r.campaign_total || 0),
           worldTotals: [
-            Math.floor(r.worldTotals?.[0] || 0),
-            Math.floor(r.worldTotals?.[1] || 0),
-            Math.floor(r.worldTotals?.[2] || 0),
+            Math.floor((r.world_totals && r.world_totals[0]) || 0),
+            Math.floor((r.world_totals && r.world_totals[1]) || 0),
+            Math.floor((r.world_totals && r.world_totals[2]) || 0),
           ],
-          updatedAt: Math.floor(r.updatedAt || 0)
+          updatedAt: (r.updated_at ? new Date(r.updated_at).getTime() : 0)
         }));
 
       const scoreOf = (r)=>{
@@ -1346,11 +1178,11 @@
       return { list: cleaned, scoreOf };
     }
 
-    async function renderLeaderboardList(metric){
-      const a = await getActiveUser();
-      const myKey = a ? a.username.toLowerCase() : null;
+    function renderLeaderboardList(metric){
+      const myId = window.GRIDRUN_AUTH.user?.id || null;
 
-      const { list, scoreOf } = await buildRanking(metric);
+      const rows = window.GRIDRUN_LB_CACHE.rows || [];
+      const { list, scoreOf } = buildRankingFromRows(metric, rows);
       const top = list.slice(0, 25);
 
       const header = `
@@ -1361,8 +1193,8 @@
         </div>
       `;
 
-      const rows = top.map((r, idx)=>{
-        const isMe = (myKey && r.username.toLowerCase() === myKey);
+      const rowsHtml = top.map((r, idx)=>{
+        const isMe = (myId && r.user_id === myId);
         const val = scoreOf(r);
         return `
           <div class="lbRow ${isMe ? "me" : ""}">
@@ -1376,9 +1208,10 @@
         `;
       }).join("");
 
+      // my rank (if logged in)
       let myRankHtml = "";
-      if (myKey){
-        const i = list.findIndex(r => r.username.toLowerCase() === myKey);
+      if (myId){
+        const i = list.findIndex(r => r.user_id === myId);
         if (i >= 0){
           const me = list[i];
           myRankHtml = `
@@ -1388,16 +1221,24 @@
             </div>
           `;
         } else {
-          myRankHtml = `<div class="hint" style="margin-top:10px">Play a run to appear here.</div>`;
+          myRankHtml = `
+            <div class="hint" style="margin-top:10px">
+              Play a run to appear here.
+            </div>
+          `;
         }
       } else {
-        myRankHtml = `<div class="hint" style="margin-top:10px">Login to post scores. You can still view the board.</div>`;
+        myRankHtml = `
+          <div class="hint" style="margin-top:10px">
+            Login to post scores. You can still view the board.
+          </div>
+        `;
       }
 
       return `
         <div class="lbWrap">
           ${header}
-          ${rows || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
+          ${rowsHtml || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
         </div>
         ${myRankHtml}
       `;
@@ -1405,9 +1246,20 @@
 
     async function loadLeaderboards(){
       startMenuMusic();
-      await updateLeaderboardsFromProgress();
+
+      // ensure session state (for "YOU" badge + rank)
+      await supaRefreshSession();
+      if (isAuthed()){
+        await supaLoadAllForUser();
+        // ensure latest personal scores are posted
+        await supaUpsertLeaderboardsFromProgress();
+      }
+
+      // refresh cache (always)
+      await supaFetchLeaderboardsFresh();
+
       const container = document.getElementById("game-container");
-      const a = await getActiveUser();
+      const u = getActiveUser();
 
       const tabs = [
         { key:"endless", label:"Endless" },
@@ -1417,59 +1269,39 @@
         { key:"w3", label:"World 3" },
       ];
 
-      // Subscribe to realtime updates
-      subscribeToLeaderboardUpdates(async (payload) => {
-        // Refresh current tab when leaderboard changes
-        const activeTab = document.querySelector(".tab.active");
-        if (activeTab) {
-          const metric = activeTab.getAttribute('data-metric');
-          const content = await renderLeaderboardList(metric || 'endless');
-          const lbContent = document.getElementById("lbContent");
-          if (lbContent) lbContent.innerHTML = content;
-        }
-      });
-
-      const initialContent = await renderLeaderboardList("endless");
-
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Leaderboards</h1>
-          <p class="subhead">${a ? `Logged in as <b>${a.username}</b>. Scores update in real-time when anyone beats a personal best.` : `View rankings. Login to post scores.`}</p>
+          <p class="subhead">${u ? `Logged in as <b>${u}</b>. Scores update when you beat a personal best.` : `View rankings. Login to post scores.`}</p>
 
           <div class="panel">
             <div class="panelTitle">
               <strong>Rankings</strong>
-              <span class="pill">Top <b>25</b> (global • live)</span>
+              <span class="pill">Top <b>25</b> (global)</span>
             </div>
 
             <div class="tabs" id="lbTabs">
-              ${tabs.map((t,i)=>`<div class="tab ${i===0?"active":""}" data-metric="${t.key}" onclick="switchLbTab('${t.key}', this)">${t.label}</div>`).join("")}
+              ${tabs.map((t,i)=>`<div class="tab ${i===0?"active":""}" onclick="switchLbTab('${t.key}', this)">${t.label}</div>`).join("")}
             </div>
 
             <div id="lbContent">
-              ${initialContent}
+              ${renderLeaderboardList("endless")}
             </div>
 
             <p class="hint">
-              Global leaderboards with real-time updates via Supabase. 🔴 LIVE
+              Leaderboards are global (Supabase). Public read, owner write (RLS).
             </p>
           </div>
 
-          <button onclick="leaveLeaderboards()">Back</button>
+          <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
     }
 
-    async function switchLbTab(key, el){
+    function switchLbTab(key, el){
       document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
       el.classList.add("active");
-      const content = await renderLeaderboardList(key);
-      document.getElementById("lbContent").innerHTML = content;
-    }
-
-    async function leaveLeaderboards(){
-      unsubscribeFromLeaderboardUpdates();
-      await loadMainMenu();
+      document.getElementById("lbContent").innerHTML = renderLeaderboardList(key);
     }
 
     function playLevel(worldNumber, levelNumber) {
@@ -1480,8 +1312,8 @@
      * GAME BRIDGE (menus <-> phaser)
      ***********************/
     window.GRIDRUN = {
-      completeCampaignLevel: async (worldIdx, levelIdx, score) => {
-        const p = await loadProgress();
+      completeCampaignLevel: (worldIdx, levelIdx, score) => {
+        const p = loadProgress();
         p.bestScores[worldIdx][levelIdx] = Math.max(p.bestScores[worldIdx][levelIdx] || 0, score);
 
         const currentUnlocked = p.levelsUnlocked[worldIdx] || 0;
@@ -1493,21 +1325,19 @@
           }
         }
 
-        await saveProgress(p);
-        await updateLeaderboardsFromProgress();
+        saveProgress(p);
       },
 
-      setEndlessBest: async (score) => {
-        const p = await loadProgress();
+      setEndlessBest: (score) => {
+        const p = loadProgress();
         p.endlessBest = Math.max(p.endlessBest || 0, score);
-        await saveProgress(p);
-        await updateLeaderboardsFromProgress();
+        saveProgress(p);
       },
 
       getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,
 
-      backToLevelSelect: async (worldIdx) => { showMenus(); await loadWorld(worldIdx + 1); },
-      backToMainMenu: async () => { showMenus(); await loadMainMenu(); }
+      backToLevelSelect: (worldIdx) => { showMenus(); loadWorld(worldIdx + 1); },
+      backToMainMenu: () => { showMenus(); loadMainMenu(); }
     };
 
     /***********************
@@ -1522,7 +1352,8 @@
       phaserGame.scene.stop("Play");
       phaserGame.scene.start("Play", payload);
     }
-        function createPhaserGame(){
+
+    function createPhaserGame(){
       const W = 420, H = 760;
       const uiFont = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
 
@@ -1841,7 +1672,8 @@
         }
 
         create(){
-          // Use the global settings variable (already loaded async at startup)
+          settings = loadSettingsState();
+
           ensureObstacleTextures(this);
           this.cameras.main.setBackgroundColor(this.wcfg.bg);
           buildBackdrop(this, this.wcfg.fx, this.wcfg.glowA, this.wcfg.glowB);
@@ -2048,7 +1880,7 @@
         }
 
         playSfx(key){
-          // Use the global settings variable
+          settings = loadSettingsState();
           if (!settings.sfx) return;
           try{ this.sound.play(key, { volume: settings.volumeSfx }); }catch(e){}
         }
@@ -2451,20 +2283,20 @@
           }
         }
 
-        async levelComplete(){
+        levelComplete(){
           const score=Math.floor(this.score);
-          await window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
+          window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
           this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason:"CLEAR"});
         }
 
-        async endRun({reason}){
+        endRun({reason}){
           const score=Math.floor(this.score);
           this.flash.setAlpha(0.10);
           this.tweens.add({targets:this.flash,alpha:0,duration:170,ease:"Linear"});
           this.stopMusic();
 
           if (this.mode==="endless"){
-            await window.GRIDRUN.setEndlessBest(score);
+            window.GRIDRUN.setEndlessBest(score);
             this.scene.start("Results",{mode:"endless",score,reason});
             return;
           }
@@ -2561,14 +2393,30 @@
       });
     }
 
-    // Boot: ALWAYS show auth gate on load
+    /***********************
+     * BOOT
+     ***********************/
     window.addEventListener("load", async () => {
-      // Initialize settings and progress asynchronously
-      settings = await loadSettingsState();
-      progress = await loadProgress();
-      
-      showMenus();
-      await loadAuthGate();
+      // Track auth changes (keeps UI accurate if session expires)
+      supabase.auth.onAuthStateChange(async (_event, session) => {
+        window.GRIDRUN_AUTH.session = session;
+        window.GRIDRUN_AUTH.user = session?.user || null;
+        if (session?.user){
+          await supaLoadAllForUser();
+        } else {
+          window.GRIDRUN_AUTH.profile = null;
+          window.GRIDRUN_AUTH.progress = null;
+          window.GRIDRUN_AUTH.settings = null;
+          progress = defaultProgress();
+          settings = defaultSettings();
+        }
+      });
+
+      await supaRefreshSession();
+      if (isAuthed()){
+        await supaLoadAllForUser();
+      }
+      await loadMainMenu();
     });
   </script>
 </body>

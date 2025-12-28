@@ -690,7 +690,7 @@
         // Fetch all leaderboard data from Supabase (we'll sort client-side)
         const { data, error } = await supabase
           .from('leaderboards')
-          .select('*')
+          .select('username, endless_best, campaign_total, world_totals, updated_at')
           .limit(100);
 
         if (error) {

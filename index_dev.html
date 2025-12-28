@@ -1846,7 +1846,7 @@
 
           this.input.topOnly = true;
           const pb = this.pauseBtn.getBounds();
-          this.pauseBtn.input.hitArea.setTo(pb.x-24,pb.y-16,pb.width+38,pb.height+28);
+          this.pauseBtn.input.hitArea.setTo(-24,-16,pb.width+38,pb.height+28);
           this.pauseBtn.on("pointerdown",(p)=>{ p.event?.stopPropagation?.(); this.togglePause(!this.paused); });
 
           this.uiNoTouchZone = { x: W-220, y: 0, w: 220, h: 110 };

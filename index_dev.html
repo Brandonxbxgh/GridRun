@@ -1362,7 +1362,7 @@
       return `
         <div class="lbWrap">
           ${header}
-          ${rows || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
+          ${rows.length > 0 ? rows : `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
         </div>
         ${myRankHtml}
       `;

@@ -233,6 +233,30 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
 
   <script>
+  // 🔥 DEBUG: show JS errors on screen (Safari iOS hides console often)
+(function () {
+  const box = document.createElement("div");
+  box.style.cssText =
+    "position:fixed;left:10px;right:10px;bottom:10px;z-index:999999;" +
+    "background:rgba(0,0,0,.85);color:#fff;padding:10px;border-radius:10px;" +
+    "font:12px/1.35 system-ui;white-space:pre-wrap;max-height:40vh;overflow:auto;";
+  box.textContent = "GRIDRUN debug panel loaded…";
+  window.addEventListener("load", () => document.body.appendChild(box));
+
+  window.addEventListener("error", (e) => {
+    box.textContent =
+      "❌ JS ERROR:\n" + (e.message || "unknown") +
+      "\n\nFILE: " + (e.filename || "") +
+      "\nLINE: " + (e.lineno || "") + ":" + (e.colno || "") +
+      "\n\n" + (e.error?.stack || "");
+  });
+
+  window.addEventListener("unhandledrejection", (e) => {
+    box.textContent =
+      "❌ PROMISE REJECTION:\n" + (e.reason?.message || e.reason || "unknown") +
+      "\n\n" + (e.reason?.stack || "");
+  });
+})();
     /***********************
      * SUPABASE CONFIGURATION
      * - Replace with your actual Supabase credentials

@@ -420,17 +420,7 @@ async function initAuth(){
 }
 </script>
 
-  /************************************************************
-   * BOOT
-   ************************************************************/
-  window.addEventListener("load", async () => {
-    showMenus();
-    const ok = await requireAuth();
-    if (ok) loadMainMenu();
-  });
-  </script>
-  <script>
-/************************************************************
+  
  * GLOBAL SAVE + PROGRESS (SUPABASE)
  * Tables used:
  *  - profiles

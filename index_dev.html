@@ -667,9 +667,11 @@
             username: username,
             endless_best: Math.floor(p.endlessBest || 0),
             campaign_total: Math.floor(totals.campaignTotal || 0),
-            world_1_total: Math.floor(totals.worldTotals[0] || 0),
-            world_2_total: Math.floor(totals.worldTotals[1] || 0),
-            world_3_total: Math.floor(totals.worldTotals[2] || 0),
+            world_totals: [
+              Math.floor(totals.worldTotals[0] || 0),
+              Math.floor(totals.worldTotals[1] || 0),
+              Math.floor(totals.worldTotals[2] || 0)
+            ],
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'user_id'
@@ -690,19 +692,10 @@
           return { list: [], scoreOf: () => 0 };
         }
 
-        // Determine which field to order by
-        let orderBy = 'endless_best';
-        if (metric === 'campaign') orderBy = 'campaign_total';
-        else if (metric === 'w1') orderBy = 'world_1_total';
-        else if (metric === 'w2') orderBy = 'world_2_total';
-        else if (metric === 'w3') orderBy = 'world_3_total';
-
-        // Fetch leaderboard data from Supabase
+        // Fetch all leaderboard data from Supabase (we'll sort client-side)
         const { data, error } = await supabase
           .from('leaderboards')
           .select('*')
-          .order(orderBy, { ascending: false })
-          .order('updated_at', { ascending: false })
           .limit(100);
 
         if (error) {
@@ -714,11 +707,11 @@
           username: r.username,
           endlessBest: Math.floor(r.endless_best || 0),
           campaignTotal: Math.floor(r.campaign_total || 0),
-          worldTotals: [
-            Math.floor(r.world_1_total || 0),
-            Math.floor(r.world_2_total || 0),
-            Math.floor(r.world_3_total || 0),
-          ],
+          worldTotals: Array.isArray(r.world_totals) ? [
+            Math.floor(r.world_totals[0] || 0),
+            Math.floor(r.world_totals[1] || 0),
+            Math.floor(r.world_totals[2] || 0)
+          ] : [0, 0, 0],
           updatedAt: new Date(r.updated_at).getTime()
         }));
 
@@ -730,6 +723,14 @@
           if (metric === "w3") return r.worldTotals[2];
           return 0;
         };
+
+        // Sort client-side for flexibility and performance
+        cleaned.sort((a, b) => {
+          const scoreA = scoreOf(a);
+          const scoreB = scoreOf(b);
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          return (b.updatedAt || 0) - (a.updatedAt || 0);
+        });
 
         return { list: cleaned, scoreOf };
       } catch (e) {

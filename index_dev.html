@@ -1337,8 +1337,8 @@
      * GAME BRIDGE (menus <-> phaser)
      ***********************/
     window.GRIDRUN = {
-      completeCampaignLevel: (worldIdx, levelIdx, score) => {
-        const p = loadProgress();
+      completeCampaignLevel: async (worldIdx, levelIdx, score) => {
+        const p = await loadProgress();
         p.bestScores[worldIdx][levelIdx] = Math.max(p.bestScores[worldIdx][levelIdx] || 0, score);
 
         const currentUnlocked = p.levelsUnlocked[worldIdx] || 0;
@@ -1350,15 +1350,15 @@
           }
         }
 
-        saveProgress(p);
-        updateLeaderboardsFromProgress();
+        await saveProgress(p);
+        await updateLeaderboardsFromProgress();
       },
 
-      setEndlessBest: (score) => {
-        const p = loadProgress();
+      setEndlessBest: async (score) => {
+        const p = await loadProgress();
         p.endlessBest = Math.max(p.endlessBest || 0, score);
-        saveProgress(p);
-        updateLeaderboardsFromProgress();
+        await saveProgress(p);
+        await updateLeaderboardsFromProgress();
       },
 
       getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,
@@ -1698,20 +1698,22 @@
         }
 
         create(){
-          settings = loadSettingsState();
+          loadSettingsState().then(s => {
+            settings = s;
+            
+            this.stopMusic();
+            if (settings.gameplayMusic){
+              try{
+                this.music = this.sound.add(this.wcfg.musicKey, { loop:true, volume: settings.volumeMusic });
+                this.music.play();
+              }catch(e){}
+            }
+            this.sound.volume = settings.volumeSfx;
+          });
 
           ensureObstacleTextures(this);
           this.cameras.main.setBackgroundColor(this.wcfg.bg);
           buildBackdrop(this, this.wcfg.fx, this.wcfg.glowA, this.wcfg.glowB);
-
-          this.stopMusic();
-          if (settings.gameplayMusic){
-            try{
-              this.music = this.sound.add(this.wcfg.musicKey, { loop:true, volume: settings.volumeMusic });
-              this.music.play();
-            }catch(e){}
-          }
-          this.sound.volume = settings.volumeSfx;
 
           this.gridGraphics = this.add.graphics();
           this.obstacles = this.physics.add.group({ immovable:true, allowGravity:false });
@@ -1906,7 +1908,7 @@
         }
 
         playSfx(key){
-          settings = loadSettingsState();
+          // Use cached settings for immediate playback
           if (!settings.sfx) return;
           try{ this.sound.play(key, { volume: settings.volumeSfx }); }catch(e){}
         }
@@ -2311,8 +2313,9 @@
 
         levelComplete(){
           const score=Math.floor(this.score);
-          window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
-          this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason:"CLEAR"});
+          window.GRIDRUN.completeCampaignLevel(this.world,this.level,score).then(() => {
+            this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason:"CLEAR"});
+          });
         }
 
         endRun({reason}){
@@ -2322,8 +2325,9 @@
           this.stopMusic();
 
           if (this.mode==="endless"){
-            window.GRIDRUN.setEndlessBest(score);
-            this.scene.start("Results",{mode:"endless",score,reason});
+            window.GRIDRUN.setEndlessBest(score).then(() => {
+              this.scene.start("Results",{mode:"endless",score,reason});
+            });
             return;
           }
           this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason});

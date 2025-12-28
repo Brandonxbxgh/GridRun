@@ -73,7 +73,7 @@ window.onunhandledrejection=e=>alert("PROMISE ERROR:\n"+(e.reason?.message||e.re
  * SUPABASE
  *********************************************************/
 const SUPABASE_URL="https://pgoeyzhnrafupqvfrdnn.supabase.co";
-const SUPABASE_ANON_KEY="YOUR_KEY_ALREADY_HERE";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnb2V5emhucmFmdXBxdmZyZG5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3OTQzNTMsImV4cCI6MjA4MjM3MDM1M30.Nh7Q3VKna6eQcaqRozccFKEaSHIG0t18h6Pw37hQ4i8";
 const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
 /*********************************************************

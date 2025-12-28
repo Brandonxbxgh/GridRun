@@ -2108,6 +2108,8 @@
           if (this.mode==="campaign"){
             timeLeft = Math.max(0, this.lcfg.seconds - this.t);
             if (this.t >= this.lcfg.seconds){
+              // Clear bonus formula matches tier calculation (see computeTierTargets line 846)
+              // Base 220 + (world * 60) + (level * 35) ensures consistent scoring
               const clearBonus = CLEAR_BONUS_BASE + this.world*60 + this.level*35;
               this.score += clearBonus;
               this.playSfx("sfx_clear");

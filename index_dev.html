@@ -649,7 +649,39 @@
       const campaignTotal = worldTotals[0] + worldTotals[1] + worldTotals[2];
       return { campaignTotal, worldTotals };
     }
+async function writeLeaderboardRowFromProgress(p){
+  const user = await getActiveUser();
+  if (!user || !user.userId || !supabaseEnabled || !supabase) {
+    console.warn("LB write skipped: not logged in or supabase disabled");
+    return;
+  }
 
+  const totals = sumCampaignTotals(p);
+
+  const payload = {
+    user_id: user.userId,
+    username: user.username,
+    endless_best: Math.floor(p.endlessBest || 0),
+    campaign_total: Math.floor(totals.campaignTotal || 0),
+    world_1_total: Math.floor(totals.worldTotals[0] || 0),
+    world_2_total: Math.floor(totals.worldTotals[1] || 0),
+    world_3_total: Math.floor(totals.worldTotals[2] || 0),
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await supabase
+    .from("leaderboards")
+    .upsert(payload, { onConflict: "user_id" })
+    .select();
+
+  if (error) {
+    console.error("❌ Leaderboards UPSERT failed:", error);
+    alert("Leaderboards update failed: " + (error.message || JSON.stringify(error)));
+    return;
+  }
+
+  console.log("✅ Leaderboards updated:", data);
+}
     async function updateLeaderboardsFromProgress(){
       try {
         const user = await getActiveUser();
@@ -1470,15 +1502,15 @@ window.leaveLeaderboards = leaveLeaderboards;
           }
         }
 
-        await saveProgress(p);
-        await updateLeaderboardsFromProgress();
+      await saveProgress(p);
+      await writeLeaderboardRowFromProgress(p);
       },
 
       setEndlessBest: async (score) => {
         const p = await loadProgress();
         p.endlessBest = Math.max(p.endlessBest || 0, score);
         await saveProgress(p);
-        await updateLeaderboardsFromProgress();
+        await writeLeaderboardRowFromProgress(p);
       },
 
       getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,

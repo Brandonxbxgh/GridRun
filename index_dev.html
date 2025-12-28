@@ -1093,19 +1093,16 @@
         /***********************
      * AUTH SCREENS (forced before menu)
      ***********************/
-    function loadAuthGate(){
+    async function loadAuthGate(){
       startMenuMusic();
       
       // If Supabase is not configured, skip authentication and go straight to main menu
       if (!supabaseEnabled) {
-        loadMainMenu();
+        await loadMainMenu();
         return;
       }
       
       const container = document.getElementById("game-container");
-      const supabaseStatus = supabaseEnabled ? 
-        "Cloud sync enabled via Supabase." : 
-        "⚠️ Supabase not configured - Using offline mode.";
       
       container.innerHTML = `
         <div class="menu-screen">
@@ -1120,7 +1117,7 @@
 
             <button onclick="loadLogin()">LOGIN</button>
             <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
-            <p class="hint">${supabaseStatus}</p>
+            <p class="hint">Cloud sync enabled via Supabase.</p>
           </div>
         </div>
       `;
@@ -2571,7 +2568,7 @@
       progress = await loadProgress();
       
       showMenus();
-      loadAuthGate();
+      await loadAuthGate();
     });
   </script>
 </body>

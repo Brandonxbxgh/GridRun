@@ -286,9 +286,9 @@ window.addEventListener("unhandledrejection", (e) => {
     if (error){ alert(error.message); return; }
 
     await supabase.from("profiles").insert({
-      user_id: data.user.id,
-      username
-    });
+  id: data.user.id,
+  username
+});
 
     await requireAuth();
     loadMainMenu();
@@ -300,6 +300,125 @@ window.addEventListener("unhandledrejection", (e) => {
     currentProfile = null;
     loadAuthGate();
   }
+<script>
+/************************************************************
+ * AUTH + SESSION (GLOBAL)
+ ************************************************************/
+
+// If you already have these globals earlier, KEEP yours.
+// These are here to make initAuth self-contained.
+let currentUser = null;
+let profile = null; // { id, username, email? }
+
+// Basic username sanitize (safe + simple)
+function sanitizeUsername(v){
+  return String(v||"")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_]/g, "")
+    .slice(0, 18);
+}
+
+// Loads session + sets currentUser
+async function loadSession(){
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  currentUser = data?.session?.user || null;
+  return currentUser;
+}
+
+// Pull profile row for this user (profiles.id = auth user id)
+async function loadProfile(){
+  if (!currentUser) return null;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,username")
+    .eq("id", currentUser.id)
+    .maybeSingle();
+
+  if (error) throw error;
+  profile = data || null;
+  return profile;
+}
+
+// Create a default profile row if missing
+async function ensureProfile(){
+  if (!currentUser) return null;
+
+  if (!profile){
+    // default username = "player_1234"
+    const suffix = currentUser.id.slice(0,4);
+    const defaultUsername = sanitizeUsername(`player_${suffix}`);
+
+    const { error } = await supabase
+      .from("profiles")
+      .insert([{ id: currentUser.id, username: defaultUsername }]);
+
+    // If username collision somehow happens, fall back
+    if (error){
+      // try a different suffix
+      const suffix2 = currentUser.id.slice(0,6);
+      const fallback = sanitizeUsername(`player_${suffix2}`);
+      const { error: e2 } = await supabase
+        .from("profiles")
+        .insert([{ id: currentUser.id, username: fallback }]);
+      if (e2) throw e2;
+    }
+
+    await loadProfile();
+  }
+
+  return profile;
+}
+
+/************************************************************
+ * BOOTSTRAP AUTH
+ ************************************************************/
+async function initAuth(){
+  try{
+    console.log("initAuth START");
+
+    await loadSession();
+
+    // Listen to auth changes (login/logout/refresh)
+    supabase.auth.onAuthStateChange(async (_event, session)=>{
+      currentUser = session?.user || null;
+      try{
+        if (currentUser){
+          await loadProfile();
+          await ensureProfile();
+          // If you have a main menu render function, call it
+          if (typeof loadMainMenu === "function") loadMainMenu();
+        } else {
+          // If you have an auth gate screen, show it
+          if (typeof loadAuthGate === "function") loadAuthGate();
+        }
+      } catch(err){
+        alert("AUTH STATE ERROR:\n" + (err?.message || err));
+      }
+    });
+
+    if (!currentUser){
+      // Not logged in -> show auth UI
+      if (typeof loadAuthGate === "function") loadAuthGate();
+      console.log("initAuth END (no session)");
+      return;
+    }
+
+    // Logged in -> make sure profile exists
+    await loadProfile();
+    await ensureProfile();
+
+    // Continue normal flow
+    if (typeof loadMainMenu === "function") loadMainMenu();
+
+    console.log("initAuth END (session ok)", currentUser.email);
+  } catch(err){
+    alert("initAuth ERROR:\n" + (err?.message || err));
+  }
+}
+</script>
 
   /************************************************************
    * BOOT

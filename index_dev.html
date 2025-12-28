@@ -1308,44 +1308,6 @@
       loadAuthGate();
     }
 
-    /***********************
-     * LEADERBOARDS (polished)
-     ***********************/
-    function buildRanking(metric){
-      const lb = loadLeaderboardsState();
-      const rows = Object.values(lb.users || {});
-      const cleaned = rows
-        .filter(r => r && r.username)
-        .map(r => ({
-          username: r.username,
-          endlessBest: Math.floor(r.endlessBest || 0),
-          campaignTotal: Math.floor(r.campaignTotal || 0),
-          worldTotals: [
-            Math.floor(r.worldTotals?.[0] || 0),
-            Math.floor(r.worldTotals?.[1] || 0),
-            Math.floor(r.worldTotals?.[2] || 0),
-          ],
-          updatedAt: Math.floor(r.updatedAt || 0)
-        }));
-
-      const scoreOf = (r)=>{
-        if (metric === "endless") return r.endlessBest;
-        if (metric === "campaign") return r.campaignTotal;
-        if (metric === "w1") return r.worldTotals[0];
-        if (metric === "w2") return r.worldTotals[1];
-        if (metric === "w3") return r.worldTotals[2];
-        return 0;
-      };
-
-      cleaned.sort((a,b)=>{
-        const da = scoreOf(a), db = scoreOf(b);
-        if (db !== da) return db - da;
-        return (b.updatedAt||0) - (a.updatedAt||0);
-      });
-
-      return { list: cleaned, scoreOf };
-    }
-
     async function renderLeaderboardList(metric){
       const a = await getActiveUser();
       const myKey = a ? a.username.toLowerCase() : null;
@@ -2146,7 +2108,9 @@
           if (this.mode==="campaign"){
             timeLeft = Math.max(0, this.lcfg.seconds - this.t);
             if (this.t >= this.lcfg.seconds){
-              const clearBonus = CLEAR_BONUS_BASE + this.world*70 + this.level*40;
+              // Clear bonus formula must match tier calculation in computeTierTargets() (line 846)
+              // Uses zero-indexed world/level: base 220 + (worldIdx * 60) + (levelIdx * 35)
+              const clearBonus = CLEAR_BONUS_BASE + this.world*60 + this.level*35;
               this.score += clearBonus;
               this.playSfx("sfx_clear");
               this.levelComplete();

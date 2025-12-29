@@ -1463,13 +1463,21 @@
 
           <div class="panel">
             <div class="panelTitle">
-              <strong>Account Access</strong>
-              <span class="pill">Cloud Sync</span>
+              <strong>🔐 Account Access</strong>
+              <span class="pill">☁️ Cloud Sync</span>
             </div>
-
-            <button onclick="loadLogin()">LOGIN</button>
-            <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
-            <p class="hint">Cloud sync enabled via Supabase.</p>
+            <div style="margin-top:16px;text-align:center;padding:20px 0">
+              <div style="font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.6">
+                Sign in or create an account to sync your progress across devices and compete on global leaderboards.
+              </div>
+              <div style="display:grid;grid-template-columns:1fr;gap:12px;max-width:320px;margin:0 auto">
+                <button onclick="loadLogin()" style="font-size:16px;padding:18px 32px">🔑 LOGIN</button>
+                <button onclick="loadCreateAccount()" style="font-size:16px;padding:18px 32px">✨ CREATE ACCOUNT</button>
+              </div>
+            </div>
+            <p class="hint">
+              🌐 Your progress and scores are securely stored via Supabase.
+            </p>
           </div>
         </div>
       `;
@@ -1480,23 +1488,27 @@
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>Login</h1>
-          <p class="subhead">Enter your email + password to enter GRIDRUN.</p>
+          <h1>🔑 Login</h1>
+          <p class="subhead">Enter your credentials to access GRIDRUN</p>
 
           <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Email</strong><span class="pill">required</span></div>
+            <div class="panelTitle"><strong>📧 Email</strong><span class="pill">required</span></div>
             <input id="loginEmail" placeholder="you@email.com" autocomplete="email" />
 
-            <div style="height:10px"></div>
+            <div style="height:14px"></div>
 
-            <div class="panelTitle"><strong>Password</strong><span class="pill">required</span></div>
+            <div class="panelTitle"><strong>🔒 Password</strong><span class="pill">required</span></div>
             <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password" />
 
-            <p class="hint">Local-only login for now. Global comes later.</p>
-            <button onclick="doLoginEmailPass()">Confirm</button>
+            <div style="margin-top:20px;text-align:center">
+              <button onclick="doLoginEmailPass()" style="font-size:16px;padding:16px 40px;width:100%">🚀 Login</button>
+            </div>
+            <p class="hint">
+              🔐 Your credentials are securely managed via Supabase.
+            </p>
           </div>
 
-          <button onclick="loadAuthGate()">Back</button>
+          <button onclick="loadAuthGate()" style="margin-top:20px">← Back</button>
         </div>
       `;
     }
@@ -1521,33 +1533,37 @@
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>Create Account</h1>
-          <p class="subhead">Each email can only create one account.</p>
+          <h1>✨ Create Account</h1>
+          <p class="subhead">Join GRIDRUN and compete globally</p>
 
           <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Email</strong><span class="pill">unique</span></div>
+            <div class="panelTitle"><strong>📧 Email</strong><span class="pill">unique</span></div>
             <input id="signupEmail" placeholder="you@email.com" autocomplete="email" />
 
-            <div style="height:10px"></div>
+            <div style="height:12px"></div>
 
-            <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars</span></div>
-            <input id="signupUser" placeholder="Enter username..." autocomplete="nickname" />
+            <div class="panelTitle"><strong>👤 Username</strong><span class="pill">1–18 chars</span></div>
+            <input id="signupUser" placeholder="Choose a username..." autocomplete="nickname" />
 
-            <div style="height:10px"></div>
+            <div style="height:12px"></div>
 
-            <div class="panelTitle"><strong>Password</strong><span class="pill">min 6</span></div>
+            <div class="panelTitle"><strong>🔒 Password</strong><span class="pill">min 6</span></div>
             <input id="signupPass" type="password" placeholder="Create password..." autocomplete="new-password" />
 
-            <div style="height:10px"></div>
+            <div style="height:12px"></div>
 
-            <div class="panelTitle"><strong>Confirm Password</strong><span class="pill">match</span></div>
+            <div class="panelTitle"><strong>✓ Confirm Password</strong><span class="pill">match</span></div>
             <input id="signupPass2" type="password" placeholder="Confirm password..." autocomplete="new-password" />
 
-            <p class="hint">Local-only for now (same device/browser). Global comes later.</p>
-            <button onclick="doCreateAccount()">Create</button>
+            <div style="margin-top:20px;text-align:center">
+              <button onclick="doCreateAccount()" style="font-size:16px;padding:16px 40px;width:100%">✨ Create Account</button>
+            </div>
+            <p class="hint">
+              🌐 Your account will be synced globally via Supabase. Username cannot be changed later.
+            </p>
           </div>
 
-          <button onclick="loadAuthGate()">Back</button>
+          <button onclick="loadAuthGate()" style="margin-top:20px">← Back</button>
         </div>
       `;
     }
@@ -1583,27 +1599,35 @@
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>Account</h1>
-          <p class="subhead">Logged in as <b>${a.username}</b><br><span style="font-size:12px;color:rgba(255,255,255,0.70)">${a.email}</span></p>
+          <h1>👤 Account</h1>
+          <p class="subhead">Logged in as <b>${a.username}</b><br><span style="font-size:12px;color:var(--muted2)">${a.email}</span></p>
 
           <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Your Stats</strong><span class="pill">Supabase</span></div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
-              <span class="pill">Endless Best <b>${progress.endlessBest}</b></span>
-              <span class="pill">Campaign Total <b>${totals.campaignTotal}</b></span>
+            <div class="panelTitle"><strong>📊 Your Stats</strong><span class="pill">☁️ Cloud Synced</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+              <div style="text-align:center;padding:20px;background:var(--glass);border-radius:14px;border:1px solid var(--stroke)">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600">∞ ENDLESS BEST</div>
+                <div style="font-size:32px;font-weight:900;background:linear-gradient(135deg,var(--accentA),var(--accentB));-webkit-background-clip:text;-webkit-text-fill-color:transparent">${progress.endlessBest}</div>
+              </div>
+              <div style="text-align:center;padding:20px;background:var(--glass);border-radius:14px;border:1px solid var(--stroke)">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600">🎯 CAMPAIGN TOTAL</div>
+                <div style="font-size:32px;font-weight:900;background:linear-gradient(135deg,var(--accentA),var(--accentB));-webkit-background-clip:text;-webkit-text-fill-color:transparent">${totals.campaignTotal}</div>
+              </div>
             </div>
 
-            <div style="height:12px"></div>
-            <div class="panelTitle"><strong>Username</strong><span class="pill" title="Username cannot be changed once set">locked</span></div>
+            <div style="height:20px"></div>
+            <div class="panelTitle"><strong>🔐 Username</strong><span class="pill" title="Username cannot be changed once set">🔒 locked</span></div>
             <input id="usernameEdit" value="${a.username}" autocomplete="nickname" disabled aria-label="Username (cannot be changed)" />
 
-            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
-              <button onclick="logout()">Logout</button>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px">
+              <button onclick="logout()" style="background:linear-gradient(135deg,rgba(255,0,110,0.3),rgba(255,0,110,0.1));border-color:rgba(255,0,110,0.5)">🚪 Logout</button>
             </div>
-            <p class="hint">Username cannot be changed once set. Your data is synced globally via Supabase.</p>
+            <p class="hint">
+              🔒 Username cannot be changed once set. Your data is synced globally via Supabase.
+            </p>
           </div>
 
-          <button onclick="loadMainMenu()">Back</button>
+          <button onclick="loadMainMenu()" style="margin-top:20px">← Back to Menu</button>
         </div>
       `;
     }
@@ -1709,13 +1733,13 @@
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>Leaderboards</h1>
-          <p class="subhead">${a ? `Logged in as <b>${a.username}</b>. Scores update in real-time when anyone beats a personal best.` : `View rankings. Login to post scores.`}</p>
+          <h1>🏆 Leaderboards</h1>
+          <p class="subhead">${a ? `Logged in as <b>${a.username}</b>. 🔴 Live updates when anyone beats a PB.` : `View global rankings. Login to compete!`}</p>
 
           <div class="panel">
             <div class="panelTitle">
-              <strong>Rankings</strong>
-              <span class="pill">Top <b>25</b> (global • live)</span>
+              <strong>📊 Global Rankings</strong>
+              <span class="pill">Top <b>25</b> • 🔴 LIVE</span>
             </div>
 
             <div class="tabs" id="lbTabs">
@@ -1726,19 +1750,19 @@
               ${initialContent}
             </div>
 
-            <div style="display:flex;gap:10px;justify-content:center;margin-top:12px">
-              <button id="lbRefreshBtn" onclick="refreshLeaderboardManually()" style="padding:10px 20px;font-size:14px">
-                <span id="lbRefreshText">Refresh</span>
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+              <button id="lbRefreshBtn" onclick="refreshLeaderboardManually()" style="padding:12px 24px;font-size:14px">
+                <span id="lbRefreshText">🔄 Refresh Data</span>
               </button>
             </div>
 
             <p class="hint">
-              Global leaderboards with real-time updates via Supabase. 🔴 LIVE<br>
-              Click <b>Refresh</b> if scores appear outdated after a database reset.
+              🌐 Global leaderboards with real-time updates via Supabase.<br>
+              Click <b>Refresh</b> if scores appear outdated.
             </p>
           </div>
 
-          <button onclick="leaveLeaderboards()">Back</button>
+          <button onclick="leaveLeaderboards()" style="margin-top:20px">← Back to Menu</button>
         </div>
       `;
     }

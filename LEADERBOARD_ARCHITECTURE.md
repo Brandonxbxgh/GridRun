@@ -5,38 +5,92 @@ This document explains how leaderboard scores are stored, updated, and retrieved
 
 ## Storage Mechanism
 
-### Primary Storage: Supabase (Cloud Database)
-Leaderboard scores are **stored in Supabase**, a cloud PostgreSQL database, NOT in localStorage.
+### Two-Table Architecture ⚠️ IMPORTANT
 
-**Table**: `leaderboards`
+GridRun uses **TWO separate tables** for player data:
 
-**Schema**:
-- `user_id` (uuid, primary key): Unique user identifier from Supabase Auth
-- `username` (text, unique): Player's display name
+#### 1. `progress` Table (Source of Truth)
+Stores detailed per-level game progress:
+- `user_id` (uuid, primary key): Unique user identifier
+- `worlds_unlocked` (integer): Number of worlds unlocked (1-3)
+- `levels_unlocked` (integer array): Levels unlocked per world [5, 3, 0]
+- `best_scores` (integer 2D array): Best scores per level [[w1l1,w1l2,...],[w2l1,...],[w3l1,...]]
 - `endless_best` (integer): Best score in Endless mode
-- `campaign_total` (integer): Sum of all campaign level best scores
-- `world_totals` (array of integers): Array of 3 integers for each world's total score
 - `updated_at` (timestamp): Last update timestamp
 
-### Secondary Storage: Progress Data (Supabase + localStorage fallback)
-Player progress (unlocked levels, best scores per level) is stored separately:
+#### 2. `leaderboards` Table (Calculated Display)
+Stores aggregated scores for leaderboard display:
+- `user_id` (uuid, primary key): Unique user identifier from Supabase Auth
+- `username` (text, unique): Player's display name
+- `endless_best` (integer): Best score in Endless mode (copied from progress)
+- `campaign_total` (integer): Sum of all campaign level best scores (calculated)
+- `world_totals` (array of integers): Array of 3 integers for each world's total score (calculated)
+- `updated_at` (timestamp): Last update timestamp
 
-**Table**: `progress`
-- Stores per-level best scores in `best_scores` field (3x5 array)
-- Stores `endless_best` score
-- Falls back to localStorage if user is not logged in or Supabase is unavailable
+### Why Two Tables?
+
+The separation provides important benefits:
+- **Performance**: Fast leaderboard queries without calculating sums every time
+- **Detail**: Progress table maintains per-level granularity for gameplay
+- **Flexibility**: Can recalculate leaderboards if scoring logic changes
+- **Efficiency**: Realtime updates only broadcast aggregated data
+
+### ⚠️ Critical for Database Resets
+
+**When resetting scores, you MUST reset BOTH tables:**
+
+1. If you only reset `leaderboards`:
+   - ❌ Scores reappear when users log in
+   - ❌ `updateLeaderboardsFromProgress()` recalculates from `progress` table
+   - ❌ Old scores are restored automatically
+
+2. To properly reset, update BOTH tables:
+   ```sql
+   UPDATE progress SET best_scores = ..., endless_best = 0;
+   UPDATE leaderboards SET campaign_total = 0, endless_best = 0, ...;
+   ```
+
+**See `RESET_SCORES.md` for complete reset instructions.**
+
+### localStorage Fallback
+Progress falls back to localStorage if:
+- User is not logged in
+- Supabase is not configured
+- Supabase connection fails
+
+**Note**: localStorage is only for progress, never for leaderboards. Leaderboards require authentication.
 
 ## Data Flow
+
+### Table Relationship
+
+```
+progress table                    leaderboards table
+(source of truth)                 (calculated display)
+═════════════════                 ═══════════════════
+user_id                    ─────> user_id
+worlds_unlocked                   username
+levels_unlocked                   
+best_scores (3x5 array)    ─────> campaign_total (sum of best_scores)
+                           ─────> world_totals (sum per world)
+endless_best               ─────> endless_best (copied)
+updated_at                        updated_at
+
+              updateLeaderboardsFromProgress()
+              (recalculates and syncs)
+```
+
+**Key Insight**: The `leaderboards` table is a **cached/calculated view** of the `progress` table. It's automatically regenerated whenever `updateLeaderboardsFromProgress()` is called.
 
 ### 1. Score Update Flow
 ```
 Player completes level/endless run
     ↓
-Update local progress (saveProgress)
+saveProgress() → progress table (source of truth updated)
     ↓
 Calculate totals from progress (sumCampaignTotals)
     ↓
-Upsert to Supabase leaderboards table (updateLeaderboardsFromProgress)
+updateLeaderboardsFromProgress() → leaderboards table (calculated view updated)
     ↓
 Realtime subscription notifies all clients
     ↓
@@ -47,11 +101,11 @@ UI auto-refreshes leaderboard display
 ```
 User opens leaderboards screen (loadLeaderboards)
     ↓
-Update leaderboards from current progress (updateLeaderboardsFromProgress)
+updateLeaderboardsFromProgress() → Sync progress to leaderboards
     ↓
 Subscribe to realtime updates (subscribeToLeaderboardUpdates)
     ↓
-Fetch top 100 from Supabase (buildRanking)
+buildRanking() → Fetch top 100 from leaderboards table
     ↓
 Sort client-side by selected metric
     ↓
@@ -121,35 +175,73 @@ function subscribeToLeaderboardUpdates(callback) {
 }
 ```
 
-## Current Issues Identified
+## Common Issues and Solutions
 
-### Issue 1: No Handling of Database Resets
-**Problem**: If an administrator resets scores in the database, clients don't automatically detect or refresh the data beyond the realtime subscription.
+### Issue 1: Scores Reappear After Resetting Leaderboards ⚠️ CRITICAL
+**Problem**: Administrator resets the `leaderboards` table, but scores reappear when users log in.
+
+**Root Cause**: The `progress` table is the source of truth. When users log in or refresh:
+1. App calls `updateLeaderboardsFromProgress()`
+2. Function reads from `progress` table (which still has old scores)
+3. Function recalculates and re-inserts scores into `leaderboards` table
+4. Old scores are restored automatically
+
+**Solution**: Reset **BOTH** tables:
+```sql
+-- Reset progress (source of truth)
+UPDATE progress SET best_scores = ARRAY[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]], 
+                    endless_best = 0, 
+                    worlds_unlocked = 1, 
+                    levels_unlocked = ARRAY[1,0,0];
+
+-- Reset leaderboards (calculated display)
+UPDATE leaderboards SET campaign_total = 0, 
+                        world_totals = ARRAY[0,0,0], 
+                        endless_best = 0;
+```
+
+**See `RESET_SCORES.md` for detailed reset instructions.**
+
+### Issue 2: Manual Refresh (NOW IMPLEMENTED ✅)
+**Problem**: Users cannot manually refresh leaderboard data if they suspect it's stale.
+
+**Solution**: ✅ **IMPLEMENTED** - Added manual refresh button in PR
+- Users can click "Refresh" button on leaderboards screen
+- Forces re-fetch from database
+- Shows loading state during operation
+
+### Issue 3: No Explicit Reset Detection
+**Problem**: System relies on realtime subscription for reset detection.
+
+**Impact**: If subscription fails or is delayed, users see stale data.
+
+**Solution**: ✅ **PARTIALLY ADDRESSED** 
+- Manual refresh provides workaround
+- Full solution would require database-side reset versioning
+- Users can click refresh button if they suspect stale data
+
+### Issue 4: No Cache Invalidation Strategy
+**Problem**: Leaderboard data is fetched fresh each time, but no explicit cache strategy.
 
 **Impact**: 
-- Cached data may show stale scores
-- No manual way for users to force a refresh
-- Progress data and leaderboard data may become out of sync
+- Multiple fetches on rapid tab switches
+- Potential for stale data between fetches
 
-**Recommendation**: Add manual refresh functionality
+**Status**: ⚠️ LOW PRIORITY
+- Current implementation re-fetches on each tab switch (acceptable performance)
+- Future: Could add client-side caching with TTL
 
-### Issue 2: No Cache Invalidation
-**Problem**: Leaderboard data is fetched fresh each time, but there's no explicit cache invalidation strategy when user logs in/out.
+### Issue 5: Progress and Leaderboards Can Desync
+**Problem**: If `updateLeaderboardsFromProgress()` fails, the two tables become out of sync.
 
-**Impact**: 
-- User sees previous data briefly before refresh
-- Multiple unnecessary fetches on tab switches
+**Impact**: Leaderboard shows outdated scores until next successful sync.
 
-**Recommendation**: Implement proper cache invalidation
+**Mitigation**: 
+- Function is called frequently (login, level complete, screen entry, manual refresh)
+- Multiple opportunities for resync
+- Error logging helps identify issues
 
-### Issue 3: No Error Recovery for Stale Data
-**Problem**: If a fetch fails or returns stale data, there's no retry mechanism.
-
-**Impact**:
-- Users may see empty leaderboards temporarily
-- No visual feedback that data is being refreshed
-
-**Recommendation**: Add loading states and retry logic
+**Future Enhancement**: Add background sync job to ensure consistency
 
 ## Recommendations for Database Reset Handling
 

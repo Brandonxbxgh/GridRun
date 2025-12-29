@@ -1606,10 +1606,11 @@
           
           // Handle both pointerdown and pointerup for reliability
           // Some mobile devices work better with one vs the other
+          // Pause triggers on pointerup (release) for better UX - prevents accidental pauses from touches
           let pauseHandled = false;
           this.pauseBtn.on("pointerdown",(p)=>{ 
             p.event?.stopPropagation?.(); 
-            pauseHandled = false;
+            pauseHandled = false; // Reset flag for new press cycle
             this.pauseBtn.setScale(originalScale * 0.95); // Visual press feedback
           });
           
@@ -1617,7 +1618,7 @@
             p.event?.stopPropagation?.(); 
             if (!pauseHandled) {
               this.togglePause(!this.paused);
-              pauseHandled = true;
+              pauseHandled = true; // Mark as handled to prevent duplicate toggles
             }
             this.pauseBtn.setScale(originalScale);
           });

@@ -2374,14 +2374,43 @@
         togglePause(on){
           this.paused=on;
           if (on){
-            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.55).setDepth(140).setInteractive();
-            const t = this.add.text(W/2,H*0.44,"PAUSED",{fontFamily:uiFont,fontSize:"28px",color:"#ffffff"}).setOrigin(0.5).setDepth(141);
-            const s = this.add.text(W/2,H*0.52,"Tap anywhere to resume",{fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff"})
-              .setOrigin(0.5).setDepth(141).setAlpha(0.9);
+            // Dark overlay with blur effect
+            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.70).setDepth(140).setInteractive();
+            
+            // Panel background
+            const panelBg = this.add.graphics().setDepth(141);
+            panelBg.fillStyle(0x000000, 0.5);
+            panelBg.fillRoundedRect(W/2-160, H*0.35, 320, 200, 20);
+            panelBg.lineStyle(3, this.wcfg.border, 0.7);
+            panelBg.strokeRoundedRect(W/2-160, H*0.35, 320, 200, 20);
+            
+            // Pause icon and text
+            const t = this.add.text(W/2,H*0.42,"⏸️ PAUSED",{
+              fontFamily:uiFont,fontSize:"32px",color:"#ffffff",fontStyle:"bold"
+            }).setOrigin(0.5).setDepth(142).setShadow(0,2,rgba(0,0,0,0.5),6);
+            
+            const s = this.add.text(W/2,H*0.50,"Tap anywhere to resume",{
+              fontFamily:uiFont,fontSize:"15px",color:"#b7b7ff"
+            }).setOrigin(0.5).setDepth(142).setAlpha(0.9);
+            
+            // Add animated pulse effect
+            this.tweens.add({
+              targets: t,
+              scale: { from: 1, to: 1.05 },
+              alpha: { from: 1, to: 0.9 },
+              duration: 1000,
+              yoyo: true,
+              repeat: -1,
+              ease: 'Sine.easeInOut'
+            });
+            
             this.pauseOverlay.on("pointerdown", ()=>this.togglePause(false));
-            this._pauseText=t; this._pauseSub=s;
+            this._pauseText=t; this._pauseSub=s; this._pausePanel=panelBg;
           } else {
-            this.pauseOverlay?.destroy(); this._pauseText?.destroy(); this._pauseSub?.destroy();
+            this.pauseOverlay?.destroy(); 
+            this._pauseText?.destroy(); 
+            this._pauseSub?.destroy();
+            this._pausePanel?.destroy();
             this.pauseOverlay=null;
           }
         }
@@ -2861,40 +2890,74 @@
 
           this.cameras.main.setBackgroundColor(bg);
 
-          this.add.text(W/2,H*0.18, mode==="endless"?"ENDLESS RESULT":"LEVEL RESULT",{
-            fontFamily:uiFont,fontSize:"30px",color:"#ffffff"
-          }).setOrigin(0.5);
+          // Add background effect
+          const stars = [];
+          for (let i=0;i<40;i++){
+            const s = this.add.circle(
+              Phaser.Math.Between(0,W), 
+              Phaser.Math.Between(0,H), 
+              Phaser.Math.Between(1,2), 
+              glow
+            ).setAlpha(Phaser.Math.FloatBetween(0.1, 0.3));
+            stars.push(s);
+          }
+
+          // Header with gradient
+          const headerBg = this.add.graphics();
+          headerBg.fillStyle(0x000000, 0.4);
+          headerBg.fillRoundedRect(W/2-180, H*0.14, 360, 100, 20);
+          headerBg.lineStyle(2, glow, 0.6);
+          headerBg.strokeRoundedRect(W/2-180, H*0.14, 360, 100, 20);
+
+          const cleared = (mode==="campaign" && reason==="CLEAR");
+          const failed = (mode==="campaign" && reason!=="CLEAR");
+
+          this.add.text(W/2,H*0.17, mode==="endless"?"∞ ENDLESS RESULT":cleared?"✓ LEVEL CLEARED":failed?"✗ LEVEL FAILED":"LEVEL RESULT",{
+            fontFamily:uiFont,fontSize:"28px",color:"#ffffff",fontStyle:"bold"
+          }).setOrigin(0.5).setShadow(0,2,rgba(0,0,0,0.5),4);
 
           let subtitle = "";
           if (mode==="campaign"){
-            subtitle = `${WORLDS[data.world].name} • Level ${data.level+1} • ${reason==="CLEAR"?"CLEARED":"FAILED"}`;
+            const worldIcon = ['🌆', '❄️', '🌌'][data.world];
+            subtitle = `${worldIcon} ${WORLDS[data.world].name} • Level ${data.level+1}`;
           } else {
-            subtitle = `Reason: ${reason}`;
+            subtitle = `Ended: ${reason}`;
           }
 
-          this.add.text(W/2,H*0.24,subtitle,{
-            fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff",align:"center"
-          }).setOrigin(0.5).setAlpha(0.95);
+          this.add.text(W/2,H*0.22,subtitle,{
+            fontFamily:uiFont,fontSize:"13px",color:"#b7b7ff",align:"center"
+          }).setOrigin(0.5).setAlpha(0.90);
 
-          this.add.text(W/2,H*0.38,`Score: ${score}`,{
-            fontFamily:uiFont,fontSize:"26px",color:"#ffffff"
-          }).setOrigin(0.5).setAlpha(0.98);
+          // Score panel
+          const scoreBg = this.add.graphics();
+          scoreBg.fillStyle(0x000000, 0.35);
+          scoreBg.fillRoundedRect(W/2-160, H*0.30, 320, 100, 18);
+          scoreBg.lineStyle(3, accent, 0.7);
+          scoreBg.strokeRoundedRect(W/2-160, H*0.30, 320, 100, 18);
 
-          const cleared = (mode==="campaign" && reason==="CLEAR");
+          this.add.text(W/2,H*0.34,"FINAL SCORE",{
+            fontFamily:uiFont,fontSize:"13px",color:"rgba(255,255,255,0.70)",letterSpacing:1
+          }).setOrigin(0.5);
+
+          this.add.text(W/2,H*0.39,`${score}`,{
+            fontFamily:uiFont,fontSize:"42px",color:"#ffffff",fontStyle:"bold"
+          }).setOrigin(0.5).setShadow(0,0,rgba(accent,0.8),10);
 
           if (mode==="campaign"){
             const tiers = window.GRIDRUN.getTierTargets(data.world, data.level);
             let tier = "—";
-            if (score >= tiers.gold) tier = "GOLD";
-            else if (score >= tiers.silver) tier = "SILVER";
-            else if (score >= tiers.bronze) tier = "BRONZE";
+            let tierEmoji = "";
+            let tierColor = "#888888";
+            if (score >= tiers.gold) { tier = "GOLD"; tierEmoji = "🥇"; tierColor = "#ffd700"; }
+            else if (score >= tiers.silver) { tier = "SILVER"; tierEmoji = "🥈"; tierColor = "#c0c0c0"; }
+            else if (score >= tiers.bronze) { tier = "BRONZE"; tierEmoji = "🥉"; tierColor = "#cd7f32"; }
 
-            this.add.text(W/2,H*0.46,`Tier: ${tier}`,{
-              fontFamily:uiFont,fontSize:"16px",color:"#ffffff"
-            }).setOrigin(0.5).setAlpha(0.95);
+            this.add.text(W/2,H*0.48,`${tierEmoji} ${tier}`,{
+              fontFamily:uiFont,fontSize:"18px",color:tierColor,fontStyle:"bold"
+            }).setOrigin(0.5).setShadow(0,0,tierColor,8);
 
-            this.add.text(W/2,H*0.52,`Bronze ${tiers.bronze}  •  Silver ${tiers.silver}  •  Gold ${tiers.gold}`,{
-              fontFamily:uiFont,fontSize:"12px",color:"rgba(255,255,255,0.80)",align:"center"
+            this.add.text(W/2,H*0.54,`🥉 ${tiers.bronze}  •  🥈 ${tiers.silver}  •  🥇 ${tiers.gold}`,{
+              fontFamily:uiFont,fontSize:"11px",color:"rgba(255,255,255,0.70)",align:"center"
             }).setOrigin(0.5);
           }
 
@@ -2908,20 +2971,20 @@
           const y0 = H*0.62;
 
           if (mode==="campaign"){
-            makePillButton(this, "RETRY", y0, () => this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}), accent, glow);
+            makePillButton(this, "🔄 RETRY", y0, () => this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}), accent, glow);
 
             const nxt = cleared ? nextFor(data.world, data.level) : null;
             if (nxt){
-              makePillButton(this, "NEXT LEVEL", y0 + 62, () => this.scene.start("Play",{mode:"campaign",world:nxt.world,level:nxt.level}), theme.glowA, glow);
-              makePillButton(this, "BACK TO LEVELS", y0 + 124, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
-              makePillButton(this, "MAIN MENU", y0 + 186, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+              makePillButton(this, "▶ NEXT LEVEL", y0 + 62, () => this.scene.start("Play",{mode:"campaign",world:nxt.world,level:nxt.level}), theme.glowA, glow);
+              makePillButton(this, "← BACK TO LEVELS", y0 + 124, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
+              makePillButton(this, "🏠 MAIN MENU", y0 + 186, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
             } else {
-              makePillButton(this, "BACK TO LEVELS", y0 + 62, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
-              makePillButton(this, "MAIN MENU", y0 + 124, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+              makePillButton(this, "← BACK TO LEVELS", y0 + 62, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
+              makePillButton(this, "🏠 MAIN MENU", y0 + 124, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
             }
           } else {
-            makePillButton(this, "RETRY ENDLESS", y0, () => this.scene.start("Play",{mode:"endless"}), accent, glow);
-            makePillButton(this, "MAIN MENU", y0 + 72, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+            makePillButton(this, "🔄 RETRY ENDLESS", y0, () => this.scene.start("Play",{mode:"endless"}), accent, glow);
+            makePillButton(this, "🏠 MAIN MENU", y0 + 72, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
           }
         }
       }

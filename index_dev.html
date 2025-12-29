@@ -6,27 +6,45 @@
   <title>GRIDRUN</title>
   <style>
     :root{
-      --bgA:#1a1c30;
-      --bgB:#292942;
-      --accentA:#ff5733;
-      --accentB:#ff8b3d;
-      --glass:rgba(0,0,0,0.22);
-      --glass2:rgba(0,0,0,0.30);
-      --stroke:rgba(255,255,255,0.12);
-      --stroke2:rgba(255,255,255,0.18);
-      --text:rgba(255,255,255,0.92);
-      --muted:rgba(255,255,255,0.72);
-      --muted2:rgba(255,255,255,0.58);
+      --bgA:#0a0e27;
+      --bgB:#1a1f3a;
+      --bgC:#0f1428;
+      --accentA:#00d9ff;
+      --accentB:#7b2fff;
+      --accentC:#ff006e;
+      --glass:rgba(255,255,255,0.05);
+      --glass2:rgba(255,255,255,0.08);
+      --glass3:rgba(0,0,0,0.35);
+      --stroke:rgba(255,255,255,0.1);
+      --stroke2:rgba(255,255,255,0.15);
+      --stroke3:rgba(0,217,255,0.3);
+      --text:rgba(255,255,255,0.95);
+      --muted:rgba(255,255,255,0.75);
+      --muted2:rgba(255,255,255,0.55);
+      --shadow:rgba(0,0,0,0.5);
     }
 
     body{
       margin:0;padding:0;
-      font-family:Verdana,sans-serif;
-      background:linear-gradient(135deg,var(--bgA),var(--bgB),var(--bgA));
-      animation:backgroundMove 10s infinite alternate;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+      background:radial-gradient(ellipse at top left, var(--bgB), var(--bgA) 45%, var(--bgC) 75%, var(--bgA));
+      background-size:400% 400%;
+      animation:backgroundMove 20s ease infinite;
       height:100vh; overflow:hidden; color:white;
+      position:relative;
     }
-    @keyframes backgroundMove {0%{background-position:0% 50%}100%{background-position:100% 50%}}
+    body::before{
+      content:'';
+      position:absolute;
+      top:0;left:0;right:0;bottom:0;
+      background:radial-gradient(circle at 20% 80%, rgba(0,217,255,0.08), transparent 40%),
+                 radial-gradient(circle at 80% 20%, rgba(123,47,255,0.08), transparent 40%);
+      pointer-events:none;
+    }
+    @keyframes backgroundMove {
+      0%,100%{background-position:0% 50%}
+      50%{background-position:100% 50%}
+    }
 
     #game-container{
       display:flex;
@@ -44,149 +62,291 @@
     }
     canvas{display:block;margin:0 auto;}
 
-    h1{font-size:3rem;font-weight:bold;color:#fff;text-shadow:0 0 20px var(--accentA),0 0 30px var(--accentA); margin:0 0 8px 0;}
-    p{font-size:18px;margin:10px 0;}
-    button{
-      margin:8px;padding:15px 30px;font-size:1rem;font-weight:bold;color:white;
-      background:linear-gradient(45deg,var(--accentA),var(--accentB));
-      border:none;border-radius:50px;cursor:pointer;
-      box-shadow:0 4px 10px rgba(0,0,0,.4),0 0 15px rgba(255,87,51,.7);
-      transition:transform .2s,box-shadow .3s,opacity .2s;
+    h1{
+      font-size:3.5rem;
+      font-weight:900;
+      color:#fff;
+      text-shadow:0 0 40px var(--accentA),0 0 80px var(--accentB),0 4px 12px rgba(0,0,0,0.5);
+      margin:0 0 12px 0;
+      letter-spacing:-1px;
+      background:linear-gradient(135deg,#fff,var(--accentA),var(--accentB));
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+      background-clip:text;
+      animation:titlePulse 3s ease-in-out infinite;
     }
-    button:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 25px rgba(255,110,60,1)}
-    button:active{transform:translateY(2px);box-shadow:0 2px 5px rgba(0,0,0,.3),0 0 10px rgba(255,79,40,.9)}
-    button:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.25);box-shadow:none;transform:none}
+    @keyframes titlePulse{
+      0%,100%{filter:brightness(1)}
+      50%{filter:brightness(1.15)}
+    }
+    
+    p{font-size:16px;margin:12px 0;line-height:1.6}
+    
+    button{
+      margin:10px;
+      padding:16px 36px;
+      font-size:15px;
+      font-weight:700;
+      color:white;
+      background:linear-gradient(135deg,var(--accentA),var(--accentB));
+      border:2px solid rgba(255,255,255,0.2);
+      border-radius:12px;
+      cursor:pointer;
+      box-shadow:0 8px 24px rgba(0,0,0,.3),0 0 0 1px rgba(255,255,255,0.1) inset,0 2px 0 rgba(255,255,255,0.15) inset;
+      transition:all .3s cubic-bezier(0.4,0,0.2,1);
+      position:relative;
+      overflow:hidden;
+      letter-spacing:0.5px;
+    }
+    button::before{
+      content:'';
+      position:absolute;
+      top:0;left:-100%;
+      width:100%;height:100%;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);
+      transition:left .5s;
+    }
+    button:hover{
+      transform:translateY(-3px) scale(1.02);
+      box-shadow:0 12px 32px rgba(0,217,255,.4),0 0 0 1px rgba(255,255,255,0.2) inset,0 2px 0 rgba(255,255,255,0.2) inset;
+      border-color:rgba(255,255,255,0.3);
+    }
+    button:hover::before{left:100%}
+    button:active{
+      transform:translateY(-1px) scale(0.98);
+      box-shadow:0 4px 12px rgba(0,0,0,.3),0 0 0 1px rgba(255,255,255,0.1) inset;
+    }
+    button:disabled{
+      opacity:.4;
+      cursor:not-allowed;
+      filter:grayscale(.5);
+      box-shadow:0 2px 8px rgba(0,0,0,.2);
+      transform:none;
+    }
+    button:disabled::before{display:none}
 
     .menu-screen{
-      display:flex;flex-direction:column;align-items:center;gap:10px;
-      padding:20px;max-width:560px;width:100%;
+      display:flex;flex-direction:column;align-items:center;gap:14px;
+      padding:30px 20px;max-width:580px;width:100%;
+      animation:fadeInUp .6s ease-out;
+    }
+    @keyframes fadeInUp{
+      from{opacity:0;transform:translateY(20px)}
+      to{opacity:1;transform:translateY(0)}
     }
 
     .subhead{
-      font-size:14px;
+      font-size:15px;
       color:var(--muted);
-      margin:0 0 14px 0;
-      line-height:1.4;
-      max-width:520px;
+      margin:0 0 18px 0;
+      line-height:1.6;
+      max-width:540px;
+      text-align:center;
     }
 
     .panel{
       width:100%;
       background:var(--glass);
+      backdrop-filter:blur(20px);
+      -webkit-backdrop-filter:blur(20px);
       border:1px solid var(--stroke);
-      border-radius:18px;
-      padding:14px;
-      box-shadow:0 10px 26px rgba(0,0,0,0.28);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
+      border-radius:20px;
+      padding:20px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 0 1px rgba(255,255,255,0.05) inset;
+      position:relative;
+      overflow:hidden;
+    }
+    .panel::before{
+      content:'';
+      position:absolute;
+      top:0;left:0;right:0;
+      height:1px;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
     }
 
     .panelTitle{
       display:flex;
       justify-content:space-between;
       align-items:center;
-      gap:10px;
-      margin-bottom:10px;
+      gap:12px;
+      margin-bottom:14px;
     }
     .panelTitle strong{
-      font-size:14px;
+      font-size:15px;
       color:var(--text);
-      letter-spacing:0.3px;
+      letter-spacing:0.5px;
+      font-weight:700;
     }
     .pill{
       display:inline-flex;
       align-items:center;
       gap:8px;
-      padding:8px 12px;
+      padding:8px 14px;
       border-radius:999px;
-      background:rgba(0,0,0,0.25);
-      border:1px solid var(--stroke);
+      background:var(--glass2);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      border:1px solid var(--stroke2);
       color:var(--muted);
       font-size:12px;
+      font-weight:600;
       user-select:none;
       white-space:nowrap;
+      box-shadow:0 2px 8px rgba(0,0,0,0.2);
     }
-    .pill b{color:#fff; font-weight:700;}
+    .pill b{color:#fff; font-weight:800;text-shadow:0 0 10px currentColor}
 
     .toggle-row{
       width:100%;
       display:flex;
       justify-content:space-between;
       align-items:center;
-      gap:12px;
-      padding:10px 12px;
-      border-radius:14px;
-      background:rgba(0,0,0,0.22);
-      border:1px solid rgba(255,255,255,0.12);
+      gap:14px;
+      padding:14px 16px;
+      border-radius:16px;
+      background:var(--glass2);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      border:1px solid var(--stroke);
+      transition:all .3s ease;
+      margin-bottom:10px;
     }
-    .toggle-row span{font-size:14px;opacity:0.95}
-    .small-note{font-size:12px;opacity:0.75;max-width:520px;line-height:1.35}
+    .toggle-row:hover{
+      background:var(--glass3);
+      border-color:var(--stroke2);
+      transform:translateX(4px);
+    }
+    .toggle-row span{font-size:14px;opacity:0.95;font-weight:500}
+    .small-note{font-size:12px;opacity:0.7;max-width:540px;line-height:1.5;margin-top:10px}
+
+    /* Input Fields */
+    input{
+      width:100%;
+      padding:16px 18px;
+      border-radius:14px;
+      border:2px solid var(--stroke);
+      background:var(--glass2);
+      backdrop-filter:blur(15px);
+      -webkit-backdrop-filter:blur(15px);
+      color:white;
+      font-size:16px;
+      font-weight:500;
+      outline:none;
+      box-sizing:border-box;
+      transition:all .3s cubic-bezier(0.4,0,0.2,1);
+      box-shadow:0 2px 8px rgba(0,0,0,0.2) inset;
+    }
+    input:focus{
+      border-color:var(--accentA);
+      background:rgba(255,255,255,0.08);
+      box-shadow:0 0 0 3px rgba(0,217,255,0.15),0 2px 8px rgba(0,0,0,0.2) inset;
+      transform:translateY(-1px);
+    }
+    input:disabled{
+      opacity:0.5;
+      cursor:not-allowed;
+      background:rgba(0,0,0,0.3);
+      color:rgba(255,255,255,0.5);
+    }
+    input::placeholder{
+      color:var(--muted2);
+    }
 
     /* Leaderboards UI */
     .tabs{
       display:flex;
-      gap:8px;
+      gap:10px;
       justify-content:center;
       flex-wrap:wrap;
-      margin:10px 0 12px 0;
+      margin:14px 0 16px 0;
     }
     .tab{
-      padding:10px 14px;
-      border-radius:999px;
-      background:rgba(0,0,0,0.28);
+      padding:12px 18px;
+      border-radius:12px;
+      background:var(--glass2);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
       border:1px solid var(--stroke);
       color:var(--muted);
-      font-size:12px;
+      font-size:13px;
       font-weight:700;
       cursor:pointer;
-      transition:transform .15s, border-color .2s, background .2s, color .2s;
+      transition:all .3s cubic-bezier(0.4,0,0.2,1);
       user-select:none;
+      position:relative;
+      overflow:hidden;
     }
-    .tab:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,0.22); }
+    .tab::before{
+      content:'';
+      position:absolute;
+      top:0;left:0;right:0;bottom:0;
+      background:linear-gradient(135deg,var(--accentA),var(--accentB));
+      opacity:0;
+      transition:opacity .3s;
+    }
+    .tab span{position:relative;z-index:1}
+    .tab:hover{ 
+      transform:translateY(-2px); 
+      border-color:var(--stroke3);
+      box-shadow:0 4px 16px rgba(0,217,255,0.2);
+    }
     .tab.active{
-      background:linear-gradient(45deg,rgba(255,87,51,0.35),rgba(255,139,61,0.28));
-      border-color:rgba(255,140,80,0.55);
+      background:linear-gradient(135deg,rgba(0,217,255,0.15),rgba(123,47,255,0.15));
+      border:2px solid var(--stroke3);
       color:#fff;
-      box-shadow:0 0 20px rgba(255,110,60,0.25);
+      box-shadow:0 0 24px rgba(0,217,255,0.3),0 4px 12px rgba(0,0,0,0.3);
+      font-weight:800;
     }
+    .tab.active::before{opacity:0.1}
 
     .lbWrap{
       width:100%;
       max-height:52vh;
       overflow:auto;
-      border-radius:14px;
+      border-radius:16px;
       border:1px solid var(--stroke);
-      background:rgba(0,0,0,0.22);
+      background:var(--glass2);
+      backdrop-filter:blur(15px);
+      -webkit-backdrop-filter:blur(15px);
+      box-shadow:0 4px 20px rgba(0,0,0,0.3) inset;
     }
     .lbHeader, .lbRow{
       display:grid;
-      grid-template-columns: 70px 1fr 110px;
-      gap:10px;
+      grid-template-columns: 80px 1fr 120px;
+      gap:12px;
       align-items:center;
-      padding:12px 12px;
+      padding:14px 16px;
     }
     .lbHeader{
       position:sticky;
       top:0;
       z-index:2;
-      background:rgba(0,0,0,0.45);
-      border-bottom:1px solid rgba(255,255,255,0.10);
+      background:var(--glass3);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom:1px solid var(--stroke2);
       font-size:12px;
       color:var(--muted);
-      letter-spacing:0.3px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      letter-spacing:0.5px;
+      font-weight:700;
+      text-transform:uppercase;
     }
     .lbRow{
-      border-bottom:1px solid rgba(255,255,255,0.08);
+      border-bottom:1px solid rgba(255,255,255,0.05);
       font-size:14px;
       color:var(--text);
+      transition:all .2s ease;
+    }
+    .lbRow:hover{
+      background:var(--glass);
+      border-bottom-color:var(--stroke);
     }
     .lbRow:last-child{border-bottom:none;}
     .rank{
       font-weight:900;
       color:#fff;
       opacity:0.92;
+      font-size:16px;
     }
     .name{
       display:flex;
@@ -195,31 +355,39 @@
       overflow:hidden;
       text-overflow:ellipsis;
       white-space:nowrap;
+      font-weight:600;
     }
     .badge{
       font-size:11px;
-      padding:6px 10px;
+      padding:6px 12px;
       border-radius:999px;
-      background:rgba(255,255,255,0.08);
-      border:1px solid rgba(255,255,255,0.10);
+      background:var(--glass2);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      border:1px solid var(--stroke);
       color:var(--muted);
       white-space:nowrap;
+      font-weight:700;
     }
     .score{
       text-align:right;
       font-weight:900;
       color:#fff;
-      letter-spacing:0.3px;
+      letter-spacing:0.5px;
+      font-size:15px;
+      text-shadow:0 0 10px currentColor;
     }
     .me{
-      background:linear-gradient(90deg,rgba(255,87,51,0.16),rgba(0,0,0,0));
-      border-left:3px solid rgba(255,87,51,0.65);
+      background:linear-gradient(90deg,rgba(0,217,255,0.15),rgba(0,0,0,0));
+      border-left:3px solid var(--accentA);
+      box-shadow:0 0 20px rgba(0,217,255,0.2);
     }
     .hint{
       font-size:12px;
       color:var(--muted2);
-      line-height:1.4;
-      margin-top:10px;
+      line-height:1.5;
+      margin-top:12px;
+      text-align:center;
     }
 
     .lbWrap{ -webkit-overflow-scrolling: touch; }
@@ -1242,16 +1410,12 @@
 
           <div class="panel" style="text-align:left;">
             <div class="panelTitle"><strong>Email</strong><span class="pill">required</span></div>
-            <input id="loginEmail" placeholder="you@email.com" autocomplete="email"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+            <input id="loginEmail" placeholder="you@email.com" autocomplete="email" />
 
             <div style="height:10px"></div>
 
             <div class="panelTitle"><strong>Password</strong><span class="pill">required</span></div>
-            <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+            <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password" />
 
             <p class="hint">Local-only login for now. Global comes later.</p>
             <button onclick="doLoginEmailPass()">Confirm</button>
@@ -1287,30 +1451,22 @@
 
           <div class="panel" style="text-align:left;">
             <div class="panelTitle"><strong>Email</strong><span class="pill">unique</span></div>
-            <input id="signupEmail" placeholder="you@email.com" autocomplete="email"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+            <input id="signupEmail" placeholder="you@email.com" autocomplete="email" />
 
             <div style="height:10px"></div>
 
             <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars</span></div>
-            <input id="signupUser" placeholder="Enter username..." autocomplete="nickname"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+            <input id="signupUser" placeholder="Enter username..." autocomplete="nickname" />
 
             <div style="height:10px"></div>
 
             <div class="panelTitle"><strong>Password</strong><span class="pill">min 6</span></div>
-            <input id="signupPass" type="password" placeholder="Create password..." autocomplete="new-password"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+            <input id="signupPass" type="password" placeholder="Create password..." autocomplete="new-password" />
 
             <div style="height:10px"></div>
 
             <div class="panelTitle"><strong>Confirm Password</strong><span class="pill">match</span></div>
-            <input id="signupPass2" type="password" placeholder="Confirm password..." autocomplete="new-password"
-              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+            <input id="signupPass2" type="password" placeholder="Confirm password..." autocomplete="new-password" />
 
             <p class="hint">Local-only for now (same device/browser). Global comes later.</p>
             <button onclick="doCreateAccount()">Create</button>
@@ -1364,9 +1520,7 @@
 
             <div style="height:12px"></div>
             <div class="panelTitle"><strong>Username</strong><span class="pill" title="Username cannot be changed once set">locked</span></div>
-            <input id="usernameEdit" value="${a.username}" autocomplete="nickname" disabled aria-label="Username (cannot be changed)"
-              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);
-              background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.60);font-size:16px;outline:none;box-sizing:border-box;cursor:not-allowed;" />
+            <input id="usernameEdit" value="${a.username}" autocomplete="nickname" disabled aria-label="Username (cannot be changed)" />
 
             <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
               <button onclick="logout()">Logout</button>

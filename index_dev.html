@@ -290,6 +290,35 @@
     /***********************
      * SUPABASE AUTH FUNCTIONS
      ***********************/
+    async function isUsernameAvailable(username) {
+      if (!supabaseEnabled || !supabase) {
+        return true; // If Supabase is not enabled, assume available
+      }
+
+      try {
+        // Query the leaderboards table to check if username exists
+        // Using maybeSingle() to avoid throwing on no results
+        const { data, error } = await supabase
+          .from('leaderboards')
+          .select('username')
+          .eq('username', username)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error checking username availability:", error);
+          // For errors, allow creation attempt (will fail at database level if duplicate)
+          return true;
+        }
+        
+        // If data is null, username is available
+        return data === null;
+      } catch (e) {
+        console.error("Error checking username availability:", e);
+        // Allow creation attempt on unexpected errors
+        return true;
+      }
+    }
+
     async function getActiveUser(){
       try{
         if (!supabaseEnabled || !supabase) return null;
@@ -321,6 +350,14 @@
 
       if (!supabaseEnabled || !supabase) {
         throw new Error("Supabase is not configured. Cannot create account.");
+      }
+
+      // Check username availability
+      // Note: There's a small race condition window between this check and account creation.
+      // The database unique constraint will prevent duplicate usernames if race occurs.
+      const isAvailable = await isUsernameAvailable(u);
+      if (!isAvailable) {
+        throw new Error("This username is already taken. Please choose another.");
       }
 
       // Create account with Supabase Auth
@@ -1250,55 +1287,20 @@
             </div>
 
             <div style="height:12px"></div>
-            <div class="panelTitle"><strong>Edit Username</strong><span class="pill">profile</span></div>
-            <input id="usernameEdit" value="${a.username}" autocomplete="nickname"
-              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
-              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
+            <div class="panelTitle"><strong>Username</strong><span class="pill" title="Username cannot be changed once set">locked</span></div>
+            <input id="usernameEdit" value="${a.username}" autocomplete="nickname" disabled aria-label="Username (cannot be changed)"
+              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);
+              background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.60);font-size:16px;outline:none;box-sizing:border-box;cursor:not-allowed;" />
 
             <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
-              <button onclick="saveUsernameChange()">Save</button>
               <button onclick="logout()">Logout</button>
             </div>
-            <p class="hint">Your data is synced globally via Supabase.</p>
+            <p class="hint">Username cannot be changed once set. Your data is synced globally via Supabase.</p>
           </div>
 
           <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
-    }
-
-    async function saveUsernameChange(){
-      const el = document.getElementById("usernameEdit");
-      if (!el) return;
-      const newU = sanitizeUsername(el.value);
-      if (!newU){ alert("Invalid username."); return; }
-
-      const a = await getActiveUser();
-      if (!a || !a.userId) return;
-
-      try {
-        // Update username in user metadata
-        const { error } = await supabase.auth.updateUser({
-          data: { username: newU }
-        });
-
-        if (error) {
-          alert("Failed to update username: " + error.message);
-          return;
-        }
-
-        // Update leaderboard username
-        await supabase
-          .from('leaderboards')
-          .update({ username: newU })
-          .eq('user_id', a.userId);
-
-        progress = await loadProgress();
-        await updateLeaderboardsFromProgress();
-        await loadAccount();
-      } catch (e) {
-        alert("Error updating username: " + (e?.message || "Unknown error"));
-      }
     }
 
     async function logout(){

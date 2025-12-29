@@ -851,11 +851,10 @@
         // Re-sync current user's progress to leaderboards
         await updateLeaderboardsFromProgress();
         
-        // Re-fetch and re-render current tab
+        // Re-fetch and re-render current tab (defaults to 'endless' if no tab is active)
         const activeTab = document.querySelector(".tab.active");
         const metric = activeTab ? activeTab.getAttribute('data-metric') : 'endless';
         
-        // Fallback to 'endless' if no active tab found
         const content = await renderLeaderboardList(metric);
         const lbContent = document.getElementById("lbContent");
         if (lbContent) lbContent.innerHTML = content;
@@ -863,7 +862,8 @@
         console.log("✅ Leaderboard manually refreshed");
       } catch (e) {
         console.error("Error refreshing leaderboard:", e);
-        // Provide user feedback on error
+        // TODO: Consider replacing alert() with a non-blocking toast notification system
+        // Using alert() for consistency with existing error handling in this codebase
         alert("Failed to refresh leaderboard. Please check your connection and try again.");
       } finally {
         // Reset loading state

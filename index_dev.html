@@ -1270,7 +1270,6 @@
         </div>
       `;
     }
-    }
 
     async function loadLevelIntro(worldNumber, levelNumber) {
       startMenuMusic();
@@ -2914,7 +2913,7 @@
 
           this.add.text(W/2,H*0.17, mode==="endless"?"∞ ENDLESS RESULT":cleared?"✓ LEVEL CLEARED":failed?"✗ LEVEL FAILED":"LEVEL RESULT",{
             fontFamily:uiFont,fontSize:"28px",color:"#ffffff",fontStyle:"bold"
-          }).setOrigin(0.5).setShadow(0,2,rgba(0,0,0,0.5),4);
+          }).setOrigin(0.5).setShadow(0,2,'rgba(0,0,0,0.5)',4);
 
           let subtitle = "";
           if (mode==="campaign"){

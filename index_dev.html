@@ -1065,6 +1065,9 @@
     /***********************
      * WORLD THEMES (menus)
      ***********************/
+    const worldIcons = ['🌆', '❄️', '🌌'];
+    const tierIcons = { bronze: '🥉', silver: '🥈', gold: '🥇' };
+    
     const worlds = [
       { name: "Neon Bliss", description: "Lively neon glow. Learn the flow." },
       { name: "Techno Abyss", description: "Icy pulses. Faster and denser." },
@@ -1185,7 +1188,7 @@
       const container = document.getElementById("game-container");
       const worldButtons = worlds.map((world, i) => {
         const unlocked = progress.worldsUnlocked > i;
-        const icon = ['🌆', '❄️', '🌌'][i];
+        const icon = worldIcons[i];
         return `
           <button onclick="loadWorld(${i + 1})" ${unlocked ? '' : 'disabled'} 
                   style="padding:20px 24px;text-align:left;${unlocked ? '' : 'opacity:0.4;'}">
@@ -1225,13 +1228,12 @@
       const container = document.getElementById("game-container");
       const worldIdx = worldNumber - 1;
       const levelsUnlocked = progress.levelsUnlocked[worldIdx] || 0;
-      const worldIcon = ['🌆', '❄️', '🌌'][worldIdx];
+      const worldIcon = worldIcons[worldIdx];
 
       const levelButtons = Array.from({ length: 5 }, (_, i) => {
         const unlocked = i < levelsUnlocked;
         const best = progress.bestScores[worldIdx]?.[i] || 0;
         const ld = levelData(worldIdx, i);
-        const tierIcons = { bronze: '🥉', silver: '🥈', gold: '🥇' };
         let tierBadge = '';
         if (unlocked && best > 0) {
           if (best >= ld.scores.gold) tierBadge = tierIcons.gold;
@@ -1279,7 +1281,7 @@
       const l = levelNumber - 1;
       const ld = levelData(w, l);
       const best = progress.bestScores[w]?.[l] || 0;
-      const worldIcon = ['🌆', '❄️', '🌌'][w];
+      const worldIcon = worldIcons[w];
 
       let tierStatus = '';
       if (best > 0) {
@@ -2917,7 +2919,7 @@
 
           let subtitle = "";
           if (mode==="campaign"){
-            const worldIcon = ['🌆', '❄️', '🌌'][data.world];
+            const worldIcon = worldIcons[data.world];
             subtitle = `${worldIcon} ${WORLDS[data.world].name} • Level ${data.level+1}`;
           } else {
             subtitle = `Ended: ${reason}`;

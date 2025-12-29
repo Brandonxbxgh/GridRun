@@ -636,7 +636,6 @@
     /***********************
      * LEADERBOARDS (Supabase with Realtime)
      ***********************/
-    const LB_KEY = "gridrun_leaderboards_local_v1";
     let leaderboardSubscription = null;
 
     function sumCampaignTotals(p){
@@ -667,9 +666,7 @@
             username: username,
             endless_best: Math.floor(p.endlessBest || 0),
             campaign_total: Math.floor(totals.campaignTotal || 0),
-            world_1_total: Math.floor(totals.worldTotals[0] || 0),
-            world_2_total: Math.floor(totals.worldTotals[1] || 0),
-            world_3_total: Math.floor(totals.worldTotals[2] || 0),
+            world_totals: totals.worldTotals.map(total => Math.floor(total || 0)),
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'user_id'
@@ -690,19 +687,10 @@
           return { list: [], scoreOf: () => 0 };
         }
 
-        // Determine which field to order by
-        let orderBy = 'endless_best';
-        if (metric === 'campaign') orderBy = 'campaign_total';
-        else if (metric === 'w1') orderBy = 'world_1_total';
-        else if (metric === 'w2') orderBy = 'world_2_total';
-        else if (metric === 'w3') orderBy = 'world_3_total';
-
-        // Fetch leaderboard data from Supabase
+        // Fetch all leaderboard data from Supabase (we'll sort client-side)
         const { data, error } = await supabase
           .from('leaderboards')
-          .select('*')
-          .order(orderBy, { ascending: false })
-          .order('updated_at', { ascending: false })
+          .select('username, endless_best, campaign_total, world_totals, updated_at')
           .limit(100);
 
         if (error) {
@@ -714,11 +702,9 @@
           username: r.username,
           endlessBest: Math.floor(r.endless_best || 0),
           campaignTotal: Math.floor(r.campaign_total || 0),
-          worldTotals: [
-            Math.floor(r.world_1_total || 0),
-            Math.floor(r.world_2_total || 0),
-            Math.floor(r.world_3_total || 0),
-          ],
+          worldTotals: Array.isArray(r.world_totals) 
+            ? r.world_totals.map(total => Math.floor(total || 0))
+            : [0, 0, 0],
           updatedAt: new Date(r.updated_at).getTime()
         }));
 
@@ -730,6 +716,14 @@
           if (metric === "w3") return r.worldTotals[2];
           return 0;
         };
+
+        // Sort client-side for flexibility and performance
+        cleaned.sort((a, b) => {
+          const scoreA = scoreOf(a);
+          const scoreB = scoreOf(b);
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          return (b.updatedAt || 0) - (a.updatedAt || 0);
+        });
 
         return { list: cleaned, scoreOf };
       } catch (e) {
@@ -1311,41 +1305,6 @@
     /***********************
      * LEADERBOARDS (polished)
      ***********************/
-    function buildRanking(metric){
-      const lb = loadLeaderboardsState();
-      const rows = Object.values(lb.users || {});
-      const cleaned = rows
-        .filter(r => r && r.username)
-        .map(r => ({
-          username: r.username,
-          endlessBest: Math.floor(r.endlessBest || 0),
-          campaignTotal: Math.floor(r.campaignTotal || 0),
-          worldTotals: [
-            Math.floor(r.worldTotals?.[0] || 0),
-            Math.floor(r.worldTotals?.[1] || 0),
-            Math.floor(r.worldTotals?.[2] || 0),
-          ],
-          updatedAt: Math.floor(r.updatedAt || 0)
-        }));
-
-      const scoreOf = (r)=>{
-        if (metric === "endless") return r.endlessBest;
-        if (metric === "campaign") return r.campaignTotal;
-        if (metric === "w1") return r.worldTotals[0];
-        if (metric === "w2") return r.worldTotals[1];
-        if (metric === "w3") return r.worldTotals[2];
-        return 0;
-      };
-
-      cleaned.sort((a,b)=>{
-        const da = scoreOf(a), db = scoreOf(b);
-        if (db !== da) return db - da;
-        return (b.updatedAt||0) - (a.updatedAt||0);
-      });
-
-      return { list: cleaned, scoreOf };
-    }
-
     async function renderLeaderboardList(metric){
       const a = await getActiveUser();
       const myKey = a ? a.username.toLowerCase() : null;
@@ -1397,7 +1356,7 @@
       return `
         <div class="lbWrap">
           ${header}
-          ${rows || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
+          ${top.length > 0 ? rows : `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
         </div>
         ${myRankHtml}
       `;

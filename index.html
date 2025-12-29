@@ -549,7 +549,7 @@
       const expectedDodge = Math.floor((t/10) * TIER_MODEL.expectedDodgePer10s[worldIdx]);
       const dodgeScore = expectedDodge * TIER_MODEL.expectedDodgePoints;
 
-      const clearBonus = TIER_MODEL.clearBonusBase + worldIdx*60 + levelIdx*35;
+      const clearBonus = TIER_MODEL.clearBonusBase + worldIdx*70 + levelIdx*40;
       const expected = survival + streakScore + dodgeScore + nearScore + clearBonus;
 
       const bronze = Math.floor(expected * (0.78 + 0.015*levelIdx));
@@ -1829,9 +1829,7 @@
           if (this.mode==="campaign"){
             timeLeft = Math.max(0, this.lcfg.seconds - this.t);
             if (this.t >= this.lcfg.seconds){
-              // Fix: Reduced bonus multipliers to match tier model expectations (was *70/*40, now *60/*35)
-              // This prevents excessive bonus scores that made gold-tier too easy to achieve
-              const clearBonus = CLEAR_BONUS_BASE + this.world*60 + this.level*35;
+              const clearBonus = CLEAR_BONUS_BASE + this.world*70 + this.level*40;
               this.score += clearBonus;
               this.playSfx("sfx_clear");
               this.levelComplete();

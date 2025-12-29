@@ -1579,15 +1579,19 @@
           
           // Expand hit area generously for better touch detection
           // Mobile gets extra generous hit area (50% larger), desktop gets moderate expansion
+          // Note: hitArea coordinates are relative to the game object, not world coordinates
           const pb = this.pauseBtn.getBounds();
           const hitExpansion = isMobile ? 1.5 : 1.2; // Mobile: 50% larger, Desktop: 20% larger
           const extraW = pb.width * (hitExpansion - 1);
           const extraH = pb.height * (hitExpansion - 1);
+          
+          // Since origin is (1,0) (top-right), the local x position is negative for the left edge
+          // Local coordinates: x goes from -width to 0, y goes from 0 to height
           this.pauseBtn.input.hitArea.setTo(
-            pb.x - extraW,
-            pb.y - extraH,
-            pb.width + extraW * 2,
-            pb.height + extraH * 2
+            -pb.width - extraW,  // Start further left
+            -extraH,              // Start above
+            pb.width + extraW * 2,  // Total width
+            pb.height + extraH * 2  // Total height
           );
           
           // Add visual feedback for better user experience

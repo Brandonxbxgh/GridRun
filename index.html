@@ -1560,17 +1560,72 @@
           this.uiSub = this.add.text(18,32,"",{fontFamily:uiFont,fontSize:"12px",color:"#eaeaff"}).setDepth(70).setAlpha(0.95);
           this.uiCombo = this.add.text(W-18,12,"",{fontFamily:uiFont,fontSize:"12px",color:"#ffffff"}).setOrigin(1,0).setDepth(70).setAlpha(0.90);
 
+          // Improved pause button with better mobile support
+          // Make button size responsive: larger on mobile, standard on desktop
+          const isMobile = IS_TOUCH;
+          const btnFontSize = isMobile ? "16px" : "12px";
+          const btnPaddingH = isMobile ? 14 : 10;
+          const btnPaddingV = isMobile ? 8 : 6;
+          
           this.pauseBtn = this.add.text(W-18,34,"PAUSE",{
-            fontFamily:uiFont,fontSize:"12px",color:"#ffffff",
-            backgroundColor:"rgba(0,0,0,0.35)", padding:{left:10,right:10,top:6,bottom:6}
+            fontFamily:uiFont,
+            fontSize:btnFontSize,
+            color:"#ffffff",
+            backgroundColor:"rgba(0,0,0,0.35)", 
+            padding:{left:btnPaddingH,right:btnPaddingH,top:btnPaddingV,bottom:btnPaddingV}
           }).setOrigin(1,0).setDepth(9999).setInteractive({useHandCursor:true});
 
           this.input.topOnly = true;
+          
+          // Expand hit area generously for better touch detection
+          // Mobile gets extra generous hit area (50% larger), desktop gets moderate expansion
           const pb = this.pauseBtn.getBounds();
-          this.pauseBtn.input.hitArea.setTo(pb.x-24,pb.y-16,pb.width+38,pb.height+28);
-          this.pauseBtn.on("pointerdown",(p)=>{ p.event?.stopPropagation?.(); this.togglePause(!this.paused); });
+          const hitExpansion = isMobile ? 1.5 : 1.2; // Mobile: 50% larger, Desktop: 20% larger
+          const extraW = pb.width * (hitExpansion - 1);
+          const extraH = pb.height * (hitExpansion - 1);
+          this.pauseBtn.input.hitArea.setTo(
+            pb.x - extraW,
+            pb.y - extraH,
+            pb.width + extraW * 2,
+            pb.height + extraH * 2
+          );
+          
+          // Add visual feedback for better user experience
+          const originalAlpha = this.pauseBtn.alpha;
+          const originalScale = this.pauseBtn.scale;
+          
+          this.pauseBtn.on("pointerover", ()=>{
+            this.pauseBtn.setAlpha(0.8);
+            this.pauseBtn.setScale(originalScale * 1.05);
+          });
+          
+          this.pauseBtn.on("pointerout", ()=>{
+            this.pauseBtn.setAlpha(originalAlpha);
+            this.pauseBtn.setScale(originalScale);
+          });
+          
+          // Handle both pointerdown and pointerup for reliability
+          // Some mobile devices work better with one vs the other
+          let pauseHandled = false;
+          this.pauseBtn.on("pointerdown",(p)=>{ 
+            p.event?.stopPropagation?.(); 
+            pauseHandled = false;
+            this.pauseBtn.setScale(originalScale * 0.95); // Visual press feedback
+          });
+          
+          this.pauseBtn.on("pointerup",(p)=>{ 
+            p.event?.stopPropagation?.(); 
+            if (!pauseHandled) {
+              this.togglePause(!this.paused);
+              pauseHandled = true;
+            }
+            this.pauseBtn.setScale(originalScale);
+          });
 
-          this.uiNoTouchZone = { x: W-220, y: 0, w: 220, h: 110 };
+          // Expand no-touch zone to accommodate larger button on mobile
+          const noTouchWidth = isMobile ? 260 : 220;
+          const noTouchHeight = isMobile ? 130 : 110;
+          this.uiNoTouchZone = { x: W-noTouchWidth, y: 0, w: noTouchWidth, h: noTouchHeight };
 
           this.input.on("pointerdown",(p)=>{
             if (this.paused){ this.togglePause(false); return; }

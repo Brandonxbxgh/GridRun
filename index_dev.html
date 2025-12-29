@@ -856,7 +856,7 @@
         const metric = activeTab ? activeTab.getAttribute('data-metric') : 'endless';
         
         // Fallback to 'endless' if no active tab found
-        const content = await renderLeaderboardList(metric || 'endless');
+        const content = await renderLeaderboardList(metric);
         const lbContent = document.getElementById("lbContent");
         if (lbContent) lbContent.innerHTML = content;
         

@@ -93,7 +93,7 @@ async function updateLeaderboardsFromProgress(){
 ```
 
 ### `buildRanking(metric)`
-**Location**: Line 743-797  
+**Location**: Line 743-799  
 **Purpose**: Fetches and sorts leaderboard data for a specific metric  
 **Parameters**: 
 - `metric`: "endless", "campaign", "w1", "w2", or "w3"
@@ -109,7 +109,7 @@ async function buildRanking(metric){
 ```
 
 ### `subscribeToLeaderboardUpdates(callback)`
-**Location**: Line 801-826  
+**Location**: Line 801-827  
 **Purpose**: Subscribes to realtime database changes  
 **Implementation**:
 ```javascript
@@ -205,9 +205,9 @@ Add version field to leaderboards:
 |---------|------|------------|----------|
 | Supabase Init | index_dev.html | 240-261 | Global |
 | Leaderboard Update | index_dev.html | 708-741 | updateLeaderboardsFromProgress() |
-| Fetch Rankings | index_dev.html | 743-797 | buildRanking() |
-| Realtime Subscribe | index_dev.html | 801-826 | subscribeToLeaderboardUpdates() |
-| Manual Refresh | index_dev.html | 836-869 | refreshLeaderboardManually() |
+| Fetch Rankings | index_dev.html | 743-799 | buildRanking() |
+| Realtime Subscribe | index_dev.html | 801-827 | subscribeToLeaderboardUpdates() |
+| Manual Refresh | index_dev.html | 836-874 | refreshLeaderboardManually() |
 | Render UI | index_dev.html | 1391-1443 | renderLeaderboardList() |
 | Load Screen | index_dev.html | 1445-1517 | loadLeaderboards() |
 | Progress Storage | index_dev.html | 429-486 | loadProgress() |

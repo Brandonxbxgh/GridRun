@@ -230,16 +230,45 @@
   <div id="phaser-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
 
   <script>
     /***********************
-     * LOCAL AUTH (email + password + username)
-     * - local-only, upgradeable later
-     * - unique email enforced
+     * SUPABASE CONFIGURATION
+     * - Replace with your actual Supabase credentials
+     ***********************/
+    const SUPABASE_URL = "https://uhpqmliygxbplgiencud.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_X7cuvFLmNRJv07zpdzcX_w_v3Agfx5M";
+    
+    // Initialize Supabase client with error handling
+    let supabase = null;
+    let supabaseEnabled = false;
+    
+    try {
+      if (SUPABASE_URL && SUPABASE_ANON_KEY && 
+          SUPABASE_URL !== "YOUR_SUPABASE_URL" && 
+          SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabaseEnabled = true;
+        console.log("✅ Supabase initialized - Cloud sync enabled");
+      } else {
+        console.log("ℹ️ Supabase not configured - Using localStorage mode");
+      }
+    } catch (e) {
+      console.warn("⚠️ Supabase initialization failed - Falling back to localStorage:", e);
+      supabase = null;
+      supabaseEnabled = false;
+    }
+    
+    /***********************
+     * LEGACY KEYS (for migration fallback)
      ***********************/
     const AUTH_KEY = "gridrun_auth_v2";           // active session: { email, username }
     const ACCOUNTS_KEY = "gridrun_accounts_v1";   // accounts map by emailLower
 
+    /***********************
+     * UTILITY FUNCTIONS
+     ***********************/
     function normalizeEmail(email){ return String(email || "").trim().toLowerCase(); }
 
     function sanitizeUsername(u){
@@ -250,39 +279,6 @@
       return u;
     }
 
-    function loadAccounts(){
-      try{
-        const raw = localStorage.getItem(ACCOUNTS_KEY);
-        if (!raw) return {};
-        const obj = JSON.parse(raw);
-        return (obj && typeof obj === "object") ? obj : {};
-      }catch{ return {}; }
-    }
-    function saveAccounts(map){
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(map || {}));
-    }
-
-    function getActiveUser(){
-      try{
-        const raw = localStorage.getItem(AUTH_KEY);
-        if (!raw) return null;
-        const a = JSON.parse(raw);
-        const email = normalizeEmail(a?.email);
-        const username = String(a?.username || "").trim();
-        if (!email || !username) return null;
-        return { email, username };
-      }catch{ return null; }
-    }
-
-    function setActiveUser(email, username){
-      const e = normalizeEmail(email);
-      const u = sanitizeUsername(username);
-      if (!e || !u) return;
-      localStorage.setItem(AUTH_KEY, JSON.stringify({ email: e, username: u }));
-    }
-
-    function clearActiveUser(){ localStorage.removeItem(AUTH_KEY); }
-
     function isValidEmail(email){
       const e = String(email || "").trim();
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
@@ -291,11 +287,27 @@
       return String(pw || "").length >= 6;
     }
 
-    async function sha256Hex(str){
-      const enc = new TextEncoder();
-      const buf = await crypto.subtle.digest("SHA-256", enc.encode(String(str)));
-      const bytes = Array.from(new Uint8Array(buf));
-      return bytes.map(b=>b.toString(16).padStart(2,"0")).join("");
+    /***********************
+     * SUPABASE AUTH FUNCTIONS
+     ***********************/
+    async function getActiveUser(){
+      try{
+        if (!supabaseEnabled || !supabase) return null;
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return null;
+        
+        const email = normalizeEmail(session.user.email);
+        
+        // Get username from user metadata
+        const username = session.user.user_metadata?.username || session.user.email.split('@')[0];
+        
+        if (!email || !username) return null;
+        return { email, username, userId: session.user.id };
+      }catch(e){
+        console.error("Error getting active user:", e);
+        return null;
+      }
     }
 
     async function createLocalAccount({ email, password, username }){
@@ -307,15 +319,25 @@
       if (!u) throw new Error("Please enter a username.");
       if (!isValidPassword(pw)) throw new Error("Password must be at least 6 characters.");
 
-      const accounts = loadAccounts();
-      if (accounts[e]) throw new Error("That email already has an account.");
+      if (!supabaseEnabled || !supabase) {
+        throw new Error("Supabase is not configured. Cannot create account.");
+      }
 
-      const passHash = await sha256Hex(pw);
-      accounts[e] = { email:e, username:u, passHash, createdAt: Date.now() };
-      saveAccounts(accounts);
+      // Create account with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: e,
+        password: pw,
+        options: {
+          data: {
+            username: u
+          }
+        }
+      });
 
-      setActiveUser(e, u);
-      return { email:e, username:u };
+      if (error) throw new Error(error.message);
+      if (!data.user) throw new Error("Account creation failed.");
+
+      return { email: e, username: u, userId: data.user.id };
     }
 
     async function loginLocalAccount({ email, password }){
@@ -325,29 +347,34 @@
       if (!isValidEmail(e)) throw new Error("Please enter a valid email.");
       if (!pw) throw new Error("Please enter your password.");
 
-      const accounts = loadAccounts();
-      const acc = accounts[e];
-      if (!acc) throw new Error("No account found for that email.");
+      if (!supabaseEnabled || !supabase) {
+        throw new Error("Supabase is not configured. Cannot login.");
+      }
 
-      const passHash = await sha256Hex(pw);
-      if (passHash !== acc.passHash) throw new Error("Incorrect password.");
+      // Sign in with Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: e,
+        password: pw
+      });
 
-      setActiveUser(e, acc.username);
-      return { email:e, username:acc.username };
+      if (error) throw new Error(error.message);
+      if (!data.user) throw new Error("Login failed.");
+
+      const username = data.user.user_metadata?.username || data.user.email.split('@')[0];
+      return { email: e, username, userId: data.user.id };
+    }
+
+    async function clearActiveUser(){
+      if (supabaseEnabled && supabase) {
+        await supabase.auth.signOut();
+      }
     }
 
     /***********************
-     * SAVE (progress + settings)
-     * - per-account progress by email
+     * PROGRESS STORAGE (Supabase)
+     * - Stores per-user progress in Supabase database
      ***********************/
     const SAVE_KEY_LEGACY = "gridrun_dom_progress_v2";
-    const SETTINGS_KEY = "gridrun_audio_settings_v1";
-
-    function progressKey(){
-      const a = getActiveUser();
-      const email = a?.email;
-      return email ? `gridrun_progress_email_${email}` : SAVE_KEY_LEGACY;
-    }
 
     function defaultProgress() {
       return {
@@ -362,23 +389,84 @@
       };
     }
 
-    function loadProgress() {
+    async function loadProgress() {
       try {
-        const key = progressKey();
+        const user = await getActiveUser();
+        if (!user || !user.userId || !supabaseEnabled || !supabase) {
+          // Fallback to legacy localStorage if not logged in or Supabase not available
+          return loadProgressLegacy();
+        }
 
-        const raw = localStorage.getItem(key);
+        // Load from Supabase
+        const { data, error } = await supabase
+          .from('progress')
+          .select('*')
+          .eq('user_id', user.userId)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error loading progress:", error);
+          return defaultProgress();
+        }
+
+        if (!data) {
+          // No progress yet, return default
+          return defaultProgress();
+        }
+
+        // Map database fields to app format
+        const p = {
+          worldsUnlocked: data.worlds_unlocked || 1,
+          levelsUnlocked: data.levels_unlocked || [1, 0, 0],
+          bestScores: data.best_scores || [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],
+          endlessBest: data.endless_best || 0
+        };
+
+        // Validate structure
+        const d = defaultProgress();
+        const out = { ...d, ...p };
+
+        if (!Array.isArray(out.levelsUnlocked) || out.levelsUnlocked.length !== 3) 
+          out.levelsUnlocked = d.levelsUnlocked.slice();
+        if (!Array.isArray(out.bestScores) || out.bestScores.length !== 3) 
+          out.bestScores = d.bestScores.map(r=>r.slice());
+
+        for (let w=0; w<3; w++){
+          if (!Array.isArray(out.bestScores[w]) || out.bestScores[w].length !== 5) 
+            out.bestScores[w] = [0,0,0,0,0];
+          for (let l=0; l<5; l++) 
+            out.bestScores[w][l] = Math.max(0, Math.floor(out.bestScores[w][l] || 0));
+        }
+
+        out.worldsUnlocked = Math.max(1, Math.min(3, Math.floor(out.worldsUnlocked || 1)));
+        out.levelsUnlocked = out.levelsUnlocked.map((x)=>Math.max(0, Math.min(5, Math.floor(x || 0))));
+        out.endlessBest = Math.max(0, Math.floor(out.endlessBest || 0));
+        return out;
+      } catch (e) {
+        console.error("Error in loadProgress:", e);
+        return defaultProgress();
+      }
+    }
+
+    function loadProgressLegacy() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY_LEGACY);
         if (!raw) return defaultProgress();
 
         const p = JSON.parse(raw);
         const d = defaultProgress();
         const out = { ...d, ...p };
 
-        if (!Array.isArray(out.levelsUnlocked) || out.levelsUnlocked.length !== 3) out.levelsUnlocked = d.levelsUnlocked.slice();
-        if (!Array.isArray(out.bestScores) || out.bestScores.length !== 3) out.bestScores = d.bestScores.map(r=>r.slice());
+        if (!Array.isArray(out.levelsUnlocked) || out.levelsUnlocked.length !== 3) 
+          out.levelsUnlocked = d.levelsUnlocked.slice();
+        if (!Array.isArray(out.bestScores) || out.bestScores.length !== 3) 
+          out.bestScores = d.bestScores.map(r=>r.slice());
 
         for (let w=0; w<3; w++){
-          if (!Array.isArray(out.bestScores[w]) || out.bestScores[w].length !== 5) out.bestScores[w] = [0,0,0,0,0];
-          for (let l=0; l<5; l++) out.bestScores[w][l] = Math.max(0, Math.floor(out.bestScores[w][l] || 0));
+          if (!Array.isArray(out.bestScores[w]) || out.bestScores[w].length !== 5) 
+            out.bestScores[w] = [0,0,0,0,0];
+          for (let l=0; l<5; l++) 
+            out.bestScores[w][l] = Math.max(0, Math.floor(out.bestScores[w][l] || 0));
         }
 
         out.worldsUnlocked = Math.max(1, Math.min(3, Math.floor(out.worldsUnlocked || 1)));
@@ -390,8 +478,49 @@
       }
     }
 
-    function saveProgress(p) { localStorage.setItem(progressKey(), JSON.stringify(p)); }
-    let progress = loadProgress();
+    async function saveProgress(p) {
+      try {
+        const user = await getActiveUser();
+        if (!user || !user.userId || !supabaseEnabled || !supabase) {
+          // Fallback to legacy localStorage if not logged in or Supabase not available
+          localStorage.setItem(SAVE_KEY_LEGACY, JSON.stringify(p));
+          return;
+        }
+
+        // Save to Supabase
+        const { error } = await supabase
+          .from('progress')
+          .upsert({
+            user_id: user.userId,
+            worlds_unlocked: p.worldsUnlocked,
+            levels_unlocked: p.levelsUnlocked,
+            best_scores: p.bestScores,
+            endless_best: p.endlessBest,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
+
+        if (error) {
+          console.error("Error saving progress:", error);
+        }
+      } catch (e) {
+        console.error("Error in saveProgress:", e);
+      }
+    }
+
+    let progress = defaultProgress();
+    
+    // Initialize progress asynchronously
+    (async () => {
+      progress = await loadProgress();
+    })();
+
+    /***********************
+     * SETTINGS STORAGE (Supabase)
+     * - Stores per-user settings in Supabase database
+     ***********************/
+    const SETTINGS_KEY = "gridrun_audio_settings_v1";
 
     function defaultSettings(){
       return {
@@ -403,7 +532,53 @@
       };
     }
 
-    function loadSettingsState(){
+    async function loadSettingsState(){
+      try{
+        const user = await getActiveUser();
+        if (!user || !user.userId || !supabaseEnabled || !supabase) {
+          // Fallback to legacy localStorage if not logged in or Supabase not available
+          return loadSettingsLegacy();
+        }
+
+        // Load from Supabase
+        const { data, error } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('user_id', user.userId)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error loading settings:", error);
+          return defaultSettings();
+        }
+
+        if (!data) {
+          return defaultSettings();
+        }
+
+        const s = { ...defaultSettings(), ...data };
+        s.menuMusic = !!s.menu_music;
+        s.gameplayMusic = !!s.gameplay_music;
+        s.sfx = !!s.sfx;
+        s.volumeMusic = Math.max(0, Math.min(1, Number(s.volume_music ?? 0.75)));
+        s.volumeSfx = Math.max(0, Math.min(1, Number(s.volume_sfx ?? 0.85)));
+        
+        // Clean up snake_case keys for app use
+        delete s.menu_music;
+        delete s.gameplay_music;
+        delete s.volume_music;
+        delete s.volume_sfx;
+        delete s.user_id;
+        delete s.updated_at;
+        
+        return s;
+      }catch(e){
+        console.error("Error in loadSettingsState:", e);
+        return defaultSettings();
+      }
+    }
+
+    function loadSettingsLegacy(){
       try{
         const raw = localStorage.getItem(SETTINGS_KEY);
         if (!raw) return defaultSettings();
@@ -419,24 +594,49 @@
       }
     }
 
-    function saveSettingsState(s){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
-    let settings = loadSettingsState();
+    async function saveSettingsState(s){
+      try {
+        const user = await getActiveUser();
+        if (!user || !user.userId || !supabaseEnabled || !supabase) {
+          // Fallback to legacy localStorage if not logged in or Supabase not available
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+          return;
+        }
+
+        // Save to Supabase
+        const { error } = await supabase
+          .from('settings')
+          .upsert({
+            user_id: user.userId,
+            menu_music: s.menuMusic,
+            gameplay_music: s.gameplayMusic,
+            sfx: s.sfx,
+            volume_music: s.volumeMusic,
+            volume_sfx: s.volumeSfx,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
+
+        if (error) {
+          console.error("Error saving settings:", error);
+        }
+      } catch (e) {
+        console.error("Error in saveSettingsState:", e);
+      }
+    }
+
+    let settings = defaultSettings();
+    
+    // Initialize settings asynchronously
+    (async () => {
+      settings = await loadSettingsState();
+    })();
 
     /***********************
-     * LOCAL LEADERBOARDS
+     * LEADERBOARDS (Supabase with Realtime)
      ***********************/
-    const LB_KEY = "gridrun_leaderboards_local_v1";
-    function defaultLeaderboards(){ return { users: {} }; }
-    function loadLeaderboardsState(){
-      try{
-        const raw = localStorage.getItem(LB_KEY);
-        if (!raw) return defaultLeaderboards();
-        const s = { ...defaultLeaderboards(), ...JSON.parse(raw) };
-        if (!s.users || typeof s.users !== "object") s.users = {};
-        return s;
-      }catch{ return defaultLeaderboards(); }
-    }
-    function saveLeaderboardsState(s){ localStorage.setItem(LB_KEY, JSON.stringify(s)); }
+    let leaderboardSubscription = null;
 
     function sumCampaignTotals(p){
       const worldTotals = [0,0,0];
@@ -449,30 +649,118 @@
       return { campaignTotal, worldTotals };
     }
 
-    function updateLeaderboardsFromProgress(){
-      const a = getActiveUser();
-      if (!a) return;
-      const username = a.username;
-      const k = username.toLowerCase();
-      const lb = loadLeaderboardsState();
-      const p = loadProgress();
-      const totals = sumCampaignTotals(p);
+    async function updateLeaderboardsFromProgress(){
+      try {
+        const user = await getActiveUser();
+        if (!user || !user.userId || !supabaseEnabled || !supabase) return;
+        
+        const username = user.username;
+        const p = await loadProgress();
+        const totals = sumCampaignTotals(p);
 
-      const prev = lb.users[k] || { username, endlessBest:0, campaignTotal:0, worldTotals:[0,0,0], updatedAt:0 };
+        // Update leaderboard in Supabase
+        const { error } = await supabase
+          .from('leaderboards')
+          .upsert({
+            user_id: user.userId,
+            username: username,
+            endless_best: Math.floor(p.endlessBest || 0),
+            campaign_total: Math.floor(totals.campaignTotal || 0),
+            world_totals: totals.worldTotals.map(total => Math.floor(total || 0)),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
 
-      lb.users[k] = {
-        username,
-        endlessBest: Math.max(prev.endlessBest || 0, Math.floor(p.endlessBest || 0)),
-        campaignTotal: Math.max(prev.campaignTotal || 0, Math.floor(totals.campaignTotal || 0)),
-        worldTotals: [
-          Math.max(prev.worldTotals?.[0] || 0, totals.worldTotals[0]),
-          Math.max(prev.worldTotals?.[1] || 0, totals.worldTotals[1]),
-          Math.max(prev.worldTotals?.[2] || 0, totals.worldTotals[2]),
-        ],
-        updatedAt: Date.now()
-      };
+        if (error) {
+          console.error("Error updating leaderboards:", error);
+        }
+      } catch (e) {
+        console.error("Error in updateLeaderboardsFromProgress:", e);
+      }
+    }
 
-      saveLeaderboardsState(lb);
+    async function buildRanking(metric){
+      try {
+        if (!supabaseEnabled || !supabase) {
+          // Return empty leaderboard if Supabase not available
+          return { list: [], scoreOf: () => 0 };
+        }
+
+        // Fetch all leaderboard data from Supabase (we'll sort client-side)
+        const { data, error } = await supabase
+          .from('leaderboards')
+          .select('username, endless_best, campaign_total, world_totals, updated_at')
+          .limit(100);
+
+        if (error) {
+          console.error("Error fetching leaderboards:", error);
+          return { list: [], scoreOf: () => 0 };
+        }
+
+        const cleaned = (data || []).map(r => ({
+          username: r.username,
+          endlessBest: Math.floor(r.endless_best || 0),
+          campaignTotal: Math.floor(r.campaign_total || 0),
+          worldTotals: Array.isArray(r.world_totals) 
+            ? r.world_totals.map(total => Math.floor(total || 0))
+            : [0, 0, 0],
+          updatedAt: new Date(r.updated_at).getTime()
+        }));
+
+        const scoreOf = (r)=>{
+          if (metric === "endless") return r.endlessBest;
+          if (metric === "campaign") return r.campaignTotal;
+          if (metric === "w1") return r.worldTotals[0];
+          if (metric === "w2") return r.worldTotals[1];
+          if (metric === "w3") return r.worldTotals[2];
+          return 0;
+        };
+
+        // Sort client-side for flexibility and performance
+        cleaned.sort((a, b) => {
+          const scoreA = scoreOf(a);
+          const scoreB = scoreOf(b);
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          return (b.updatedAt || 0) - (a.updatedAt || 0);
+        });
+
+        return { list: cleaned, scoreOf };
+      } catch (e) {
+        console.error("Error in buildRanking:", e);
+        return { list: [], scoreOf: () => 0 };
+      }
+    }
+
+    function subscribeToLeaderboardUpdates(callback) {
+      if (!supabaseEnabled || !supabase) {
+        console.log("ℹ️ Realtime leaderboards not available (Supabase not configured)");
+        return;
+      }
+
+      // Unsubscribe from previous subscription if exists
+      if (leaderboardSubscription) {
+        leaderboardSubscription.unsubscribe();
+      }
+
+      // Subscribe to realtime changes
+      leaderboardSubscription = supabase
+        .channel('leaderboard_changes')
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'leaderboards' },
+          (payload) => {
+            console.log('Leaderboard update received:', payload);
+            if (callback) callback(payload);
+          }
+        )
+        .subscribe();
+    }
+
+    function unsubscribeFromLeaderboardUpdates() {
+      if (leaderboardSubscription) {
+        leaderboardSubscription.unsubscribe();
+        leaderboardSubscription = null;
+      }
     }
 
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -573,10 +861,10 @@
       stopMenuMusic();
     }
 
-    function loadMainMenu(){
+    async function loadMainMenu(){
       startMenuMusic();
       const container = document.getElementById("game-container");
-      const a = getActiveUser();
+      const a = await getActiveUser();
       if (!a){ loadAuthGate(); return; }
 
       container.innerHTML = `
@@ -611,9 +899,9 @@
       `;
     }
 
-    function loadCampaignMode() {
+    async function loadCampaignMode() {
       startMenuMusic();
-      progress = loadProgress();
+      progress = await loadProgress();
       const container = document.getElementById("game-container");
       const worldButtons = worlds.map((world, i) => `
         <button onclick="loadWorld(${i + 1})" ${progress.worldsUnlocked > i ? '' : 'disabled'}>
@@ -634,9 +922,9 @@
       `;
     }
 
-    function loadWorld(worldNumber) {
+    async function loadWorld(worldNumber) {
       startMenuMusic();
-      progress = loadProgress();
+      progress = await loadProgress();
       const container = document.getElementById("game-container");
       const worldIdx = worldNumber - 1;
       const levelsUnlocked = progress.levelsUnlocked[worldIdx] || 0;
@@ -665,9 +953,9 @@
       `;
     }
 
-    function loadLevelIntro(worldNumber, levelNumber) {
+    async function loadLevelIntro(worldNumber, levelNumber) {
       startMenuMusic();
-      progress = loadProgress();
+      progress = await loadProgress();
       const container = document.getElementById("game-container");
       const w = worldNumber - 1;
       const l = levelNumber - 1;
@@ -701,9 +989,9 @@
       `;
     }
 
-    function loadEndlessIntro(){
+    async function loadEndlessIntro(){
       startMenuMusic();
-      progress = loadProgress();
+      progress = await loadProgress();
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
@@ -718,9 +1006,9 @@
       `;
     }
 
-    function loadSettings(){
+    async function loadSettings(){
       startMenuMusic();
-      settings = loadSettingsState();
+      settings = await loadSettingsState();
       const container = document.getElementById("game-container");
       const onOff = (v)=> v ? "ON" : "OFF";
       container.innerHTML = `
@@ -749,15 +1037,15 @@
       `;
     }
 
-    function toggleSetting(key){
-      settings = loadSettingsState();
+    async function toggleSetting(key){
+      settings = await loadSettingsState();
       settings[key] = !settings[key];
-      saveSettingsState(settings);
+      await saveSettingsState(settings);
       updateMenuMusicState();
       if (window.GRIDRUN_AUDIO && typeof window.GRIDRUN_AUDIO.applySettings === "function"){
         window.GRIDRUN_AUDIO.applySettings(settings);
       }
-      loadSettings();
+      await loadSettings();
     }
 
     function loadHowTo(){
@@ -799,24 +1087,31 @@
         /***********************
      * AUTH SCREENS (forced before menu)
      ***********************/
-    function loadAuthGate(){
+    async function loadAuthGate(){
       startMenuMusic();
+      
+      // If Supabase is not configured, skip authentication and go straight to main menu
+      if (!supabaseEnabled) {
+        await loadMainMenu();
+        return;
+      }
+      
       const container = document.getElementById("game-container");
+      
       container.innerHTML = `
         <div class="menu-screen">
           <h1>GRIDRUN</h1>
-          <p class="subhead">When the site loads, login or create an account to enter.</p>
+          <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
 
           <div class="panel">
             <div class="panelTitle">
               <strong>Account Access</strong>
-              <span class="pill">Required</span>
+              <span class="pill">Cloud Sync</span>
             </div>
 
             <button onclick="loadLogin()">LOGIN</button>
             <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
-
-            <p class="hint">Local-only for now (same device/browser). Email is unique.</p>
+            <p class="hint">Cloud sync enabled via Supabase.</p>
           </div>
         </div>
       `;
@@ -857,9 +1152,9 @@
       const pass = document.getElementById("loginPass")?.value || "";
       try{
         await loginLocalAccount({ email, password: pass });
-        progress = loadProgress();
-        updateLeaderboardsFromProgress();
-        loadMainMenu();
+        progress = await loadProgress();
+        await updateLeaderboardsFromProgress();
+        await loadMainMenu();
       }catch(e){
         alert(e?.message || "Login failed.");
       }
@@ -920,21 +1215,21 @@
       }
       try{
         await createLocalAccount({ email, password: pass, username: user });
-        progress = loadProgress();
-        updateLeaderboardsFromProgress();
-        loadMainMenu();
+        progress = await loadProgress();
+        await updateLeaderboardsFromProgress();
+        await loadMainMenu();
       }catch(e){
         alert(e?.message || "Create account failed.");
       }
     }
 
-    function loadAccount(){
+    async function loadAccount(){
       startMenuMusic();
-      const a = getActiveUser();
+      const a = await getActiveUser();
       const container = document.getElementById("game-container");
       if (!a){ loadAuthGate(); return; }
 
-      progress = loadProgress();
+      progress = await loadProgress();
       const totals = sumCampaignTotals(progress);
 
       container.innerHTML = `
@@ -943,7 +1238,7 @@
           <p class="subhead">Logged in as <b>${a.username}</b><br><span style="font-size:12px;color:rgba(255,255,255,0.70)">${a.email}</span></p>
 
           <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Your Stats</strong><span class="pill">Local</span></div>
+            <div class="panelTitle"><strong>Your Stats</strong><span class="pill">Supabase</span></div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
               <span class="pill">Endless Best <b>${progress.endlessBest}</b></span>
               <span class="pill">Campaign Total <b>${totals.campaignTotal}</b></span>
@@ -959,7 +1254,7 @@
               <button onclick="saveUsernameChange()">Save</button>
               <button onclick="logout()">Logout</button>
             </div>
-            <p class="hint">Email/password are local-only for now. Global later.</p>
+            <p class="hint">Your data is synced globally via Supabase.</p>
           </div>
 
           <button onclick="loadMainMenu()">Back</button>
@@ -967,92 +1262,54 @@
       `;
     }
 
-    function saveUsernameChange(){
+    async function saveUsernameChange(){
       const el = document.getElementById("usernameEdit");
       if (!el) return;
       const newU = sanitizeUsername(el.value);
       if (!newU){ alert("Invalid username."); return; }
 
-      const a = getActiveUser();
-      if (!a) return;
+      const a = await getActiveUser();
+      if (!a || !a.userId) return;
 
-      const accounts = loadAccounts();
-      const acc = accounts[a.email];
-      if (!acc){ alert("Account not found."); return; }
+      try {
+        // Update username in user metadata
+        const { error } = await supabase.auth.updateUser({
+          data: { username: newU }
+        });
 
-      const oldUser = acc.username;
-      acc.username = newU;
-      accounts[a.email] = acc;
-      saveAccounts(accounts);
+        if (error) {
+          alert("Failed to update username: " + error.message);
+          return;
+        }
 
-      setActiveUser(a.email, newU);
+        // Update leaderboard username
+        await supabase
+          .from('leaderboards')
+          .update({ username: newU })
+          .eq('user_id', a.userId);
 
-      // migrate leaderboard key (username-based)
-      const lb = loadLeaderboardsState();
-      const oldK = String(oldUser||"").toLowerCase();
-      const newK = String(newU||"").toLowerCase();
-      if (oldK && oldK !== newK && lb.users?.[oldK]){
-        const row = lb.users[oldK];
-        delete lb.users[oldK];
-        row.username = newU;
-        lb.users[newK] = row;
-        saveLeaderboardsState(lb);
+        progress = await loadProgress();
+        await updateLeaderboardsFromProgress();
+        await loadAccount();
+      } catch (e) {
+        alert("Error updating username: " + (e?.message || "Unknown error"));
       }
-
-      progress = loadProgress();
-      updateLeaderboardsFromProgress();
-      loadAccount();
     }
 
-    function logout(){
-      clearActiveUser();
-      progress = loadProgress();
+    async function logout(){
+      await clearActiveUser();
+      progress = await loadProgress();
       loadAuthGate();
     }
 
     /***********************
      * LEADERBOARDS (polished)
      ***********************/
-    function buildRanking(metric){
-      const lb = loadLeaderboardsState();
-      const rows = Object.values(lb.users || {});
-      const cleaned = rows
-        .filter(r => r && r.username)
-        .map(r => ({
-          username: r.username,
-          endlessBest: Math.floor(r.endlessBest || 0),
-          campaignTotal: Math.floor(r.campaignTotal || 0),
-          worldTotals: [
-            Math.floor(r.worldTotals?.[0] || 0),
-            Math.floor(r.worldTotals?.[1] || 0),
-            Math.floor(r.worldTotals?.[2] || 0),
-          ],
-          updatedAt: Math.floor(r.updatedAt || 0)
-        }));
-
-      const scoreOf = (r)=>{
-        if (metric === "endless") return r.endlessBest;
-        if (metric === "campaign") return r.campaignTotal;
-        if (metric === "w1") return r.worldTotals[0];
-        if (metric === "w2") return r.worldTotals[1];
-        if (metric === "w3") return r.worldTotals[2];
-        return 0;
-      };
-
-      cleaned.sort((a,b)=>{
-        const da = scoreOf(a), db = scoreOf(b);
-        if (db !== da) return db - da;
-        return (b.updatedAt||0) - (a.updatedAt||0);
-      });
-
-      return { list: cleaned, scoreOf };
-    }
-
-    function renderLeaderboardList(metric){
-      const a = getActiveUser();
+    async function renderLeaderboardList(metric){
+      const a = await getActiveUser();
       const myKey = a ? a.username.toLowerCase() : null;
 
-      const { list, scoreOf } = buildRanking(metric);
+      const { list, scoreOf } = await buildRanking(metric);
       const top = list.slice(0, 25);
 
       const header = `
@@ -1099,17 +1356,17 @@
       return `
         <div class="lbWrap">
           ${header}
-          ${rows || `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
+          ${top.length > 0 ? rows : `<div style="padding:14px;color:rgba(255,255,255,0.75)">No scores yet.</div>`}
         </div>
         ${myRankHtml}
       `;
     }
 
-    function loadLeaderboards(){
+    async function loadLeaderboards(){
       startMenuMusic();
-      updateLeaderboardsFromProgress();
+      await updateLeaderboardsFromProgress();
       const container = document.getElementById("game-container");
-      const a = getActiveUser();
+      const a = await getActiveUser();
 
       const tabs = [
         { key:"endless", label:"Endless" },
@@ -1119,39 +1376,59 @@
         { key:"w3", label:"World 3" },
       ];
 
+      // Subscribe to realtime updates
+      subscribeToLeaderboardUpdates(async (payload) => {
+        // Refresh current tab when leaderboard changes
+        const activeTab = document.querySelector(".tab.active");
+        if (activeTab) {
+          const metric = activeTab.getAttribute('data-metric');
+          const content = await renderLeaderboardList(metric || 'endless');
+          const lbContent = document.getElementById("lbContent");
+          if (lbContent) lbContent.innerHTML = content;
+        }
+      });
+
+      const initialContent = await renderLeaderboardList("endless");
+
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Leaderboards</h1>
-          <p class="subhead">${a ? `Logged in as <b>${a.username}</b>. Scores update when you beat a personal best.` : `View rankings. Login to post scores.`}</p>
+          <p class="subhead">${a ? `Logged in as <b>${a.username}</b>. Scores update in real-time when anyone beats a personal best.` : `View rankings. Login to post scores.`}</p>
 
           <div class="panel">
             <div class="panelTitle">
               <strong>Rankings</strong>
-              <span class="pill">Top <b>25</b> (local)</span>
+              <span class="pill">Top <b>25</b> (global • live)</span>
             </div>
 
             <div class="tabs" id="lbTabs">
-              ${tabs.map((t,i)=>`<div class="tab ${i===0?"active":""}" onclick="switchLbTab('${t.key}', this)">${t.label}</div>`).join("")}
+              ${tabs.map((t,i)=>`<div class="tab ${i===0?"active":""}" data-metric="${t.key}" onclick="switchLbTab('${t.key}', this)">${t.label}</div>`).join("")}
             </div>
 
             <div id="lbContent">
-              ${renderLeaderboardList("endless")}
+              ${initialContent}
             </div>
 
             <p class="hint">
-              Local leaderboards are stored on-device for now. Global leaderboards later.
+              Global leaderboards with real-time updates via Supabase. 🔴 LIVE
             </p>
           </div>
 
-          <button onclick="loadMainMenu()">Back</button>
+          <button onclick="leaveLeaderboards()">Back</button>
         </div>
       `;
     }
 
-    function switchLbTab(key, el){
+    async function switchLbTab(key, el){
       document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
       el.classList.add("active");
-      document.getElementById("lbContent").innerHTML = renderLeaderboardList(key);
+      const content = await renderLeaderboardList(key);
+      document.getElementById("lbContent").innerHTML = content;
+    }
+
+    async function leaveLeaderboards(){
+      unsubscribeFromLeaderboardUpdates();
+      await loadMainMenu();
     }
 
     function playLevel(worldNumber, levelNumber) {
@@ -1162,8 +1439,8 @@
      * GAME BRIDGE (menus <-> phaser)
      ***********************/
     window.GRIDRUN = {
-      completeCampaignLevel: (worldIdx, levelIdx, score) => {
-        const p = loadProgress();
+      completeCampaignLevel: async (worldIdx, levelIdx, score) => {
+        const p = await loadProgress();
         p.bestScores[worldIdx][levelIdx] = Math.max(p.bestScores[worldIdx][levelIdx] || 0, score);
 
         const currentUnlocked = p.levelsUnlocked[worldIdx] || 0;
@@ -1175,21 +1452,21 @@
           }
         }
 
-        saveProgress(p);
-        updateLeaderboardsFromProgress();
+        await saveProgress(p);
+        await updateLeaderboardsFromProgress();
       },
 
-      setEndlessBest: (score) => {
-        const p = loadProgress();
+      setEndlessBest: async (score) => {
+        const p = await loadProgress();
         p.endlessBest = Math.max(p.endlessBest || 0, score);
-        saveProgress(p);
-        updateLeaderboardsFromProgress();
+        await saveProgress(p);
+        await updateLeaderboardsFromProgress();
       },
 
       getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,
 
-      backToLevelSelect: (worldIdx) => { showMenus(); loadWorld(worldIdx + 1); },
-      backToMainMenu: () => { showMenus(); loadMainMenu(); }
+      backToLevelSelect: async (worldIdx) => { showMenus(); await loadWorld(worldIdx + 1); },
+      backToMainMenu: async () => { showMenus(); await loadMainMenu(); }
     };
 
     /***********************
@@ -1523,8 +1800,7 @@
         }
 
         create(){
-          settings = loadSettingsState();
-
+          // Use the global settings variable (already loaded async at startup)
           ensureObstacleTextures(this);
           this.cameras.main.setBackgroundColor(this.wcfg.bg);
           buildBackdrop(this, this.wcfg.fx, this.wcfg.glowA, this.wcfg.glowB);
@@ -1731,7 +2007,7 @@
         }
 
         playSfx(key){
-          settings = loadSettingsState();
+          // Use the global settings variable
           if (!settings.sfx) return;
           try{ this.sound.play(key, { volume: settings.volumeSfx }); }catch(e){}
         }
@@ -1829,8 +2105,7 @@
           if (this.mode==="campaign"){
             timeLeft = Math.max(0, this.lcfg.seconds - this.t);
             if (this.t >= this.lcfg.seconds){
-              // Clear bonus formula aligned with tier model expectations (TIER_MODEL.clearBonusBase + worldIdx*60 + levelIdx*35)
-              const clearBonus = CLEAR_BONUS_BASE + this.world*60 + this.level*35;
+              const clearBonus = CLEAR_BONUS_BASE + this.world*70 + this.level*40;
               this.score += clearBonus;
               this.playSfx("sfx_clear");
               this.levelComplete();
@@ -2135,20 +2410,20 @@
           }
         }
 
-        levelComplete(){
+        async levelComplete(){
           const score=Math.floor(this.score);
-          window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
+          await window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
           this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason:"CLEAR"});
         }
 
-        endRun({reason}){
+        async endRun({reason}){
           const score=Math.floor(this.score);
           this.flash.setAlpha(0.10);
           this.tweens.add({targets:this.flash,alpha:0,duration:170,ease:"Linear"});
           this.stopMusic();
 
           if (this.mode==="endless"){
-            window.GRIDRUN.setEndlessBest(score);
+            await window.GRIDRUN.setEndlessBest(score);
             this.scene.start("Results",{mode:"endless",score,reason});
             return;
           }
@@ -2246,9 +2521,13 @@
     }
 
     // Boot: ALWAYS show auth gate on load
-    window.addEventListener("load", () => {
+    window.addEventListener("load", async () => {
+      // Initialize settings and progress asynchronously
+      settings = await loadSettingsState();
+      progress = await loadProgress();
+      
       showMenus();
-      loadAuthGate();
+      await loadAuthGate();
     });
   </script>
 </body>

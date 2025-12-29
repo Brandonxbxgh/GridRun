@@ -274,17 +274,7 @@
       transition:all .3s cubic-bezier(0.4,0,0.2,1);
       user-select:none;
       position:relative;
-      overflow:hidden;
     }
-    .tab::before{
-      content:'';
-      position:absolute;
-      top:0;left:0;right:0;bottom:0;
-      background:linear-gradient(135deg,var(--accentA),var(--accentB));
-      opacity:0;
-      transition:opacity .3s;
-    }
-    .tab span{position:relative;z-index:1}
     .tab:hover{ 
       transform:translateY(-2px); 
       border-color:var(--stroke3);
@@ -297,7 +287,6 @@
       box-shadow:0 0 24px rgba(0,217,255,0.3),0 4px 12px rgba(0,0,0,0.3);
       font-weight:800;
     }
-    .tab.active::before{opacity:0.1}
 
     .lbWrap{
       width:100%;
@@ -1151,11 +1140,13 @@
         <div class="menu-screen" id="main-menu">
           <h1>GRIDRUN</h1>
           <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
-          <button onclick="loadModeSelect()">PLAY</button>
-          <button onclick="loadAccount()">ACCOUNT</button>
-          <button onclick="loadLeaderboards()">LEADERBOARDS</button>
-          <button onclick="loadHowTo()">HOW TO PLAY</button>
-          <button onclick="loadSettings()">SETTINGS</button>
+          <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:380px;">
+            <button onclick="loadModeSelect()" style="font-size:18px;padding:20px 40px;">▶ PLAY</button>
+            <button onclick="loadAccount()">👤 ACCOUNT</button>
+            <button onclick="loadLeaderboards()">🏆 LEADERBOARDS</button>
+            <button onclick="loadHowTo()">❓ HOW TO PLAY</button>
+            <button onclick="loadSettings()">⚙️ SETTINGS</button>
+          </div>
         </div>
       `;
     }
@@ -1166,15 +1157,24 @@
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Select Mode</h1>
+          <p class="subhead">Choose your challenge</p>
           <div class="panel">
             <div class="panelTitle">
-              <strong>Choose your run</strong>
+              <strong>Game Modes</strong>
               <span class="pill">Tip: <b>Campaign</b> unlocks Worlds</span>
             </div>
-            <button onclick="loadCampaignMode()">Campaign</button>
-            <button onclick="loadEndlessIntro()">Endless</button>
+            <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px">
+              <button onclick="loadCampaignMode()" style="padding:24px 32px;text-align:left">
+                <div style="font-size:18px;font-weight:800;margin-bottom:4px">🎯 Campaign</div>
+                <div style="font-size:13px;opacity:0.8;font-weight:500">Progress through worlds and levels</div>
+              </button>
+              <button onclick="loadEndlessIntro()" style="padding:24px 32px;text-align:left">
+                <div style="font-size:18px;font-weight:800;margin-bottom:4px">∞ Endless</div>
+                <div style="font-size:13px;opacity:0.8;font-weight:500">Survive as long as you can</div>
+              </button>
+            </div>
           </div>
-          <button onclick="loadMainMenu()">Back</button>
+          <button onclick="loadMainMenu()" style="margin-top:20px">← Back</button>
         </div>
       `;
     }
@@ -1183,11 +1183,26 @@
       startMenuMusic();
       progress = await loadProgress();
       const container = document.getElementById("game-container");
-      const worldButtons = worlds.map((world, i) => `
-        <button onclick="loadWorld(${i + 1})" ${progress.worldsUnlocked > i ? '' : 'disabled'}>
-          ${progress.worldsUnlocked > i ? world.name : 'Locked'}
-        </button>
-      `).join("");
+      const worldButtons = worlds.map((world, i) => {
+        const unlocked = progress.worldsUnlocked > i;
+        const icon = ['🌆', '❄️', '🌌'][i];
+        return `
+          <button onclick="loadWorld(${i + 1})" ${unlocked ? '' : 'disabled'} 
+                  style="padding:20px 24px;text-align:left;${unlocked ? '' : 'opacity:0.4;'}">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="font-size:28px">${icon}</div>
+              <div style="flex:1">
+                <div style="font-size:16px;font-weight:800;margin-bottom:2px">
+                  ${unlocked ? world.name : '🔒 Locked'}
+                </div>
+                <div style="font-size:12px;opacity:0.8;font-weight:500">
+                  ${unlocked ? world.description : 'Complete previous world to unlock'}
+                </div>
+              </div>
+            </div>
+          </button>
+        `;
+      }).join("");
 
       container.innerHTML = `
         <div class="menu-screen">
@@ -1195,9 +1210,11 @@
           <p class="subhead">Survive each level to unlock the next. Your best scores build your Campaign Total.</p>
           <div class="panel">
             <div class="panelTitle"><strong>Select a World</strong><span class="pill">Unlocked: <b>${progress.worldsUnlocked}/3</b></span></div>
-            ${worldButtons}
+            <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px">
+              ${worldButtons}
+            </div>
           </div>
-          <button onclick="loadModeSelect()">Back</button>
+          <button onclick="loadModeSelect()" style="margin-top:20px">← Back</button>
         </div>
       `;
     }
@@ -1208,29 +1225,51 @@
       const container = document.getElementById("game-container");
       const worldIdx = worldNumber - 1;
       const levelsUnlocked = progress.levelsUnlocked[worldIdx] || 0;
+      const worldIcon = ['🌆', '❄️', '🌌'][worldIdx];
 
       const levelButtons = Array.from({ length: 5 }, (_, i) => {
         const unlocked = i < levelsUnlocked;
         const best = progress.bestScores[worldIdx]?.[i] || 0;
         const ld = levelData(worldIdx, i);
+        const tierIcons = { bronze: '🥉', silver: '🥈', gold: '🥇' };
+        let tierBadge = '';
+        if (unlocked && best > 0) {
+          if (best >= ld.scores.gold) tierBadge = tierIcons.gold;
+          else if (best >= ld.scores.silver) tierBadge = tierIcons.silver;
+          else if (best >= ld.scores.bronze) tierBadge = tierIcons.bronze;
+        }
         return `
-          <button onclick="loadLevelIntro(${worldNumber}, ${i + 1})" ${unlocked ? '' : 'disabled'}>
-            ${unlocked ? `Level ${i + 1} • ${ld.time}s • Best: ${best}` : 'Locked'}
+          <button onclick="loadLevelIntro(${worldNumber}, ${i + 1})" ${unlocked ? '' : 'disabled'}
+                  style="padding:16px 20px;text-align:left;${unlocked ? '' : 'opacity:0.4;'}">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-size:15px;font-weight:800;margin-bottom:3px">
+                  ${unlocked ? `Level ${i + 1} ${tierBadge}` : '🔒 Locked'}
+                </div>
+                <div style="font-size:12px;opacity:0.8;font-weight:500">
+                  ${unlocked ? `${ld.time}s • Best: ${best}` : 'Complete previous level'}
+                </div>
+              </div>
+              ${unlocked ? '<div style="font-size:20px;opacity:0.6">▶</div>' : ''}
+            </div>
           </button>
         `;
       }).join("");
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>${worlds[worldIdx].name}</h1>
+          <h1>${worldIcon} ${worlds[worldIdx].name}</h1>
           <p class="subhead">${worlds[worldIdx].description}</p>
           <div class="panel">
             <div class="panelTitle"><strong>Levels</strong><span class="pill">Unlocked: <b>${levelsUnlocked}/5</b></span></div>
-            ${levelButtons}
+            <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px">
+              ${levelButtons}
+            </div>
           </div>
-          <button onclick="loadCampaignMode()">Back</button>
+          <button onclick="loadCampaignMode()" style="margin-top:20px">← Back</button>
         </div>
       `;
+    }
     }
 
     async function loadLevelIntro(worldNumber, levelNumber) {
@@ -1241,30 +1280,54 @@
       const l = levelNumber - 1;
       const ld = levelData(w, l);
       const best = progress.bestScores[w]?.[l] || 0;
+      const worldIcon = ['🌆', '❄️', '🌌'][w];
+
+      let tierStatus = '';
+      if (best > 0) {
+        if (best >= ld.scores.gold) tierStatus = '<div style="color:#ffd700;font-weight:800">🥇 GOLD TIER</div>';
+        else if (best >= ld.scores.silver) tierStatus = '<div style="color:#c0c0c0;font-weight:800">🥈 SILVER TIER</div>';
+        else if (best >= ld.scores.bronze) tierStatus = '<div style="color:#cd7f32;font-weight:800">🥉 BRONZE TIER</div>';
+        else tierStatus = '<div style="color:var(--muted);font-weight:600">No tier yet</div>';
+      }
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>Level ${levelNumber}</h1>
+          <h1>${worldIcon} Level ${levelNumber}</h1>
           <p class="subhead">${worlds[w].name}</p>
 
           <div class="panel">
-            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive: <b>${ld.time}s</b></span></div>
-            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85);">
-              Stay alive until the timer hits zero. More points = better tier.
+            <div class="panelTitle"><strong>⏱️ Objective</strong><span class="pill">Survive: <b>${ld.time}s</b></span></div>
+            <p style="margin:8px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85);line-height:1.5">
+              Stay alive until the timer hits zero. Score points through survival, streaks, near misses, and dodges.
             </p>
-            <div style="height:10px"></div>
-            <div class="panelTitle"><strong>Your Best</strong><span class="pill"><b>${best}</b></span></div>
-            <div style="height:10px"></div>
-            <div class="panelTitle"><strong>Performance Tiers</strong><span class="pill">Targets</span></div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
-              <span class="pill">Bronze <b>${ld.scores.bronze}</b></span>
-              <span class="pill">Silver <b>${ld.scores.silver}</b></span>
-              <span class="pill">Gold <b>${ld.scores.gold}</b></span>
+            <div style="height:16px"></div>
+            
+            <div class="panelTitle"><strong>📊 Your Best Score</strong><span class="pill"><b>${best}</b></span></div>
+            ${tierStatus ? `<div style="margin-top:6px;text-align:center">${tierStatus}</div>` : ''}
+            
+            <div style="height:16px"></div>
+            <div class="panelTitle"><strong>🎯 Performance Tiers</strong><span class="pill">Score Targets</span></div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px">
+              <div style="text-align:center;padding:12px;background:var(--glass);border-radius:12px;border:1px solid var(--stroke)">
+                <div style="font-size:24px;margin-bottom:4px">🥉</div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">BRONZE</div>
+                <div style="font-size:16px;font-weight:800">${ld.scores.bronze}</div>
+              </div>
+              <div style="text-align:center;padding:12px;background:var(--glass);border-radius:12px;border:1px solid var(--stroke)">
+                <div style="font-size:24px;margin-bottom:4px">🥈</div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">SILVER</div>
+                <div style="font-size:16px;font-weight:800">${ld.scores.silver}</div>
+              </div>
+              <div style="text-align:center;padding:12px;background:var(--glass);border-radius:12px;border:1px solid var(--stroke)">
+                <div style="font-size:24px;margin-bottom:4px">🥇</div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">GOLD</div>
+                <div style="font-size:16px;font-weight:800">${ld.scores.gold}</div>
+              </div>
             </div>
           </div>
 
-          <button onclick="playLevel(${worldNumber}, ${levelNumber})">Start</button>
-          <button onclick="loadWorld(${worldNumber})">Back</button>
+          <button onclick="playLevel(${worldNumber}, ${levelNumber})" style="font-size:17px;padding:18px 40px;margin-top:20px">▶ START LEVEL</button>
+          <button onclick="loadWorld(${worldNumber})">← Back to ${worlds[w].name}</button>
         </div>
       `;
     }
@@ -1275,13 +1338,24 @@
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>Endless</h1>
+          <h1>∞ Endless Mode</h1>
           <p class="subhead">Difficulty ramps from <b>W1L1</b> → <b>W3L5</b> over ~120s, then plateaus.</p>
           <div class="panel">
-            <div class="panelTitle"><strong>Local Best</strong><span class="pill"><b>${progress.endlessBest}</b></span></div>
-            <button onclick="startGameplay({ mode:'endless' })">Start Endless</button>
+            <div style="text-align:center;padding:20px 0">
+              <div style="font-size:14px;color:var(--muted);margin-bottom:8px;font-weight:600">YOUR BEST SCORE</div>
+              <div style="font-size:48px;font-weight:900;background:linear-gradient(135deg,var(--accentA),var(--accentB));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 40px var(--accentA)">${progress.endlessBest}</div>
+            </div>
+            <div style="height:12px"></div>
+            <div class="panelTitle"><strong>⚡ Challenge Info</strong><span class="pill">Survival</span></div>
+            <p style="margin:8px 0 0 0; font-size:13px; color:rgba(255,255,255,0.80);line-height:1.5">
+              • Difficulty increases continuously<br>
+              • No time limit - survive as long as possible<br>
+              • All worlds' hazards appear as you progress<br>
+              • Score points through survival skills
+            </p>
+            <button onclick="startGameplay({ mode:'endless' })" style="font-size:17px;padding:18px 40px;margin-top:20px;width:100%">▶ START ENDLESS</button>
           </div>
-          <button onclick="loadModeSelect()">Back</button>
+          <button onclick="loadModeSelect()" style="margin-top:20px">← Back</button>
         </div>
       `;
     }
@@ -1333,37 +1407,38 @@
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>How To Play</h1>
-          <p class="subhead">Everything you need — objective, scoring, worlds, and endless.</p>
+          <h1>❓ How To Play</h1>
+          <p class="subhead">Master the grid. Learn the mechanics. Climb the ranks.</p>
 
           <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive</span></div>
-            <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              Stay alive inside the grid. In <b>Campaign</b>, you must survive the full timer for each level to clear it and unlock progression.
-              In <b>Endless</b>, survive as long as you can while difficulty ramps up.
+            <div class="panelTitle"><strong>🎯 Objective</strong><span class="pill">Survive</span></div>
+            <p style="margin:8px 0 16px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.6">
+              Stay alive inside the grid. In <b>Campaign</b>, survive the full timer for each level to clear it and unlock progression.
+              In <b>Endless</b>, survive as long as you can while difficulty ramps continuously.
             </p>
 
-            <div class="panelTitle"><strong>Controls</strong><span class="pill">Touch or WASD</span></div>
-            <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              <b>Mobile:</b> touch where you want to move — your runner follows.
-              <br><b>Desktop:</b> WASD / Arrow keys.
+            <div class="panelTitle"><strong>🎮 Controls</strong><span class="pill">Touch or WASD</span></div>
+            <p style="margin:8px 0 16px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.6">
+              <b>📱 Mobile:</b> Touch where you want to move — your runner follows smoothly.<br>
+              <b>⌨️ Desktop:</b> WASD or Arrow Keys for precise control.
             </p>
 
-            <div class="panelTitle"><strong>Scoring</strong><span class="pill">Skill-based</span></div>
-            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              Score comes from in-game actions while the timer is active:<br>
-              • <b>Survival:</b> +6 points per second alive<br>
-              • <b>Near Miss:</b> +22 points (close dodges with combo multiplier)<br>
-              • <b>Dodge:</b> +10 points (skillful evasion)<br>
-              • <b>Streak:</b> +40 points every 15 seconds alive
-            </p>
+            <div class="panelTitle"><strong>💯 Scoring System</strong><span class="pill">Skill-based</span></div>
+            <div style="background:var(--glass);border-radius:12px;padding:14px;margin-top:10px;border:1px solid var(--stroke)">
+              <div style="display:grid;gap:10px;font-size:13px;line-height:1.6">
+                <div><b style="color:var(--accentA)">⏱️ Survival:</b> +6 pts/sec alive</div>
+                <div><b style="color:var(--accentA)">💥 Near Miss:</b> +22 pts (with combo multiplier)</div>
+                <div><b style="color:var(--accentA)">🎯 Dodge:</b> +10 pts per skillful evasion</div>
+                <div><b style="color:var(--accentA)">🔥 Streak:</b> +40 pts every 15 seconds</div>
+              </div>
+            </div>
 
-            <p class="hint">
-              Your <b>Leaderboards</b> scores update automatically when you improve a best score (Campaign or Endless).
+            <p class="hint" style="margin-top:16px;text-align:center">
+              <b>💡 Tip:</b> Your <b>Leaderboard</b> scores update automatically when you improve a personal best!
             </p>
           </div>
 
-          <button onclick="loadMainMenu()">Back</button>
+          <button onclick="loadMainMenu()" style="margin-top:20px">← Back to Menu</button>
         </div>
       `;
     }

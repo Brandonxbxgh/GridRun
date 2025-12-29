@@ -853,16 +853,18 @@
         
         // Re-fetch and re-render current tab
         const activeTab = document.querySelector(".tab.active");
-        if (activeTab) {
-          const metric = activeTab.getAttribute('data-metric') || 'endless';
-          const content = await renderLeaderboardList(metric);
-          const lbContent = document.getElementById("lbContent");
-          if (lbContent) lbContent.innerHTML = content;
-        }
+        const metric = activeTab ? activeTab.getAttribute('data-metric') : 'endless';
+        
+        // Fallback to 'endless' if no active tab found
+        const content = await renderLeaderboardList(metric || 'endless');
+        const lbContent = document.getElementById("lbContent");
+        if (lbContent) lbContent.innerHTML = content;
         
         console.log("✅ Leaderboard manually refreshed");
       } catch (e) {
         console.error("Error refreshing leaderboard:", e);
+        // Provide user feedback on error
+        alert("Failed to refresh leaderboard. Please check your connection and try again.");
       } finally {
         // Reset loading state
         leaderboardRefreshing = false;

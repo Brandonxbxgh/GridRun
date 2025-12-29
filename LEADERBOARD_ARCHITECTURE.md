@@ -72,14 +72,15 @@ Callback re-fetches and re-renders current leaderboard tab
 ## Key Functions
 
 ### `updateLeaderboardsFromProgress()`
-**Location**: Line 689-718  
+**Location**: Line 708-741  
 **Purpose**: Synchronizes player's current progress to the leaderboards table  
 **When called**:
-- On login (line 1198)
-- On account creation (line 1261)
-- After completing a level (line 1463)
-- After ending an endless run (line 1470)
-- When opening leaderboards screen (line 1374)
+- On login (line 1273)
+- On account creation (line 1337)
+- After completing a level (line 1555)
+- After ending an endless run (line 1562)
+- When opening leaderboards screen (line 1453)
+- When manually refreshing (line 852)
 
 **Implementation**:
 ```javascript
@@ -92,7 +93,7 @@ async function updateLeaderboardsFromProgress(){
 ```
 
 ### `buildRanking(metric)`
-**Location**: Line 720-770  
+**Location**: Line 743-797  
 **Purpose**: Fetches and sorts leaderboard data for a specific metric  
 **Parameters**: 
 - `metric`: "endless", "campaign", "w1", "w2", or "w3"
@@ -108,7 +109,7 @@ async function buildRanking(metric){
 ```
 
 ### `subscribeToLeaderboardUpdates(callback)`
-**Location**: Line 772-794  
+**Location**: Line 801-826  
 **Purpose**: Subscribes to realtime database changes  
 **Implementation**:
 ```javascript
@@ -203,11 +204,12 @@ Add version field to leaderboards:
 | Feature | File | Line Range | Function |
 |---------|------|------------|----------|
 | Supabase Init | index_dev.html | 240-261 | Global |
-| Leaderboard Update | index_dev.html | 689-718 | updateLeaderboardsFromProgress() |
-| Fetch Rankings | index_dev.html | 720-770 | buildRanking() |
-| Realtime Subscribe | index_dev.html | 772-794 | subscribeToLeaderboardUpdates() |
-| Render UI | index_dev.html | 1315-1370 | renderLeaderboardList() |
-| Load Screen | index_dev.html | 1372-1427 | loadLeaderboards() |
+| Leaderboard Update | index_dev.html | 708-741 | updateLeaderboardsFromProgress() |
+| Fetch Rankings | index_dev.html | 743-797 | buildRanking() |
+| Realtime Subscribe | index_dev.html | 801-826 | subscribeToLeaderboardUpdates() |
+| Manual Refresh | index_dev.html | 836-869 | refreshLeaderboardManually() |
+| Render UI | index_dev.html | 1391-1443 | renderLeaderboardList() |
+| Load Screen | index_dev.html | 1445-1517 | loadLeaderboards() |
 | Progress Storage | index_dev.html | 429-486 | loadProgress() |
 | Progress Save | index_dev.html | 518-547 | saveProgress() |
 

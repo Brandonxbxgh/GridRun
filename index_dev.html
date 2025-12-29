@@ -6,45 +6,27 @@
   <title>GRIDRUN</title>
   <style>
     :root{
-      --bgA:#0a0e27;
-      --bgB:#1a1f3a;
-      --bgC:#0f1428;
-      --accentA:#00d9ff;
-      --accentB:#7b2fff;
-      --accentC:#ff006e;
-      --glass:rgba(255,255,255,0.05);
-      --glass2:rgba(255,255,255,0.08);
-      --glass3:rgba(0,0,0,0.35);
-      --stroke:rgba(255,255,255,0.1);
-      --stroke2:rgba(255,255,255,0.15);
-      --stroke3:rgba(0,217,255,0.3);
-      --text:rgba(255,255,255,0.95);
-      --muted:rgba(255,255,255,0.75);
-      --muted2:rgba(255,255,255,0.55);
-      --shadow:rgba(0,0,0,0.5);
+      --bgA:#1a1c30;
+      --bgB:#292942;
+      --accentA:#ff5733;
+      --accentB:#ff8b3d;
+      --glass:rgba(0,0,0,0.22);
+      --glass2:rgba(0,0,0,0.30);
+      --stroke:rgba(255,255,255,0.12);
+      --stroke2:rgba(255,255,255,0.18);
+      --text:rgba(255,255,255,0.92);
+      --muted:rgba(255,255,255,0.72);
+      --muted2:rgba(255,255,255,0.58);
     }
 
     body{
       margin:0;padding:0;
-      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
-      background:radial-gradient(ellipse at top left, var(--bgB), var(--bgA) 45%, var(--bgC) 75%, var(--bgA));
-      background-size:400% 400%;
-      animation:backgroundMove 20s ease infinite;
+      font-family:Verdana,sans-serif;
+      background:linear-gradient(135deg,var(--bgA),var(--bgB),var(--bgA));
+      animation:backgroundMove 10s infinite alternate;
       height:100vh; overflow:hidden; color:white;
-      position:relative;
     }
-    body::before{
-      content:'';
-      position:absolute;
-      top:0;left:0;right:0;bottom:0;
-      background:radial-gradient(circle at 20% 80%, rgba(0,217,255,0.08), transparent 40%),
-                 radial-gradient(circle at 80% 20%, rgba(123,47,255,0.08), transparent 40%);
-      pointer-events:none;
-    }
-    @keyframes backgroundMove {
-      0%,100%{background-position:0% 50%}
-      50%{background-position:100% 50%}
-    }
+    @keyframes backgroundMove {0%{background-position:0% 50%}100%{background-position:100% 50%}}
 
     #game-container{
       display:flex;
@@ -62,280 +44,149 @@
     }
     canvas{display:block;margin:0 auto;}
 
-    h1{
-      font-size:3.5rem;
-      font-weight:900;
-      color:#fff;
-      text-shadow:0 0 40px var(--accentA),0 0 80px var(--accentB),0 4px 12px rgba(0,0,0,0.5);
-      margin:0 0 12px 0;
-      letter-spacing:-1px;
-      background:linear-gradient(135deg,#fff,var(--accentA),var(--accentB));
-      -webkit-background-clip:text;
-      -webkit-text-fill-color:transparent;
-      background-clip:text;
-      animation:titlePulse 3s ease-in-out infinite;
-    }
-    @keyframes titlePulse{
-      0%,100%{filter:brightness(1)}
-      50%{filter:brightness(1.15)}
-    }
-    
-    p{font-size:16px;margin:12px 0;line-height:1.6}
-    
+    h1{font-size:3rem;font-weight:bold;color:#fff;text-shadow:0 0 20px var(--accentA),0 0 30px var(--accentA); margin:0 0 8px 0;}
+    p{font-size:18px;margin:10px 0;}
     button{
-      margin:10px;
-      padding:16px 36px;
-      font-size:15px;
-      font-weight:700;
-      color:white;
-      background:linear-gradient(135deg,var(--accentA),var(--accentB));
-      border:2px solid rgba(255,255,255,0.2);
-      border-radius:12px;
-      cursor:pointer;
-      box-shadow:0 8px 24px rgba(0,0,0,.3),0 0 0 1px rgba(255,255,255,0.1) inset,0 2px 0 rgba(255,255,255,0.15) inset;
-      transition:all .3s cubic-bezier(0.4,0,0.2,1);
-      position:relative;
-      overflow:hidden;
-      letter-spacing:0.5px;
+      margin:8px;padding:15px 30px;font-size:1rem;font-weight:bold;color:white;
+      background:linear-gradient(45deg,var(--accentA),var(--accentB));
+      border:none;border-radius:50px;cursor:pointer;
+      box-shadow:0 4px 10px rgba(0,0,0,.4),0 0 15px rgba(255,87,51,.7);
+      transition:transform .2s,box-shadow .3s,opacity .2s;
     }
-    button::before{
-      content:'';
-      position:absolute;
-      top:0;left:-100%;
-      width:100%;height:100%;
-      background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);
-      transition:left .5s;
-    }
-    button:hover{
-      transform:translateY(-3px) scale(1.02);
-      box-shadow:0 12px 32px rgba(0,217,255,.4),0 0 0 1px rgba(255,255,255,0.2) inset,0 2px 0 rgba(255,255,255,0.2) inset;
-      border-color:rgba(255,255,255,0.3);
-    }
-    button:hover::before{left:100%}
-    button:active{
-      transform:translateY(-1px) scale(0.98);
-      box-shadow:0 4px 12px rgba(0,0,0,.3),0 0 0 1px rgba(255,255,255,0.1) inset;
-    }
-    button:disabled{
-      opacity:.4;
-      cursor:not-allowed;
-      filter:grayscale(.5);
-      box-shadow:0 2px 8px rgba(0,0,0,.2);
-      transform:none;
-    }
-    button:disabled::before{display:none}
+    button:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,.4),0 0 25px rgba(255,110,60,1)}
+    button:active{transform:translateY(2px);box-shadow:0 2px 5px rgba(0,0,0,.3),0 0 10px rgba(255,79,40,.9)}
+    button:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.25);box-shadow:none;transform:none}
 
     .menu-screen{
-      display:flex;flex-direction:column;align-items:center;gap:14px;
-      padding:30px 20px;max-width:580px;width:100%;
-      animation:fadeInUp .6s ease-out;
-    }
-    @keyframes fadeInUp{
-      from{opacity:0;transform:translateY(20px)}
-      to{opacity:1;transform:translateY(0)}
+      display:flex;flex-direction:column;align-items:center;gap:10px;
+      padding:20px;max-width:560px;width:100%;
     }
 
     .subhead{
-      font-size:15px;
+      font-size:14px;
       color:var(--muted);
-      margin:0 0 18px 0;
-      line-height:1.6;
-      max-width:540px;
-      text-align:center;
+      margin:0 0 14px 0;
+      line-height:1.4;
+      max-width:520px;
     }
 
     .panel{
       width:100%;
       background:var(--glass);
-      backdrop-filter:blur(20px);
-      -webkit-backdrop-filter:blur(20px);
       border:1px solid var(--stroke);
-      border-radius:20px;
-      padding:20px;
-      box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 0 1px rgba(255,255,255,0.05) inset;
-      position:relative;
-      overflow:hidden;
-    }
-    .panel::before{
-      content:'';
-      position:absolute;
-      top:0;left:0;right:0;
-      height:1px;
-      background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+      border-radius:18px;
+      padding:14px;
+      box-shadow:0 10px 26px rgba(0,0,0,0.28);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
     }
 
     .panelTitle{
       display:flex;
       justify-content:space-between;
       align-items:center;
-      gap:12px;
-      margin-bottom:14px;
+      gap:10px;
+      margin-bottom:10px;
     }
     .panelTitle strong{
-      font-size:15px;
+      font-size:14px;
       color:var(--text);
-      letter-spacing:0.5px;
-      font-weight:700;
+      letter-spacing:0.3px;
     }
     .pill{
       display:inline-flex;
       align-items:center;
       gap:8px;
-      padding:8px 14px;
+      padding:8px 12px;
       border-radius:999px;
-      background:var(--glass2);
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
-      border:1px solid var(--stroke2);
+      background:rgba(0,0,0,0.25);
+      border:1px solid var(--stroke);
       color:var(--muted);
       font-size:12px;
-      font-weight:600;
       user-select:none;
       white-space:nowrap;
-      box-shadow:0 2px 8px rgba(0,0,0,0.2);
     }
-    .pill b{color:#fff; font-weight:800;text-shadow:0 0 10px currentColor}
+    .pill b{color:#fff; font-weight:700;}
 
     .toggle-row{
       width:100%;
       display:flex;
       justify-content:space-between;
       align-items:center;
-      gap:14px;
-      padding:14px 16px;
-      border-radius:16px;
-      background:var(--glass2);
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
-      border:1px solid var(--stroke);
-      transition:all .3s ease;
-      margin-bottom:10px;
-    }
-    .toggle-row:hover{
-      background:var(--glass3);
-      border-color:var(--stroke2);
-      transform:translateX(4px);
-    }
-    .toggle-row span{font-size:14px;opacity:0.95;font-weight:500}
-    .small-note{font-size:12px;opacity:0.7;max-width:540px;line-height:1.5;margin-top:10px}
-
-    /* Input Fields */
-    input{
-      width:100%;
-      padding:16px 18px;
+      gap:12px;
+      padding:10px 12px;
       border-radius:14px;
-      border:2px solid var(--stroke);
-      background:var(--glass2);
-      backdrop-filter:blur(15px);
-      -webkit-backdrop-filter:blur(15px);
-      color:white;
-      font-size:16px;
-      font-weight:500;
-      outline:none;
-      box-sizing:border-box;
-      transition:all .3s cubic-bezier(0.4,0,0.2,1);
-      box-shadow:0 2px 8px rgba(0,0,0,0.2) inset;
+      background:rgba(0,0,0,0.22);
+      border:1px solid rgba(255,255,255,0.12);
     }
-    input:focus{
-      border-color:var(--accentA);
-      background:rgba(255,255,255,0.08);
-      box-shadow:0 0 0 3px rgba(0,217,255,0.15),0 2px 8px rgba(0,0,0,0.2) inset;
-      transform:translateY(-1px);
-    }
-    input:disabled{
-      opacity:0.5;
-      cursor:not-allowed;
-      background:rgba(0,0,0,0.3);
-      color:rgba(255,255,255,0.5);
-    }
-    input::placeholder{
-      color:var(--muted2);
-    }
+    .toggle-row span{font-size:14px;opacity:0.95}
+    .small-note{font-size:12px;opacity:0.75;max-width:520px;line-height:1.35}
 
     /* Leaderboards UI */
     .tabs{
       display:flex;
-      gap:10px;
+      gap:8px;
       justify-content:center;
       flex-wrap:wrap;
-      margin:14px 0 16px 0;
+      margin:10px 0 12px 0;
     }
     .tab{
-      padding:12px 18px;
-      border-radius:12px;
-      background:var(--glass2);
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
+      padding:10px 14px;
+      border-radius:999px;
+      background:rgba(0,0,0,0.28);
       border:1px solid var(--stroke);
       color:var(--muted);
-      font-size:13px;
+      font-size:12px;
       font-weight:700;
       cursor:pointer;
-      transition:all .3s cubic-bezier(0.4,0,0.2,1);
+      transition:transform .15s, border-color .2s, background .2s, color .2s;
       user-select:none;
-      position:relative;
     }
-    .tab:hover{ 
-      transform:translateY(-2px); 
-      border-color:var(--stroke3);
-      box-shadow:0 4px 16px rgba(0,217,255,0.2);
-    }
+    .tab:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,0.22); }
     .tab.active{
-      background:linear-gradient(135deg,rgba(0,217,255,0.15),rgba(123,47,255,0.15));
-      border:2px solid var(--stroke3);
+      background:linear-gradient(45deg,rgba(255,87,51,0.35),rgba(255,139,61,0.28));
+      border-color:rgba(255,140,80,0.55);
       color:#fff;
-      box-shadow:0 0 24px rgba(0,217,255,0.3),0 4px 12px rgba(0,0,0,0.3);
-      font-weight:800;
+      box-shadow:0 0 20px rgba(255,110,60,0.25);
     }
 
     .lbWrap{
       width:100%;
       max-height:52vh;
       overflow:auto;
-      border-radius:16px;
+      border-radius:14px;
       border:1px solid var(--stroke);
-      background:var(--glass2);
-      backdrop-filter:blur(15px);
-      -webkit-backdrop-filter:blur(15px);
-      box-shadow:0 4px 20px rgba(0,0,0,0.3) inset;
+      background:rgba(0,0,0,0.22);
     }
     .lbHeader, .lbRow{
       display:grid;
-      grid-template-columns: 80px 1fr 120px;
-      gap:12px;
+      grid-template-columns: 70px 1fr 110px;
+      gap:10px;
       align-items:center;
-      padding:14px 16px;
+      padding:12px 12px;
     }
     .lbHeader{
       position:sticky;
       top:0;
       z-index:2;
-      background:var(--glass3);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-bottom:1px solid var(--stroke2);
+      background:rgba(0,0,0,0.45);
+      border-bottom:1px solid rgba(255,255,255,0.10);
       font-size:12px;
       color:var(--muted);
-      letter-spacing:0.5px;
-      font-weight:700;
-      text-transform:uppercase;
+      letter-spacing:0.3px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
     .lbRow{
-      border-bottom:1px solid rgba(255,255,255,0.05);
+      border-bottom:1px solid rgba(255,255,255,0.08);
       font-size:14px;
       color:var(--text);
-      transition:all .2s ease;
-    }
-    .lbRow:hover{
-      background:var(--glass);
-      border-bottom-color:var(--stroke);
     }
     .lbRow:last-child{border-bottom:none;}
     .rank{
       font-weight:900;
       color:#fff;
       opacity:0.92;
-      font-size:16px;
     }
     .name{
       display:flex;
@@ -344,39 +195,31 @@
       overflow:hidden;
       text-overflow:ellipsis;
       white-space:nowrap;
-      font-weight:600;
     }
     .badge{
       font-size:11px;
-      padding:6px 12px;
+      padding:6px 10px;
       border-radius:999px;
-      background:var(--glass2);
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
-      border:1px solid var(--stroke);
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.10);
       color:var(--muted);
       white-space:nowrap;
-      font-weight:700;
     }
     .score{
       text-align:right;
       font-weight:900;
       color:#fff;
-      letter-spacing:0.5px;
-      font-size:15px;
-      text-shadow:0 0 10px currentColor;
+      letter-spacing:0.3px;
     }
     .me{
-      background:linear-gradient(90deg,rgba(0,217,255,0.15),rgba(0,0,0,0));
-      border-left:3px solid var(--accentA);
-      box-shadow:0 0 20px rgba(0,217,255,0.2);
+      background:linear-gradient(90deg,rgba(255,87,51,0.16),rgba(0,0,0,0));
+      border-left:3px solid rgba(255,87,51,0.65);
     }
     .hint{
       font-size:12px;
       color:var(--muted2);
-      line-height:1.5;
-      margin-top:12px;
-      text-align:center;
+      line-height:1.4;
+      margin-top:10px;
     }
 
     .lbWrap{ -webkit-overflow-scrolling: touch; }
@@ -1065,9 +908,6 @@
     /***********************
      * WORLD THEMES (menus)
      ***********************/
-    const worldIcons = ['🌆', '❄️', '🌌'];
-    const tierIcons = { bronze: '🥉', silver: '🥈', gold: '🥇' };
-    
     const worlds = [
       { name: "Neon Bliss", description: "Lively neon glow. Learn the flow." },
       { name: "Techno Abyss", description: "Icy pulses. Faster and denser." },
@@ -1143,13 +983,11 @@
         <div class="menu-screen" id="main-menu">
           <h1>GRIDRUN</h1>
           <p class="subhead">Fast. Skill-based. Survive the grid and climb the ranks.</p>
-          <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:380px;">
-            <button onclick="loadModeSelect()" style="font-size:18px;padding:20px 40px;">▶ PLAY</button>
-            <button onclick="loadAccount()">👤 ACCOUNT</button>
-            <button onclick="loadLeaderboards()">🏆 LEADERBOARDS</button>
-            <button onclick="loadHowTo()">❓ HOW TO PLAY</button>
-            <button onclick="loadSettings()">⚙️ SETTINGS</button>
-          </div>
+          <button onclick="loadModeSelect()">PLAY</button>
+          <button onclick="loadAccount()">ACCOUNT</button>
+          <button onclick="loadLeaderboards()">LEADERBOARDS</button>
+          <button onclick="loadHowTo()">HOW TO PLAY</button>
+          <button onclick="loadSettings()">SETTINGS</button>
         </div>
       `;
     }
@@ -1160,24 +998,15 @@
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Select Mode</h1>
-          <p class="subhead">Choose your challenge</p>
           <div class="panel">
             <div class="panelTitle">
-              <strong>Game Modes</strong>
+              <strong>Choose your run</strong>
               <span class="pill">Tip: <b>Campaign</b> unlocks Worlds</span>
             </div>
-            <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px">
-              <button onclick="loadCampaignMode()" style="padding:24px 32px;text-align:left">
-                <div style="font-size:18px;font-weight:800;margin-bottom:4px">🎯 Campaign</div>
-                <div style="font-size:13px;opacity:0.8;font-weight:500">Progress through worlds and levels</div>
-              </button>
-              <button onclick="loadEndlessIntro()" style="padding:24px 32px;text-align:left">
-                <div style="font-size:18px;font-weight:800;margin-bottom:4px">∞ Endless</div>
-                <div style="font-size:13px;opacity:0.8;font-weight:500">Survive as long as you can</div>
-              </button>
-            </div>
+            <button onclick="loadCampaignMode()">Campaign</button>
+            <button onclick="loadEndlessIntro()">Endless</button>
           </div>
-          <button onclick="loadMainMenu()" style="margin-top:20px">← Back</button>
+          <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
     }
@@ -1186,26 +1015,11 @@
       startMenuMusic();
       progress = await loadProgress();
       const container = document.getElementById("game-container");
-      const worldButtons = worlds.map((world, i) => {
-        const unlocked = progress.worldsUnlocked > i;
-        const icon = worldIcons[i];
-        return `
-          <button onclick="loadWorld(${i + 1})" ${unlocked ? '' : 'disabled'} 
-                  style="padding:20px 24px;text-align:left;${unlocked ? '' : 'opacity:0.4;'}">
-            <div style="display:flex;align-items:center;gap:12px">
-              <div style="font-size:28px">${icon}</div>
-              <div style="flex:1">
-                <div style="font-size:16px;font-weight:800;margin-bottom:2px">
-                  ${unlocked ? world.name : '🔒 Locked'}
-                </div>
-                <div style="font-size:12px;opacity:0.8;font-weight:500">
-                  ${unlocked ? world.description : 'Complete previous world to unlock'}
-                </div>
-              </div>
-            </div>
-          </button>
-        `;
-      }).join("");
+      const worldButtons = worlds.map((world, i) => `
+        <button onclick="loadWorld(${i + 1})" ${progress.worldsUnlocked > i ? '' : 'disabled'}>
+          ${progress.worldsUnlocked > i ? world.name : 'Locked'}
+        </button>
+      `).join("");
 
       container.innerHTML = `
         <div class="menu-screen">
@@ -1213,11 +1027,9 @@
           <p class="subhead">Survive each level to unlock the next. Your best scores build your Campaign Total.</p>
           <div class="panel">
             <div class="panelTitle"><strong>Select a World</strong><span class="pill">Unlocked: <b>${progress.worldsUnlocked}/3</b></span></div>
-            <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px">
-              ${worldButtons}
-            </div>
+            ${worldButtons}
           </div>
-          <button onclick="loadModeSelect()" style="margin-top:20px">← Back</button>
+          <button onclick="loadModeSelect()">Back</button>
         </div>
       `;
     }
@@ -1228,47 +1040,27 @@
       const container = document.getElementById("game-container");
       const worldIdx = worldNumber - 1;
       const levelsUnlocked = progress.levelsUnlocked[worldIdx] || 0;
-      const worldIcon = worldIcons[worldIdx];
 
       const levelButtons = Array.from({ length: 5 }, (_, i) => {
         const unlocked = i < levelsUnlocked;
         const best = progress.bestScores[worldIdx]?.[i] || 0;
         const ld = levelData(worldIdx, i);
-        let tierBadge = '';
-        if (unlocked && best > 0) {
-          if (best >= ld.scores.gold) tierBadge = tierIcons.gold;
-          else if (best >= ld.scores.silver) tierBadge = tierIcons.silver;
-          else if (best >= ld.scores.bronze) tierBadge = tierIcons.bronze;
-        }
         return `
-          <button onclick="loadLevelIntro(${worldNumber}, ${i + 1})" ${unlocked ? '' : 'disabled'}
-                  style="padding:16px 20px;text-align:left;${unlocked ? '' : 'opacity:0.4;'}">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <div>
-                <div style="font-size:15px;font-weight:800;margin-bottom:3px">
-                  ${unlocked ? `Level ${i + 1} ${tierBadge}` : '🔒 Locked'}
-                </div>
-                <div style="font-size:12px;opacity:0.8;font-weight:500">
-                  ${unlocked ? `${ld.time}s • Best: ${best}` : 'Complete previous level'}
-                </div>
-              </div>
-              ${unlocked ? '<div style="font-size:20px;opacity:0.6">▶</div>' : ''}
-            </div>
+          <button onclick="loadLevelIntro(${worldNumber}, ${i + 1})" ${unlocked ? '' : 'disabled'}>
+            ${unlocked ? `Level ${i + 1} • ${ld.time}s • Best: ${best}` : 'Locked'}
           </button>
         `;
       }).join("");
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>${worldIcon} ${worlds[worldIdx].name}</h1>
+          <h1>${worlds[worldIdx].name}</h1>
           <p class="subhead">${worlds[worldIdx].description}</p>
           <div class="panel">
             <div class="panelTitle"><strong>Levels</strong><span class="pill">Unlocked: <b>${levelsUnlocked}/5</b></span></div>
-            <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px">
-              ${levelButtons}
-            </div>
+            ${levelButtons}
           </div>
-          <button onclick="loadCampaignMode()" style="margin-top:20px">← Back</button>
+          <button onclick="loadCampaignMode()">Back</button>
         </div>
       `;
     }
@@ -1281,54 +1073,30 @@
       const l = levelNumber - 1;
       const ld = levelData(w, l);
       const best = progress.bestScores[w]?.[l] || 0;
-      const worldIcon = worldIcons[w];
-
-      let tierStatus = '';
-      if (best > 0) {
-        if (best >= ld.scores.gold) tierStatus = '<div style="color:#ffd700;font-weight:800">🥇 GOLD TIER</div>';
-        else if (best >= ld.scores.silver) tierStatus = '<div style="color:#c0c0c0;font-weight:800">🥈 SILVER TIER</div>';
-        else if (best >= ld.scores.bronze) tierStatus = '<div style="color:#cd7f32;font-weight:800">🥉 BRONZE TIER</div>';
-        else tierStatus = '<div style="color:var(--muted);font-weight:600">No tier yet</div>';
-      }
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>${worldIcon} Level ${levelNumber}</h1>
+          <h1>Level ${levelNumber}</h1>
           <p class="subhead">${worlds[w].name}</p>
 
           <div class="panel">
-            <div class="panelTitle"><strong>⏱️ Objective</strong><span class="pill">Survive: <b>${ld.time}s</b></span></div>
-            <p style="margin:8px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85);line-height:1.5">
-              Stay alive until the timer hits zero. Score points through survival, streaks, near misses, and dodges.
+            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive: <b>${ld.time}s</b></span></div>
+            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85);">
+              Stay alive until the timer hits zero. More points = better tier.
             </p>
-            <div style="height:16px"></div>
-            
-            <div class="panelTitle"><strong>📊 Your Best Score</strong><span class="pill"><b>${best}</b></span></div>
-            ${tierStatus ? `<div style="margin-top:6px;text-align:center">${tierStatus}</div>` : ''}
-            
-            <div style="height:16px"></div>
-            <div class="panelTitle"><strong>🎯 Performance Tiers</strong><span class="pill">Score Targets</span></div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px">
-              <div style="text-align:center;padding:12px;background:var(--glass);border-radius:12px;border:1px solid var(--stroke)">
-                <div style="font-size:24px;margin-bottom:4px">🥉</div>
-                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">BRONZE</div>
-                <div style="font-size:16px;font-weight:800">${ld.scores.bronze}</div>
-              </div>
-              <div style="text-align:center;padding:12px;background:var(--glass);border-radius:12px;border:1px solid var(--stroke)">
-                <div style="font-size:24px;margin-bottom:4px">🥈</div>
-                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">SILVER</div>
-                <div style="font-size:16px;font-weight:800">${ld.scores.silver}</div>
-              </div>
-              <div style="text-align:center;padding:12px;background:var(--glass);border-radius:12px;border:1px solid var(--stroke)">
-                <div style="font-size:24px;margin-bottom:4px">🥇</div>
-                <div style="font-size:11px;color:var(--muted);margin-bottom:4px">GOLD</div>
-                <div style="font-size:16px;font-weight:800">${ld.scores.gold}</div>
-              </div>
+            <div style="height:10px"></div>
+            <div class="panelTitle"><strong>Your Best</strong><span class="pill"><b>${best}</b></span></div>
+            <div style="height:10px"></div>
+            <div class="panelTitle"><strong>Performance Tiers</strong><span class="pill">Targets</span></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
+              <span class="pill">Bronze <b>${ld.scores.bronze}</b></span>
+              <span class="pill">Silver <b>${ld.scores.silver}</b></span>
+              <span class="pill">Gold <b>${ld.scores.gold}</b></span>
             </div>
           </div>
 
-          <button onclick="playLevel(${worldNumber}, ${levelNumber})" style="font-size:17px;padding:18px 40px;margin-top:20px">▶ START LEVEL</button>
-          <button onclick="loadWorld(${worldNumber})">← Back to ${worlds[w].name}</button>
+          <button onclick="playLevel(${worldNumber}, ${levelNumber})">Start</button>
+          <button onclick="loadWorld(${worldNumber})">Back</button>
         </div>
       `;
     }
@@ -1339,24 +1107,13 @@
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>∞ Endless Mode</h1>
+          <h1>Endless</h1>
           <p class="subhead">Difficulty ramps from <b>W1L1</b> → <b>W3L5</b> over ~120s, then plateaus.</p>
           <div class="panel">
-            <div style="text-align:center;padding:20px 0">
-              <div style="font-size:14px;color:var(--muted);margin-bottom:8px;font-weight:600">YOUR BEST SCORE</div>
-              <div style="font-size:48px;font-weight:900;background:linear-gradient(135deg,var(--accentA),var(--accentB));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 40px var(--accentA)">${progress.endlessBest}</div>
-            </div>
-            <div style="height:12px"></div>
-            <div class="panelTitle"><strong>⚡ Challenge Info</strong><span class="pill">Survival</span></div>
-            <p style="margin:8px 0 0 0; font-size:13px; color:rgba(255,255,255,0.80);line-height:1.5">
-              • Difficulty increases continuously<br>
-              • No time limit - survive as long as possible<br>
-              • All worlds' hazards appear as you progress<br>
-              • Score points through survival skills
-            </p>
-            <button onclick="startGameplay({ mode:'endless' })" style="font-size:17px;padding:18px 40px;margin-top:20px;width:100%">▶ START ENDLESS</button>
+            <div class="panelTitle"><strong>Local Best</strong><span class="pill"><b>${progress.endlessBest}</b></span></div>
+            <button onclick="startGameplay({ mode:'endless' })">Start Endless</button>
           </div>
-          <button onclick="loadModeSelect()" style="margin-top:20px">← Back</button>
+          <button onclick="loadModeSelect()">Back</button>
         </div>
       `;
     }
@@ -1408,38 +1165,37 @@
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>❓ How To Play</h1>
-          <p class="subhead">Master the grid. Learn the mechanics. Climb the ranks.</p>
+          <h1>How To Play</h1>
+          <p class="subhead">Everything you need — objective, scoring, worlds, and endless.</p>
 
           <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>🎯 Objective</strong><span class="pill">Survive</span></div>
-            <p style="margin:8px 0 16px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.6">
-              Stay alive inside the grid. In <b>Campaign</b>, survive the full timer for each level to clear it and unlock progression.
-              In <b>Endless</b>, survive as long as you can while difficulty ramps continuously.
+            <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive</span></div>
+            <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              Stay alive inside the grid. In <b>Campaign</b>, you must survive the full timer for each level to clear it and unlock progression.
+              In <b>Endless</b>, survive as long as you can while difficulty ramps up.
             </p>
 
-            <div class="panelTitle"><strong>🎮 Controls</strong><span class="pill">Touch or WASD</span></div>
-            <p style="margin:8px 0 16px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.6">
-              <b>📱 Mobile:</b> Touch where you want to move — your runner follows smoothly.<br>
-              <b>⌨️ Desktop:</b> WASD or Arrow Keys for precise control.
+            <div class="panelTitle"><strong>Controls</strong><span class="pill">Touch or WASD</span></div>
+            <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              <b>Mobile:</b> touch where you want to move — your runner follows.
+              <br><b>Desktop:</b> WASD / Arrow keys.
             </p>
 
-            <div class="panelTitle"><strong>💯 Scoring System</strong><span class="pill">Skill-based</span></div>
-            <div style="background:var(--glass);border-radius:12px;padding:14px;margin-top:10px;border:1px solid var(--stroke)">
-              <div style="display:grid;gap:10px;font-size:13px;line-height:1.6">
-                <div><b style="color:var(--accentA)">⏱️ Survival:</b> +6 pts/sec alive</div>
-                <div><b style="color:var(--accentA)">💥 Near Miss:</b> +22 pts (with combo multiplier)</div>
-                <div><b style="color:var(--accentA)">🎯 Dodge:</b> +10 pts per skillful evasion</div>
-                <div><b style="color:var(--accentA)">🔥 Streak:</b> +40 pts every 15 seconds</div>
-              </div>
-            </div>
+            <div class="panelTitle"><strong>Scoring</strong><span class="pill">Skill-based</span></div>
+            <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
+              Score comes from in-game actions while the timer is active:<br>
+              • <b>Survival:</b> +6 points per second alive<br>
+              • <b>Near Miss:</b> +22 points (close dodges with combo multiplier)<br>
+              • <b>Dodge:</b> +10 points (skillful evasion)<br>
+              • <b>Streak:</b> +40 points every 15 seconds alive
+            </p>
 
-            <p class="hint" style="margin-top:16px;text-align:center">
-              <b>💡 Tip:</b> Your <b>Leaderboard</b> scores update automatically when you improve a personal best!
+            <p class="hint">
+              Your <b>Leaderboards</b> scores update automatically when you improve a best score (Campaign or Endless).
             </p>
           </div>
 
-          <button onclick="loadMainMenu()" style="margin-top:20px">← Back to Menu</button>
+          <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
     }
@@ -1464,21 +1220,13 @@
 
           <div class="panel">
             <div class="panelTitle">
-              <strong>🔐 Account Access</strong>
-              <span class="pill">☁️ Cloud Sync</span>
+              <strong>Account Access</strong>
+              <span class="pill">Cloud Sync</span>
             </div>
-            <div style="margin-top:16px;text-align:center;padding:20px 0">
-              <div style="font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.6">
-                Sign in or create an account to sync your progress across devices and compete on global leaderboards.
-              </div>
-              <div style="display:grid;grid-template-columns:1fr;gap:12px;max-width:320px;margin:0 auto">
-                <button onclick="loadLogin()" style="font-size:16px;padding:18px 32px">🔑 LOGIN</button>
-                <button onclick="loadCreateAccount()" style="font-size:16px;padding:18px 32px">✨ CREATE ACCOUNT</button>
-              </div>
-            </div>
-            <p class="hint">
-              🌐 Your progress and scores are securely stored via Supabase.
-            </p>
+
+            <button onclick="loadLogin()">LOGIN</button>
+            <button onclick="loadCreateAccount()">CREATE ACCOUNT</button>
+            <p class="hint">Cloud sync enabled via Supabase.</p>
           </div>
         </div>
       `;
@@ -1489,27 +1237,27 @@
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>🔑 Login</h1>
-          <p class="subhead">Enter your credentials to access GRIDRUN</p>
+          <h1>Login</h1>
+          <p class="subhead">Enter your email + password to enter GRIDRUN.</p>
 
           <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>📧 Email</strong><span class="pill">required</span></div>
-            <input id="loginEmail" placeholder="you@email.com" autocomplete="email" />
+            <div class="panelTitle"><strong>Email</strong><span class="pill">required</span></div>
+            <input id="loginEmail" placeholder="you@email.com" autocomplete="email"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
 
-            <div style="height:14px"></div>
+            <div style="height:10px"></div>
 
-            <div class="panelTitle"><strong>🔒 Password</strong><span class="pill">required</span></div>
-            <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password" />
+            <div class="panelTitle"><strong>Password</strong><span class="pill">required</span></div>
+            <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
 
-            <div style="margin-top:20px;text-align:center">
-              <button onclick="doLoginEmailPass()" style="font-size:16px;padding:16px 40px;width:100%">🚀 Login</button>
-            </div>
-            <p class="hint">
-              🔐 Your credentials are securely managed via Supabase.
-            </p>
+            <p class="hint">Local-only login for now. Global comes later.</p>
+            <button onclick="doLoginEmailPass()">Confirm</button>
           </div>
 
-          <button onclick="loadAuthGate()" style="margin-top:20px">← Back</button>
+          <button onclick="loadAuthGate()">Back</button>
         </div>
       `;
     }
@@ -1534,37 +1282,41 @@
       const container = document.getElementById("game-container");
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>✨ Create Account</h1>
-          <p class="subhead">Join GRIDRUN and compete globally</p>
+          <h1>Create Account</h1>
+          <p class="subhead">Each email can only create one account.</p>
 
           <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>📧 Email</strong><span class="pill">unique</span></div>
-            <input id="signupEmail" placeholder="you@email.com" autocomplete="email" />
+            <div class="panelTitle"><strong>Email</strong><span class="pill">unique</span></div>
+            <input id="signupEmail" placeholder="you@email.com" autocomplete="email"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
 
-            <div style="height:12px"></div>
+            <div style="height:10px"></div>
 
-            <div class="panelTitle"><strong>👤 Username</strong><span class="pill">1–18 chars</span></div>
-            <input id="signupUser" placeholder="Choose a username..." autocomplete="nickname" />
+            <div class="panelTitle"><strong>Username</strong><span class="pill">1–18 chars</span></div>
+            <input id="signupUser" placeholder="Enter username..." autocomplete="nickname"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
 
-            <div style="height:12px"></div>
+            <div style="height:10px"></div>
 
-            <div class="panelTitle"><strong>🔒 Password</strong><span class="pill">min 6</span></div>
-            <input id="signupPass" type="password" placeholder="Create password..." autocomplete="new-password" />
+            <div class="panelTitle"><strong>Password</strong><span class="pill">min 6</span></div>
+            <input id="signupPass" type="password" placeholder="Create password..." autocomplete="new-password"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
 
-            <div style="height:12px"></div>
+            <div style="height:10px"></div>
 
-            <div class="panelTitle"><strong>✓ Confirm Password</strong><span class="pill">match</span></div>
-            <input id="signupPass2" type="password" placeholder="Confirm password..." autocomplete="new-password" />
+            <div class="panelTitle"><strong>Confirm Password</strong><span class="pill">match</span></div>
+            <input id="signupPass2" type="password" placeholder="Confirm password..." autocomplete="new-password"
+              style="width:100%;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.16);
+              background:rgba(0,0,0,0.25);color:white;font-size:16px;outline:none;box-sizing:border-box;" />
 
-            <div style="margin-top:20px;text-align:center">
-              <button onclick="doCreateAccount()" style="font-size:16px;padding:16px 40px;width:100%">✨ Create Account</button>
-            </div>
-            <p class="hint">
-              🌐 Your account will be synced globally via Supabase. Username cannot be changed later.
-            </p>
+            <p class="hint">Local-only for now (same device/browser). Global comes later.</p>
+            <button onclick="doCreateAccount()">Create</button>
           </div>
 
-          <button onclick="loadAuthGate()" style="margin-top:20px">← Back</button>
+          <button onclick="loadAuthGate()">Back</button>
         </div>
       `;
     }
@@ -1600,35 +1352,29 @@
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>👤 Account</h1>
-          <p class="subhead">Logged in as <b>${a.username}</b><br><span style="font-size:12px;color:var(--muted2)">${a.email}</span></p>
+          <h1>Account</h1>
+          <p class="subhead">Logged in as <b>${a.username}</b><br><span style="font-size:12px;color:rgba(255,255,255,0.70)">${a.email}</span></p>
 
           <div class="panel" style="text-align:left;">
-            <div class="panelTitle"><strong>📊 Your Stats</strong><span class="pill">☁️ Cloud Synced</span></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
-              <div style="text-align:center;padding:20px;background:var(--glass);border-radius:14px;border:1px solid var(--stroke)">
-                <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600">∞ ENDLESS BEST</div>
-                <div style="font-size:32px;font-weight:900;background:linear-gradient(135deg,var(--accentA),var(--accentB));-webkit-background-clip:text;-webkit-text-fill-color:transparent">${progress.endlessBest}</div>
-              </div>
-              <div style="text-align:center;padding:20px;background:var(--glass);border-radius:14px;border:1px solid var(--stroke)">
-                <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600">🎯 CAMPAIGN TOTAL</div>
-                <div style="font-size:32px;font-weight:900;background:linear-gradient(135deg,var(--accentA),var(--accentB));-webkit-background-clip:text;-webkit-text-fill-color:transparent">${totals.campaignTotal}</div>
-              </div>
+            <div class="panelTitle"><strong>Your Stats</strong><span class="pill">Supabase</span></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
+              <span class="pill">Endless Best <b>${progress.endlessBest}</b></span>
+              <span class="pill">Campaign Total <b>${totals.campaignTotal}</b></span>
             </div>
 
-            <div style="height:20px"></div>
-            <div class="panelTitle"><strong>🔐 Username</strong><span class="pill" title="Username cannot be changed once set">🔒 locked</span></div>
-            <input id="usernameEdit" value="${a.username}" autocomplete="nickname" disabled aria-label="Username (cannot be changed)" />
+            <div style="height:12px"></div>
+            <div class="panelTitle"><strong>Username</strong><span class="pill" title="Username cannot be changed once set">locked</span></div>
+            <input id="usernameEdit" value="${a.username}" autocomplete="nickname" disabled aria-label="Username (cannot be changed)"
+              style="width:100%;padding:14px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);
+              background:rgba(0,0,0,0.35);color:rgba(255,255,255,0.60);font-size:16px;outline:none;box-sizing:border-box;cursor:not-allowed;" />
 
-            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px">
-              <button onclick="logout()" style="background:linear-gradient(135deg,rgba(255,0,110,0.3),rgba(255,0,110,0.1));border-color:rgba(255,0,110,0.5)">🚪 Logout</button>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+              <button onclick="logout()">Logout</button>
             </div>
-            <p class="hint">
-              🔒 Username cannot be changed once set. Your data is synced globally via Supabase.
-            </p>
+            <p class="hint">Username cannot be changed once set. Your data is synced globally via Supabase.</p>
           </div>
 
-          <button onclick="loadMainMenu()" style="margin-top:20px">← Back to Menu</button>
+          <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
     }
@@ -1734,13 +1480,13 @@
 
       container.innerHTML = `
         <div class="menu-screen">
-          <h1>🏆 Leaderboards</h1>
-          <p class="subhead">${a ? `Logged in as <b>${a.username}</b>. 🔴 Live updates when anyone beats a PB.` : `View global rankings. Login to compete!`}</p>
+          <h1>Leaderboards</h1>
+          <p class="subhead">${a ? `Logged in as <b>${a.username}</b>. Scores update in real-time when anyone beats a personal best.` : `View rankings. Login to post scores.`}</p>
 
           <div class="panel">
             <div class="panelTitle">
-              <strong>📊 Global Rankings</strong>
-              <span class="pill">Top <b>25</b> • 🔴 LIVE</span>
+              <strong>Rankings</strong>
+              <span class="pill">Top <b>25</b> (global • live)</span>
             </div>
 
             <div class="tabs" id="lbTabs">
@@ -1751,19 +1497,19 @@
               ${initialContent}
             </div>
 
-            <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
-              <button id="lbRefreshBtn" onclick="refreshLeaderboardManually()" style="padding:12px 24px;font-size:14px">
-                <span id="lbRefreshText">🔄 Refresh Data</span>
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:12px">
+              <button id="lbRefreshBtn" onclick="refreshLeaderboardManually()" style="padding:10px 20px;font-size:14px">
+                <span id="lbRefreshText">Refresh</span>
               </button>
             </div>
 
             <p class="hint">
-              🌐 Global leaderboards with real-time updates via Supabase.<br>
-              Click <b>Refresh</b> if scores appear outdated.
+              Global leaderboards with real-time updates via Supabase. 🔴 LIVE<br>
+              Click <b>Refresh</b> if scores appear outdated after a database reset.
             </p>
           </div>
 
-          <button onclick="leaveLeaderboards()" style="margin-top:20px">← Back to Menu</button>
+          <button onclick="leaveLeaderboards()">Back</button>
         </div>
       `;
     }
@@ -2375,43 +2121,14 @@
         togglePause(on){
           this.paused=on;
           if (on){
-            // Dark overlay with blur effect
-            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.70).setDepth(140).setInteractive();
-            
-            // Panel background
-            const panelBg = this.add.graphics().setDepth(141);
-            panelBg.fillStyle(0x000000, 0.5);
-            panelBg.fillRoundedRect(W/2-160, H*0.35, 320, 200, 20);
-            panelBg.lineStyle(3, this.wcfg.border, 0.7);
-            panelBg.strokeRoundedRect(W/2-160, H*0.35, 320, 200, 20);
-            
-            // Pause icon and text
-            const t = this.add.text(W/2,H*0.42,"⏸️ PAUSED",{
-              fontFamily:uiFont,fontSize:"32px",color:"#ffffff",fontStyle:"bold"
-            }).setOrigin(0.5).setDepth(142).setShadow(0,2,'rgba(0,0,0,0.5)',6);
-            
-            const s = this.add.text(W/2,H*0.50,"Tap anywhere to resume",{
-              fontFamily:uiFont,fontSize:"15px",color:"#b7b7ff"
-            }).setOrigin(0.5).setDepth(142).setAlpha(0.9);
-            
-            // Add animated pulse effect
-            this.tweens.add({
-              targets: t,
-              scale: { from: 1, to: 1.05 },
-              alpha: { from: 1, to: 0.9 },
-              duration: 1000,
-              yoyo: true,
-              repeat: -1,
-              ease: 'Sine.easeInOut'
-            });
-            
+            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.55).setDepth(140).setInteractive();
+            const t = this.add.text(W/2,H*0.44,"PAUSED",{fontFamily:uiFont,fontSize:"28px",color:"#ffffff"}).setOrigin(0.5).setDepth(141);
+            const s = this.add.text(W/2,H*0.52,"Tap anywhere to resume",{fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff"})
+              .setOrigin(0.5).setDepth(141).setAlpha(0.9);
             this.pauseOverlay.on("pointerdown", ()=>this.togglePause(false));
-            this._pauseText=t; this._pauseSub=s; this._pausePanel=panelBg;
+            this._pauseText=t; this._pauseSub=s;
           } else {
-            this.pauseOverlay?.destroy(); 
-            this._pauseText?.destroy(); 
-            this._pauseSub?.destroy();
-            this._pausePanel?.destroy();
+            this.pauseOverlay?.destroy(); this._pauseText?.destroy(); this._pauseSub?.destroy();
             this.pauseOverlay=null;
           }
         }
@@ -2891,74 +2608,40 @@
 
           this.cameras.main.setBackgroundColor(bg);
 
-          // Add background effect
-          const stars = [];
-          for (let i=0;i<40;i++){
-            const s = this.add.circle(
-              Phaser.Math.Between(0,W), 
-              Phaser.Math.Between(0,H), 
-              Phaser.Math.Between(1,2), 
-              glow
-            ).setAlpha(Phaser.Math.FloatBetween(0.1, 0.3));
-            stars.push(s);
-          }
-
-          // Header with gradient
-          const headerBg = this.add.graphics();
-          headerBg.fillStyle(0x000000, 0.4);
-          headerBg.fillRoundedRect(W/2-180, H*0.14, 360, 100, 20);
-          headerBg.lineStyle(2, glow, 0.6);
-          headerBg.strokeRoundedRect(W/2-180, H*0.14, 360, 100, 20);
-
-          const cleared = (mode==="campaign" && reason==="CLEAR");
-          const failed = (mode==="campaign" && reason!=="CLEAR");
-
-          this.add.text(W/2,H*0.17, mode==="endless"?"∞ ENDLESS RESULT":cleared?"✓ LEVEL CLEARED":failed?"✗ LEVEL FAILED":"LEVEL RESULT",{
-            fontFamily:uiFont,fontSize:"28px",color:"#ffffff",fontStyle:"bold"
-          }).setOrigin(0.5).setShadow(0,2,'rgba(0,0,0,0.5)',4);
+          this.add.text(W/2,H*0.18, mode==="endless"?"ENDLESS RESULT":"LEVEL RESULT",{
+            fontFamily:uiFont,fontSize:"30px",color:"#ffffff"
+          }).setOrigin(0.5);
 
           let subtitle = "";
           if (mode==="campaign"){
-            const worldIcon = worldIcons[data.world];
-            subtitle = `${worldIcon} ${WORLDS[data.world].name} • Level ${data.level+1}`;
+            subtitle = `${WORLDS[data.world].name} • Level ${data.level+1} • ${reason==="CLEAR"?"CLEARED":"FAILED"}`;
           } else {
-            subtitle = `Ended: ${reason}`;
+            subtitle = `Reason: ${reason}`;
           }
 
-          this.add.text(W/2,H*0.22,subtitle,{
-            fontFamily:uiFont,fontSize:"13px",color:"#b7b7ff",align:"center"
-          }).setOrigin(0.5).setAlpha(0.90);
+          this.add.text(W/2,H*0.24,subtitle,{
+            fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff",align:"center"
+          }).setOrigin(0.5).setAlpha(0.95);
 
-          // Score panel
-          const scoreBg = this.add.graphics();
-          scoreBg.fillStyle(0x000000, 0.35);
-          scoreBg.fillRoundedRect(W/2-160, H*0.30, 320, 100, 18);
-          scoreBg.lineStyle(3, accent, 0.7);
-          scoreBg.strokeRoundedRect(W/2-160, H*0.30, 320, 100, 18);
+          this.add.text(W/2,H*0.38,`Score: ${score}`,{
+            fontFamily:uiFont,fontSize:"26px",color:"#ffffff"
+          }).setOrigin(0.5).setAlpha(0.98);
 
-          this.add.text(W/2,H*0.34,"FINAL SCORE",{
-            fontFamily:uiFont,fontSize:"13px",color:"rgba(255,255,255,0.70)",letterSpacing:1
-          }).setOrigin(0.5);
-
-          this.add.text(W/2,H*0.39,`${score}`,{
-            fontFamily:uiFont,fontSize:"42px",color:"#ffffff",fontStyle:"bold"
-          }).setOrigin(0.5).setShadow(0,0,'rgba(0,217,255,0.8)',10);
+          const cleared = (mode==="campaign" && reason==="CLEAR");
 
           if (mode==="campaign"){
             const tiers = window.GRIDRUN.getTierTargets(data.world, data.level);
             let tier = "—";
-            let tierEmoji = "";
-            let tierColor = "#888888";
-            if (score >= tiers.gold) { tier = "GOLD"; tierEmoji = "🥇"; tierColor = "#ffd700"; }
-            else if (score >= tiers.silver) { tier = "SILVER"; tierEmoji = "🥈"; tierColor = "#c0c0c0"; }
-            else if (score >= tiers.bronze) { tier = "BRONZE"; tierEmoji = "🥉"; tierColor = "#cd7f32"; }
+            if (score >= tiers.gold) tier = "GOLD";
+            else if (score >= tiers.silver) tier = "SILVER";
+            else if (score >= tiers.bronze) tier = "BRONZE";
 
-            this.add.text(W/2,H*0.48,`${tierEmoji} ${tier}`,{
-              fontFamily:uiFont,fontSize:"18px",color:tierColor,fontStyle:"bold"
-            }).setOrigin(0.5).setShadow(0,0,tierColor,8);
+            this.add.text(W/2,H*0.46,`Tier: ${tier}`,{
+              fontFamily:uiFont,fontSize:"16px",color:"#ffffff"
+            }).setOrigin(0.5).setAlpha(0.95);
 
-            this.add.text(W/2,H*0.54,`🥉 ${tiers.bronze}  •  🥈 ${tiers.silver}  •  🥇 ${tiers.gold}`,{
-              fontFamily:uiFont,fontSize:"11px",color:"rgba(255,255,255,0.70)",align:"center"
+            this.add.text(W/2,H*0.52,`Bronze ${tiers.bronze}  •  Silver ${tiers.silver}  •  Gold ${tiers.gold}`,{
+              fontFamily:uiFont,fontSize:"12px",color:"rgba(255,255,255,0.80)",align:"center"
             }).setOrigin(0.5);
           }
 
@@ -2972,20 +2655,20 @@
           const y0 = H*0.62;
 
           if (mode==="campaign"){
-            makePillButton(this, "🔄 RETRY", y0, () => this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}), accent, glow);
+            makePillButton(this, "RETRY", y0, () => this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}), accent, glow);
 
             const nxt = cleared ? nextFor(data.world, data.level) : null;
             if (nxt){
-              makePillButton(this, "▶ NEXT LEVEL", y0 + 62, () => this.scene.start("Play",{mode:"campaign",world:nxt.world,level:nxt.level}), theme.glowA, glow);
-              makePillButton(this, "← BACK TO LEVELS", y0 + 124, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
-              makePillButton(this, "🏠 MAIN MENU", y0 + 186, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+              makePillButton(this, "NEXT LEVEL", y0 + 62, () => this.scene.start("Play",{mode:"campaign",world:nxt.world,level:nxt.level}), theme.glowA, glow);
+              makePillButton(this, "BACK TO LEVELS", y0 + 124, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
+              makePillButton(this, "MAIN MENU", y0 + 186, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
             } else {
-              makePillButton(this, "← BACK TO LEVELS", y0 + 62, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
-              makePillButton(this, "🏠 MAIN MENU", y0 + 124, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+              makePillButton(this, "BACK TO LEVELS", y0 + 62, () => window.GRIDRUN.backToLevelSelect(data.world), 0x3a3a50, glow);
+              makePillButton(this, "MAIN MENU", y0 + 124, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
             }
           } else {
-            makePillButton(this, "🔄 RETRY ENDLESS", y0, () => this.scene.start("Play",{mode:"endless"}), accent, glow);
-            makePillButton(this, "🏠 MAIN MENU", y0 + 72, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
+            makePillButton(this, "RETRY ENDLESS", y0, () => this.scene.start("Play",{mode:"endless"}), accent, glow);
+            makePillButton(this, "MAIN MENU", y0 + 72, () => window.GRIDRUN.backToMainMenu(), 0x2b2b3e, glow);
           }
         }
       }

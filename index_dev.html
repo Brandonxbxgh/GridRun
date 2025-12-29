@@ -2387,7 +2387,7 @@
             // Pause icon and text
             const t = this.add.text(W/2,H*0.42,"⏸️ PAUSED",{
               fontFamily:uiFont,fontSize:"32px",color:"#ffffff",fontStyle:"bold"
-            }).setOrigin(0.5).setDepth(142).setShadow(0,2,rgba(0,0,0,0.5),6);
+            }).setOrigin(0.5).setDepth(142).setShadow(0,2,'rgba(0,0,0,0.5)',6);
             
             const s = this.add.text(W/2,H*0.50,"Tap anywhere to resume",{
               fontFamily:uiFont,fontSize:"15px",color:"#b7b7ff"
@@ -2941,7 +2941,7 @@
 
           this.add.text(W/2,H*0.39,`${score}`,{
             fontFamily:uiFont,fontSize:"42px",color:"#ffffff",fontStyle:"bold"
-          }).setOrigin(0.5).setShadow(0,0,rgba(accent,0.8),10);
+          }).setOrigin(0.5).setShadow(0,0,'rgba(0,217,255,0.8)',10);
 
           if (mode==="campaign"){
             const tiers = window.GRIDRUN.getTierTargets(data.world, data.level);

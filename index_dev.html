@@ -813,16 +813,17 @@
       [60, 80, 95, 105, 115],  // World 3
     ];
 
+    // TIER MODEL: Updated for new scoring system
     const TIER_MODEL = {
-      pps: 7,
-      streakEvery: 12,
-      streakBonus: 55,
+      pps: 6,                        // Survival: 6 points per second
+      streakEvery: 15,               // Streak: every 15 seconds
+      streakBonus: 40,               // Streak: 40 points per streak
       expectedNearPer10s: [0.45, 0.70, 0.90],
-      expectedNearPoints: 18,
+      expectedNearPoints: 22,        // Near Miss: 22 points
       expectedAvgCombo: [1.18, 1.30, 1.45],
       expectedDodgePer10s: [1.10, 1.35, 1.60],
-      expectedDodgePoints: 9,
-      clearBonusBase: 220
+      expectedDodgePoints: 10,       // Dodge: 10 points
+      clearBonusBase: 0              // Removed: No level clear bonus
     };
 
     function computeTierTargets(worldIdx, levelIdx){
@@ -837,12 +838,13 @@
       const expectedDodge = Math.floor((t/10) * TIER_MODEL.expectedDodgePer10s[worldIdx]);
       const dodgeScore = expectedDodge * TIER_MODEL.expectedDodgePoints;
 
-      const clearBonus = TIER_MODEL.clearBonusBase + worldIdx*60 + levelIdx*35;
+      const clearBonus = TIER_MODEL.clearBonusBase;  // Now 0 - no level clear bonus
       const expected = survival + streakScore + dodgeScore + nearScore + clearBonus;
 
-      const bronze = Math.floor(expected * (0.78 + 0.015*levelIdx));
-      const silver = Math.floor(expected * (0.98 + 0.02*levelIdx));
-      const gold   = Math.floor(expected * (1.18 + 0.03*levelIdx));
+      // Rebalanced tier targets: Bronze 70%, Silver 90%, Gold 110%+
+      const bronze = Math.floor(expected * 0.70);
+      const silver = Math.floor(expected * 0.90);
+      const gold   = Math.floor(expected * 1.10);
       return { time: t, scores: { bronze, silver, gold } };
     }
     function levelData(worldIdx, levelIdx){ return computeTierTargets(worldIdx, levelIdx); }
@@ -1069,10 +1071,13 @@
               <br><b>Desktop:</b> WASD / Arrow keys.
             </p>
 
-            <div class="panelTitle"><strong>Scoring</strong><span class="pill">Climb ranks</span></div>
+            <div class="panelTitle"><strong>Scoring</strong><span class="pill">Skill-based</span></div>
             <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              You gain points over time for staying alive, plus bonuses for clean survival and skillful dodges.
-              Clearing a level adds a <b>Clear Bonus</b>.
+              Score comes from in-game actions while the timer is active:<br>
+              • <b>Survival:</b> +6 points per second alive<br>
+              • <b>Near Miss:</b> +22 points (close dodges with combo multiplier)<br>
+              • <b>Dodge:</b> +10 points (skillful evasion)<br>
+              • <b>Streak:</b> +40 points every 15 seconds alive
             </p>
 
             <p class="hint">
@@ -1664,19 +1669,20 @@
       const shapeToTex = { rect:"obs_rect", frame:"obs_frame", tri:"obs_tri", hex:"obs_hex", bar:"obs_bar", plus:"obs_plus" };
 
       // SCORING
-      const SCORE_PPS = 7;
+      // Core rule: Score only from in-game actions while timer is active
+      const SCORE_PPS = 6;           // Survival: +6 points per second alive
       const NEAR_DIST = 36;
-      const NEAR_POINTS = 18;
+      const NEAR_POINTS = 22;        // Near Miss: +22 points per near miss
       const COMBO_DECAY_SEC = 1.30;
       const COMBO_STEP = 0.11;
       const COMBO_MAX = 3.10;
 
       const DODGE_DIST = 74;
-      const DODGE_POINTS = 9;
+      const DODGE_POINTS = 10;       // Dodge: +10 points per dodge
 
-      const STREAK_EVERY = 12;
-      const STREAK_BONUS = 55;
-      const CLEAR_BONUS_BASE = 220;
+      const STREAK_EVERY = 15;       // Streak: +40 points every 15 seconds
+      const STREAK_BONUS = 40;
+      const CLEAR_BONUS_BASE = 0;    // Removed: No level clear bonus
       const MAX_SCROLL_SPEED = 360;
 
       function formatTime(sec){
@@ -2105,8 +2111,7 @@
           if (this.mode==="campaign"){
             timeLeft = Math.max(0, this.lcfg.seconds - this.t);
             if (this.t >= this.lcfg.seconds){
-              const clearBonus = CLEAR_BONUS_BASE + this.world*70 + this.level*40;
-              this.score += clearBonus;
+              // No clear bonus added - score only from in-game actions
               this.playSfx("sfx_clear");
               this.levelComplete();
               return;

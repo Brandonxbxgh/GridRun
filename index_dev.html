@@ -297,23 +297,21 @@
 
       try {
         // Query the leaderboards table to check if username exists
+        // Using maybeSingle() to avoid throwing on no results
         const { data, error } = await supabase
           .from('leaderboards')
           .select('username')
           .eq('username', username)
-          .single();
+          .maybeSingle();
 
-        if (error && error.code === 'PGRST116') {
-          return true; // Username is available (PGRST116 = no rows returned)
-        }
-        
         if (error) {
           console.error("Error checking username availability:", error);
-          // For other errors, allow creation attempt (will fail at database level if duplicate)
+          // For errors, allow creation attempt (will fail at database level if duplicate)
           return true;
         }
         
-        return false; // Username is taken
+        // If data is null, username is available
+        return data === null;
       } catch (e) {
         console.error("Error checking username availability:", e);
         // Allow creation attempt on unexpected errors

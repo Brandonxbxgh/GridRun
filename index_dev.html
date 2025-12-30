@@ -74,11 +74,19 @@
       width:100%;
       background:var(--glass);
       border:1px solid var(--stroke);
-      border-radius:18px;
-      padding:14px;
-      box-shadow:0 10px 26px rgba(0,0,0,0.28);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
+      border-radius:20px;
+      padding:18px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05) inset;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      position:relative;
+    }
+    .panel::before{
+      content:'';
+      position:absolute;
+      top:0;left:0;right:0;
+      height:1px;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
     }
 
     .panelTitle{
@@ -672,8 +680,27 @@
 
     /***********************
      * LEADERBOARDS (Supabase with Realtime)
+     * 
+     * ARCHITECTURE OVERVIEW:
+     * - Leaderboard scores are stored in Supabase cloud database (NOT localStorage)
+     * - Realtime subscriptions provide live updates when any player's score changes
+     * - Progress data (per-level scores) is separate from leaderboard data
+     * 
+     * DATA FLOW:
+     * 1. Player completes level/endless → saveProgress() updates progress table
+     * 2. updateLeaderboardsFromProgress() calculates totals and upserts to leaderboards table
+     * 3. Supabase triggers realtime event → all subscribed clients refresh their UI
+     * 4. buildRanking() fetches and sorts top 100 entries for display
+     * 
+     * DATABASE RESET HANDLING:
+     * - Manual refresh button allows users to force re-fetch from database
+     * - Auto-refresh on entering leaderboards screen ensures fresh data
+     * - Realtime subscription automatically updates on any database changes
+     * 
+     * See LEADERBOARD_ARCHITECTURE.md for detailed documentation
      ***********************/
     let leaderboardSubscription = null;
+    let leaderboardRefreshing = false; // Track refresh state to prevent duplicate calls
 
     function sumCampaignTotals(p){
       const worldTotals = [0,0,0];
@@ -687,6 +714,9 @@
     }
 
     async function updateLeaderboardsFromProgress(){
+      // Synchronize player's current progress to the leaderboards table
+      // This ensures leaderboard scores reflect latest game progress
+      // Called: on login, account creation, level completion, endless end, and when viewing leaderboards
       try {
         const user = await getActiveUser();
         if (!user || !user.userId || !supabaseEnabled || !supabase) return;
@@ -695,7 +725,8 @@
         const p = await loadProgress();
         const totals = sumCampaignTotals(p);
 
-        // Update leaderboard in Supabase
+        // Upsert to leaderboards table - updates if exists, inserts if new
+        // Database handles conflicts based on user_id uniqueness constraint
         const { error } = await supabase
           .from('leaderboards')
           .upsert({
@@ -718,6 +749,12 @@
     }
 
     async function buildRanking(metric){
+      // Fetch and sort leaderboard data from Supabase for a specific metric
+      // Fetches top 100 entries and sorts client-side for flexibility
+      // Returns: { list: Array<entry>, scoreOf: Function }
+      // 
+      // This function is called whenever leaderboard data needs to be displayed or refreshed
+      // including after database resets or manual refresh requests
       try {
         if (!supabaseEnabled || !supabase) {
           // Return empty leaderboard if Supabase not available
@@ -770,6 +807,9 @@
     }
 
     function subscribeToLeaderboardUpdates(callback) {
+      // Subscribe to realtime database changes on the leaderboards table
+      // Automatically refreshes leaderboard UI when ANY player's score changes
+      // This handles database resets, new scores, and score updates in real-time
       if (!supabaseEnabled || !supabase) {
         console.log("ℹ️ Realtime leaderboards not available (Supabase not configured)");
         return;
@@ -781,6 +821,7 @@
       }
 
       // Subscribe to realtime changes
+      // Event '*' captures INSERT, UPDATE, DELETE - handles all database changes including resets
       leaderboardSubscription = supabase
         .channel('leaderboard_changes')
         .on('postgres_changes', 
@@ -797,6 +838,46 @@
       if (leaderboardSubscription) {
         leaderboardSubscription.unsubscribe();
         leaderboardSubscription = null;
+      }
+    }
+
+    async function refreshLeaderboardManually() {
+      // Manual refresh function - allows users to force-refresh leaderboard data
+      // Useful after database resets or when user suspects stale data
+      // Prevents duplicate concurrent refresh calls
+      if (leaderboardRefreshing) return;
+      
+      leaderboardRefreshing = true;
+      const refreshBtn = document.getElementById("lbRefreshBtn");
+      const refreshText = document.getElementById("lbRefreshText");
+      
+      // Show loading state
+      if (refreshBtn) refreshBtn.disabled = true;
+      if (refreshText) refreshText.textContent = "Refreshing...";
+      
+      try {
+        // Re-sync current user's progress to leaderboards
+        await updateLeaderboardsFromProgress();
+        
+        // Re-fetch and re-render current tab (defaults to 'endless' if no tab is active)
+        const activeTab = document.querySelector(".tab.active");
+        const metric = activeTab ? activeTab.getAttribute('data-metric') : 'endless';
+        
+        const content = await renderLeaderboardList(metric);
+        const lbContent = document.getElementById("lbContent");
+        if (lbContent) lbContent.innerHTML = content;
+        
+        console.log("✅ Leaderboard manually refreshed");
+      } catch (e) {
+        console.error("Error refreshing leaderboard:", e);
+        // TODO: Consider replacing alert() with a non-blocking toast notification system
+        // Using alert() for consistency with existing error handling in this codebase
+        alert("Failed to refresh leaderboard. Please check your connection and try again.");
+      } finally {
+        // Reset loading state
+        leaderboardRefreshing = false;
+        if (refreshBtn) refreshBtn.disabled = false;
+        if (refreshText) refreshText.textContent = "Refresh";
       }
     }
 
@@ -850,41 +931,10 @@
       [60, 80, 95, 105, 115],  // World 3
     ];
 
-    // TIER MODEL: Updated for new scoring system
-    const TIER_MODEL = {
-      pps: 6,                        // Survival: 6 points per second
-      streakEvery: 15,               // Streak: every 15 seconds
-      streakBonus: 40,               // Streak: 40 points per streak
-      expectedNearPer10s: [0.45, 0.70, 0.90],
-      expectedNearPoints: 22,        // Near Miss: 22 points
-      expectedAvgCombo: [1.18, 1.30, 1.45],
-      expectedDodgePer10s: [1.10, 1.35, 1.60],
-      expectedDodgePoints: 10,       // Dodge: 10 points
-      clearBonusBase: 0              // Removed: No level clear bonus
-    };
-
-    function computeTierTargets(worldIdx, levelIdx){
-      const t = levelTimes[worldIdx][levelIdx];
-      const survival = t * TIER_MODEL.pps;
-      const streaks = Math.floor(t / TIER_MODEL.streakEvery);
-      const streakScore = streaks * TIER_MODEL.streakBonus;
-
-      const expectedNear = Math.floor((t/10) * TIER_MODEL.expectedNearPer10s[worldIdx]);
-      const nearScore = expectedNear * TIER_MODEL.expectedNearPoints * TIER_MODEL.expectedAvgCombo[worldIdx];
-
-      const expectedDodge = Math.floor((t/10) * TIER_MODEL.expectedDodgePer10s[worldIdx]);
-      const dodgeScore = expectedDodge * TIER_MODEL.expectedDodgePoints;
-
-      const clearBonus = TIER_MODEL.clearBonusBase;  // Now 0 - no level clear bonus
-      const expected = survival + streakScore + dodgeScore + nearScore + clearBonus;
-
-      // Rebalanced tier targets: Bronze 70%, Silver 90%, Gold 110%+
-      const bronze = Math.floor(expected * 0.70);
-      const silver = Math.floor(expected * 0.90);
-      const gold   = Math.floor(expected * 1.10);
-      return { time: t, scores: { bronze, silver, gold } };
+    // Level data - returns time requirement only (no tiers)
+    function levelData(worldIdx, levelIdx){ 
+      return { time: levelTimes[worldIdx][levelIdx] }; 
     }
-    function levelData(worldIdx, levelIdx){ return computeTierTargets(worldIdx, levelIdx); }
 
     /***********************
      * MENUS
@@ -1000,6 +1050,10 @@
       const l = levelNumber - 1;
       const ld = levelData(w, l);
       const best = progress.bestScores[w]?.[l] || 0;
+      
+      // Check if star earned (level completed)
+      const levelsUnlocked = progress.levelsUnlocked[w] || 0;
+      const starEarned = l < levelsUnlocked;
 
       container.innerHTML = `
         <div class="menu-screen">
@@ -1009,17 +1063,15 @@
           <div class="panel">
             <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive: <b>${ld.time}s</b></span></div>
             <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85);">
-              Stay alive until the timer hits zero. More points = better tier.
+              Stay alive until the timer hits zero to earn the star.
             </p>
             <div style="height:10px"></div>
             <div class="panelTitle"><strong>Your Best</strong><span class="pill"><b>${best}</b></span></div>
             <div style="height:10px"></div>
-            <div class="panelTitle"><strong>Performance Tiers</strong><span class="pill">Targets</span></div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px">
-              <span class="pill">Bronze <b>${ld.scores.bronze}</b></span>
-              <span class="pill">Silver <b>${ld.scores.silver}</b></span>
-              <span class="pill">Gold <b>${ld.scores.gold}</b></span>
-            </div>
+            <div class="panelTitle"><strong>Reward</strong><span class="pill">1 Star</span></div>
+            <p style="margin:6px 0 0 0; font-size:13px; color:rgba(255,255,255,0.70); text-align:center;">
+              ${starEarned ? 'Star Earned' : 'Complete to earn star'}
+            </p>
           </div>
 
           <button onclick="playLevel(${worldNumber}, ${levelNumber})">Start</button>
@@ -1053,24 +1105,28 @@
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Settings</h1>
+          
           <div class="panel">
+            <div class="panelTitle"><strong>Sound</strong></div>
             <div class="toggle-row">
-              <span>Menu Music</span>
+              <span>Music</span>
               <button onclick="toggleSetting('menuMusic')">${onOff(settings.menuMusic)}</button>
             </div>
             <div class="toggle-row">
-              <span>Gameplay Music</span>
-              <button onclick="toggleSetting('gameplayMusic')">${onOff(settings.gameplayMusic)}</button>
-            </div>
-            <div class="toggle-row">
-              <span>Sound Effects (SFX)</span>
+              <span>SFX</span>
               <button onclick="toggleSetting('sfx')">${onOff(settings.sfx)}</button>
             </div>
-
-            <p class="small-note" style="margin-top:10px">
-              Audio is optional. If you don’t add files in <b>/audio/</b>, the game still runs silently.
-            </p>
           </div>
+
+          <div class="panel">
+            <div class="panelTitle"><strong>Support</strong></div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+              <button style="font-size:14px" onclick="alert('Privacy Policy: [Placeholder]')">Privacy Policy</button>
+              <button style="font-size:14px" onclick="alert('Terms of Service: [Placeholder]')">Terms of Service</button>
+              <button style="font-size:14px" onclick="alert('Contact: [Placeholder]')">Contact Support</button>
+            </div>
+          </div>
+
           <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
@@ -1078,7 +1134,13 @@
 
     async function toggleSetting(key){
       settings = await loadSettingsState();
-      settings[key] = !settings[key];
+      // Map both menuMusic and gameplayMusic to the same setting for simplicity
+      if (key === 'menuMusic' || key === 'gameplayMusic') {
+        settings.menuMusic = !settings.menuMusic;
+        settings.gameplayMusic = settings.menuMusic;
+      } else {
+        settings[key] = !settings[key];
+      }
       await saveSettingsState(settings);
       updateMenuMusicState();
       if (window.GRIDRUN_AUDIO && typeof window.GRIDRUN_AUDIO.applySettings === "function"){
@@ -1093,32 +1155,32 @@
       container.innerHTML = `
         <div class="menu-screen">
           <h1>How To Play</h1>
-          <p class="subhead">Everything you need — objective, scoring, worlds, and endless.</p>
+          <p class="subhead">Everything you need — objective, controls, and scoring.</p>
 
           <div class="panel" style="text-align:left;">
             <div class="panelTitle"><strong>Objective</strong><span class="pill">Survive</span></div>
             <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              Stay alive inside the grid. In <b>Campaign</b>, you must survive the full timer for each level to clear it and unlock progression.
-              In <b>Endless</b>, survive as long as you can while difficulty ramps up.
+              Stay alive inside the grid while avoiding obstacles.<br>
+              <b>Campaign:</b> survive the full timer to clear the level.<br>
+              <b>Endless:</b> survive as long as possible while difficulty increases.
             </p>
 
-            <div class="panelTitle"><strong>Controls</strong><span class="pill">Touch or WASD</span></div>
+            <div class="panelTitle"><strong>Controls</strong><span class="pill">Mobile / Desktop</span></div>
             <p style="margin:6px 0 14px 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              <b>Mobile:</b> touch where you want to move — your runner follows.
-              <br><b>Desktop:</b> WASD / Arrow keys.
+              <b>Mobile:</b> tap where you want to move<br>
+              <b>Desktop:</b> WASD / Arrow keys
             </p>
 
             <div class="panelTitle"><strong>Scoring</strong><span class="pill">Skill-based</span></div>
             <p style="margin:6px 0 0 0; font-size:14px; color:rgba(255,255,255,0.85); line-height:1.45">
-              Score comes from in-game actions while the timer is active:<br>
-              • <b>Survival:</b> +6 points per second alive<br>
-              • <b>Near Miss:</b> +22 points (close dodges with combo multiplier)<br>
-              • <b>Dodge:</b> +10 points (skillful evasion)<br>
-              • <b>Streak:</b> +40 points every 15 seconds alive
+              • <b>Survival:</b> +6 points per second<br>
+              • <b>Near Miss:</b> +22 points<br>
+              • <b>Dodge:</b> +10 points<br>
+              • <b>Streak:</b> +40 points every 15 seconds
             </p>
 
             <p class="hint">
-              Your <b>Leaderboards</b> scores update automatically when you improve a best score (Campaign or Endless).
+              Leaderboards update automatically on new bests
             </p>
           </div>
 
@@ -1195,6 +1257,8 @@
       try{
         await loginLocalAccount({ email, password: pass });
         progress = await loadProgress();
+        // Sync user's progress to leaderboards immediately after login
+        // This ensures leaderboard reflects any progress made while offline or after database reset
         await updateLeaderboardsFromProgress();
         await loadMainMenu();
       }catch(e){
@@ -1258,6 +1322,7 @@
       try{
         await createLocalAccount({ email, password: pass, username: user });
         progress = await loadProgress();
+        // Initialize leaderboard entry for new user with their default/initial progress
         await updateLeaderboardsFromProgress();
         await loadMainMenu();
       }catch(e){
@@ -1371,7 +1436,11 @@
 
     async function loadLeaderboards(){
       startMenuMusic();
+      
+      // Sync current user's progress to leaderboards on entry
+      // This ensures fresh data and handles cases where scores were reset in database
       await updateLeaderboardsFromProgress();
+      
       const container = document.getElementById("game-container");
       const a = await getActiveUser();
 
@@ -1384,6 +1453,7 @@
       ];
 
       // Subscribe to realtime updates
+      // This automatically handles database changes including resets
       subscribeToLeaderboardUpdates(async (payload) => {
         // Refresh current tab when leaderboard changes
         const activeTab = document.querySelector(".tab.active");
@@ -1416,8 +1486,15 @@
               ${initialContent}
             </div>
 
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:12px">
+              <button id="lbRefreshBtn" onclick="refreshLeaderboardManually()" style="padding:10px 20px;font-size:14px">
+                <span id="lbRefreshText">Refresh</span>
+              </button>
+            </div>
+
             <p class="hint">
-              Global leaderboards with real-time updates via Supabase. 🔴 LIVE
+              Global leaderboards with real-time updates via Supabase. 🔴 LIVE<br>
+              Click <b>Refresh</b> if scores appear outdated after a database reset.
             </p>
           </div>
 
@@ -1447,6 +1524,8 @@
      ***********************/
     window.GRIDRUN = {
       completeCampaignLevel: async (worldIdx, levelIdx, score) => {
+        // Called when player completes a campaign level
+        // Updates progress and syncs to leaderboards
         const p = await loadProgress();
         p.bestScores[worldIdx][levelIdx] = Math.max(p.bestScores[worldIdx][levelIdx] || 0, score);
 
@@ -1460,17 +1539,21 @@
         }
 
         await saveProgress(p);
+        // Update leaderboards with new campaign totals
+        // This triggers realtime updates for all connected clients
         await updateLeaderboardsFromProgress();
       },
 
       setEndlessBest: async (score) => {
+        // Called when player completes an endless run
+        // Updates progress and syncs to leaderboards if new best
         const p = await loadProgress();
         p.endlessBest = Math.max(p.endlessBest || 0, score);
         await saveProgress(p);
+        // Update leaderboards with new endless best score
+        // This triggers realtime updates for all connected clients
         await updateLeaderboardsFromProgress();
       },
-
-      getTierTargets: (worldIdx, levelIdx) => levelData(worldIdx, levelIdx).scores,
 
       backToLevelSelect: async (worldIdx) => { showMenus(); await loadWorld(worldIdx + 1); },
       backToMainMenu: async () => { showMenus(); await loadMainMenu(); }
@@ -1844,17 +1927,77 @@
           this.uiSub = this.add.text(18,32,"",{fontFamily:uiFont,fontSize:"12px",color:"#eaeaff"}).setDepth(70).setAlpha(0.95);
           this.uiCombo = this.add.text(W-18,12,"",{fontFamily:uiFont,fontSize:"12px",color:"#ffffff"}).setOrigin(1,0).setDepth(70).setAlpha(0.90);
 
+          // Improved pause button with better mobile support
+          // Make button size responsive: larger on mobile, standard on desktop
+          const isMobile = IS_TOUCH;
+          const btnFontSize = isMobile ? "16px" : "12px";
+          const btnPaddingH = isMobile ? 14 : 10;
+          const btnPaddingV = isMobile ? 8 : 6;
+          
           this.pauseBtn = this.add.text(W-18,34,"PAUSE",{
-            fontFamily:uiFont,fontSize:"12px",color:"#ffffff",
-            backgroundColor:"rgba(0,0,0,0.35)", padding:{left:10,right:10,top:6,bottom:6}
+            fontFamily:uiFont,
+            fontSize:btnFontSize,
+            color:"#ffffff",
+            backgroundColor:"rgba(0,0,0,0.35)", 
+            padding:{left:btnPaddingH,right:btnPaddingH,top:btnPaddingV,bottom:btnPaddingV}
           }).setOrigin(1,0).setDepth(9999).setInteractive({useHandCursor:true});
 
           this.input.topOnly = true;
+          
+          // Expand hit area generously for better touch detection
+          // Mobile gets extra generous hit area (50% larger), desktop gets moderate expansion
+          // Note: hitArea coordinates are relative to the game object, not world coordinates
           const pb = this.pauseBtn.getBounds();
-          this.pauseBtn.input.hitArea.setTo(pb.x-24,pb.y-16,pb.width+38,pb.height+28);
-          this.pauseBtn.on("pointerdown",(p)=>{ p.event?.stopPropagation?.(); this.togglePause(!this.paused); });
+          const hitExpansion = isMobile ? 1.5 : 1.2; // Mobile: 50% larger, Desktop: 20% larger
+          const extraW = pb.width * (hitExpansion - 1);
+          const extraH = pb.height * (hitExpansion - 1);
+          
+          // Since origin is (1,0) (top-right), the local x position is negative for the left edge
+          // Local coordinates: x goes from -width to 0, y goes from 0 to height
+          this.pauseBtn.input.hitArea.setTo(
+            -pb.width - extraW,  // Start further left
+            -extraH,              // Start above
+            pb.width + extraW * 2,  // Total width
+            pb.height + extraH * 2  // Total height
+          );
+          
+          // Add visual feedback for better user experience
+          const originalAlpha = this.pauseBtn.alpha;
+          const originalScale = this.pauseBtn.scale;
+          
+          this.pauseBtn.on("pointerover", ()=>{
+            this.pauseBtn.setAlpha(0.8);
+            this.pauseBtn.setScale(originalScale * 1.05);
+          });
+          
+          this.pauseBtn.on("pointerout", ()=>{
+            this.pauseBtn.setAlpha(originalAlpha);
+            this.pauseBtn.setScale(originalScale);
+          });
+          
+          // Handle both pointerdown and pointerup for reliability
+          // Some mobile devices work better with one vs the other
+          // Pause triggers on pointerup (release) for better UX - prevents accidental pauses from touches
+          let pauseHandled = false;
+          this.pauseBtn.on("pointerdown",(p)=>{ 
+            p.event?.stopPropagation?.(); 
+            pauseHandled = false; // Reset flag for new press cycle
+            this.pauseBtn.setScale(originalScale * 0.95); // Visual press feedback
+          });
+          
+          this.pauseBtn.on("pointerup",(p)=>{ 
+            p.event?.stopPropagation?.(); 
+            if (!pauseHandled) {
+              this.togglePause(!this.paused);
+              pauseHandled = true; // Mark as handled to prevent duplicate toggles
+            }
+            this.pauseBtn.setScale(originalScale);
+          });
 
-          this.uiNoTouchZone = { x: W-220, y: 0, w: 220, h: 110 };
+          // Expand no-touch zone to accommodate larger button on mobile
+          const noTouchWidth = isMobile ? 260 : 220;
+          const noTouchHeight = isMobile ? 130 : 110;
+          this.uiNoTouchZone = { x: W-noTouchWidth, y: 0, w: noTouchWidth, h: noTouchHeight };
 
           this.input.on("pointerdown",(p)=>{
             if (this.paused){ this.togglePause(false); return; }
@@ -1965,15 +2108,72 @@
         togglePause(on){
           this.paused=on;
           if (on){
-            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.55).setDepth(140).setInteractive();
-            const t = this.add.text(W/2,H*0.44,"PAUSED",{fontFamily:uiFont,fontSize:"28px",color:"#ffffff"}).setOrigin(0.5).setDepth(141);
-            const s = this.add.text(W/2,H*0.52,"Tap anywhere to resume",{fontFamily:uiFont,fontSize:"14px",color:"#b7b7ff"})
-              .setOrigin(0.5).setDepth(141).setAlpha(0.9);
-            this.pauseOverlay.on("pointerdown", ()=>this.togglePause(false));
-            this._pauseText=t; this._pauseSub=s;
+            // Dim/blur overlay
+            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.60).setDepth(140);
+            
+            // Center glass panel
+            const panelW = Math.min(W*0.85, 320);
+            const panelH = 340;
+            const panelBg = this.add.graphics().setDepth(141);
+            panelBg.fillStyle(0x000000, 0.4);
+            panelBg.fillRoundedRect(W/2-panelW/2, H/2-panelH/2, panelW, panelH, 18);
+            panelBg.lineStyle(1, this.wcfg.stroke || 0xffffff, 0.2);
+            panelBg.strokeRoundedRect(W/2-panelW/2, H/2-panelH/2, panelW, panelH, 18);
+            
+            // Title
+            const t = this.add.text(W/2,H*0.36,"PAUSED",{
+              fontFamily:uiFont,fontSize:"28px",color:"#ffffff",fontStyle:"bold"
+            }).setOrigin(0.5).setDepth(142);
+            
+            // Four buttons exactly as per spec
+            const btnY = H*0.46;
+            const btnGap = 56;
+            
+            // Store buttons for cleanup
+            this._pauseButtons = [];
+            
+            // 1. Resume (primary)
+            this._pauseButtons.push(
+              makePillButton(this, "RESUME", btnY, () => this.togglePause(false), this.wcfg.glowB, this.wcfg.border)
+            );
+            
+            // 2. Restart
+            this._pauseButtons.push(
+              makePillButton(this, "RESTART", btnY + btnGap, () => {
+                this.togglePause(false);
+                if (this.mode === "campaign") {
+                  this.scene.restart({mode:"campaign",world:this.world,level:this.level});
+                } else {
+                  this.scene.restart({mode:"endless"});
+                }
+              }, 0x3a3a50, this.wcfg.border)
+            );
+            
+            // 3. Settings
+            this._pauseButtons.push(
+              makePillButton(this, "SETTINGS", btnY + btnGap*2, () => {
+                this.togglePause(false);
+                showMenus();
+                loadSettings();
+              }, 0x3a3a50, this.wcfg.border)
+            );
+            
+            // 4. Main Menu
+            this._pauseButtons.push(
+              makePillButton(this, "MAIN MENU", btnY + btnGap*3, () => {
+                this.togglePause(false);
+                window.GRIDRUN.backToMainMenu();
+              }, 0x2b2b3e, this.wcfg.border)
+            );
+            
+            this._pauseText=t; this._pausePanel=panelBg;
           } else {
-            this.pauseOverlay?.destroy(); this._pauseText?.destroy(); this._pauseSub?.destroy();
+            this.pauseOverlay?.destroy(); 
+            this._pauseText?.destroy(); 
+            this._pausePanel?.destroy();
+            this._pauseButtons?.forEach(btn => btn.destroy());
             this.pauseOverlay=null;
+            this._pauseButtons=null;
           }
         }
 
@@ -2419,22 +2619,24 @@
 
         async levelComplete(){
           const score=Math.floor(this.score);
+          const timeSurvived=Math.floor(this.elapsed);
           await window.GRIDRUN.completeCampaignLevel(this.world,this.level,score);
-          this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason:"CLEAR"});
+          this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason:"CLEAR",timeSurvived});
         }
 
         async endRun({reason}){
           const score=Math.floor(this.score);
+          const timeSurvived=Math.floor(this.elapsed);
           this.flash.setAlpha(0.10);
           this.tweens.add({targets:this.flash,alpha:0,duration:170,ease:"Linear"});
           this.stopMusic();
 
           if (this.mode==="endless"){
             await window.GRIDRUN.setEndlessBest(score);
-            this.scene.start("Results",{mode:"endless",score,reason});
+            this.scene.start("Results",{mode:"endless",score,reason,timeSurvived});
             return;
           }
-          this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason});
+          this.scene.start("Results",{mode:"campaign",world:this.world,level:this.level,score,reason,timeSurvived});
         }
       }
 
@@ -2474,19 +2676,26 @@
           const cleared = (mode==="campaign" && reason==="CLEAR");
 
           if (mode==="campaign"){
-            const tiers = window.GRIDRUN.getTierTargets(data.world, data.level);
-            let tier = "—";
-            if (score >= tiers.gold) tier = "GOLD";
-            else if (score >= tiers.silver) tier = "SILVER";
-            else if (score >= tiers.bronze) tier = "BRONZE";
-
-            this.add.text(W/2,H*0.46,`Tier: ${tier}`,{
+            // Get time requirement
+            const ld = levelData(data.world, data.level);
+            const timeRequired = ld.time;
+            const timeSurvived = data.timeSurvived || 0;
+            
+            // Star display for campaign
+            const starEarned = cleared ? 1 : 0;
+            this.add.text(W/2,H*0.46,`Time: ${timeSurvived}s / ${timeRequired}s`,{
               fontFamily:uiFont,fontSize:"16px",color:"#ffffff"
             }).setOrigin(0.5).setAlpha(0.95);
 
-            this.add.text(W/2,H*0.52,`Bronze ${tiers.bronze}  •  Silver ${tiers.silver}  •  Gold ${tiers.gold}`,{
-              fontFamily:uiFont,fontSize:"12px",color:"rgba(255,255,255,0.80)",align:"center"
-            }).setOrigin(0.5);
+            this.add.text(W/2,H*0.52,`Star: ${starEarned} / 1`,{
+              fontFamily:uiFont,fontSize:"18px",color:"#ffffff"
+            }).setOrigin(0.5).setAlpha(0.98);
+          } else {
+            // Endless mode - show time survived, no stars
+            const timeSurvived = data.timeSurvived || 0;
+            this.add.text(W/2,H*0.46,`Time Survived: ${timeSurvived}s`,{
+              fontFamily:uiFont,fontSize:"16px",color:"#ffffff"
+            }).setOrigin(0.5).setAlpha(0.95);
           }
 
           const nextFor = (w,l) => {

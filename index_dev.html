@@ -74,11 +74,19 @@
       width:100%;
       background:var(--glass);
       border:1px solid var(--stroke);
-      border-radius:18px;
-      padding:14px;
-      box-shadow:0 10px 26px rgba(0,0,0,0.28);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
+      border-radius:20px;
+      padding:18px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05) inset;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      position:relative;
+    }
+    .panel::before{
+      content:'';
+      position:absolute;
+      top:0;left:0;right:0;
+      height:1px;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
     }
 
     .panelTitle{
@@ -1060,9 +1068,9 @@
             <div style="height:10px"></div>
             <div class="panelTitle"><strong>Your Best</strong><span class="pill"><b>${best}</b></span></div>
             <div style="height:10px"></div>
-            <div class="panelTitle"><strong>⭐ Reward</strong><span class="pill">1 Star</span></div>
+            <div class="panelTitle"><strong>Reward</strong><span class="pill">1 Star</span></div>
             <p style="margin:6px 0 0 0; font-size:13px; color:rgba(255,255,255,0.70); text-align:center;">
-              ${starEarned ? 'Star Earned ⭐' : 'Complete to earn ⭐'}
+              ${starEarned ? 'Star Earned' : 'Complete to earn star'}
             </p>
           </div>
 
@@ -2679,7 +2687,7 @@
               fontFamily:uiFont,fontSize:"16px",color:"#ffffff"
             }).setOrigin(0.5).setAlpha(0.95);
 
-            this.add.text(W/2,H*0.52,`⭐ Star: ${starEarned} / 1`,{
+            this.add.text(W/2,H*0.52,`Star: ${starEarned} / 1`,{
               fontFamily:uiFont,fontSize:"18px",color:"#ffffff"
             }).setOrigin(0.5).setAlpha(0.98);
           } else {

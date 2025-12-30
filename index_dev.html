@@ -1097,24 +1097,28 @@
       container.innerHTML = `
         <div class="menu-screen">
           <h1>Settings</h1>
+          
           <div class="panel">
+            <div class="panelTitle"><strong>Sound</strong></div>
             <div class="toggle-row">
-              <span>Menu Music</span>
+              <span>Music</span>
               <button onclick="toggleSetting('menuMusic')">${onOff(settings.menuMusic)}</button>
             </div>
             <div class="toggle-row">
-              <span>Gameplay Music</span>
-              <button onclick="toggleSetting('gameplayMusic')">${onOff(settings.gameplayMusic)}</button>
-            </div>
-            <div class="toggle-row">
-              <span>Sound Effects (SFX)</span>
+              <span>SFX</span>
               <button onclick="toggleSetting('sfx')">${onOff(settings.sfx)}</button>
             </div>
-
-            <p class="small-note" style="margin-top:10px">
-              Audio is optional. If you don’t add files in <b>/audio/</b>, the game still runs silently.
-            </p>
           </div>
+
+          <div class="panel">
+            <div class="panelTitle"><strong>Support</strong></div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+              <button style="font-size:14px" onclick="alert('Privacy Policy: [Placeholder]')">Privacy Policy</button>
+              <button style="font-size:14px" onclick="alert('Terms of Service: [Placeholder]')">Terms of Service</button>
+              <button style="font-size:14px" onclick="alert('Contact: [Placeholder]')">Contact Support</button>
+            </div>
+          </div>
+
           <button onclick="loadMainMenu()">Back</button>
         </div>
       `;
@@ -1122,7 +1126,13 @@
 
     async function toggleSetting(key){
       settings = await loadSettingsState();
-      settings[key] = !settings[key];
+      // Map both menuMusic and gameplayMusic to the same setting for simplicity
+      if (key === 'menuMusic' || key === 'gameplayMusic') {
+        settings.menuMusic = !settings.menuMusic;
+        settings.gameplayMusic = settings.menuMusic;
+      } else {
+        settings[key] = !settings[key];
+      }
       await saveSettingsState(settings);
       updateMenuMusicState();
       if (window.GRIDRUN_AUDIO && typeof window.GRIDRUN_AUDIO.applySettings === "function"){

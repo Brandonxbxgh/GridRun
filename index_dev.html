@@ -2377,23 +2377,19 @@
           this.paused=on;
           if (on){
             // Dark overlay with blur effect
-            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.70).setDepth(140).setInteractive();
+            this.pauseOverlay = this.add.rectangle(W/2,H/2,W,H,0x000000).setAlpha(0.70).setDepth(140);
             
-            // Panel background
+            // Panel background - made taller for buttons
             const panelBg = this.add.graphics().setDepth(141);
             panelBg.fillStyle(0x000000, 0.5);
-            panelBg.fillRoundedRect(W/2-160, H*0.35, 320, 200, 20);
+            panelBg.fillRoundedRect(W/2-160, H*0.28, 320, 340, 20);
             panelBg.lineStyle(3, this.wcfg.border, 0.7);
-            panelBg.strokeRoundedRect(W/2-160, H*0.35, 320, 200, 20);
+            panelBg.strokeRoundedRect(W/2-160, H*0.28, 320, 340, 20);
             
             // Pause icon and text
-            const t = this.add.text(W/2,H*0.42,"⏸️ PAUSED",{
+            const t = this.add.text(W/2,H*0.36,"⏸️ PAUSED",{
               fontFamily:uiFont,fontSize:"32px",color:"#ffffff",fontStyle:"bold"
             }).setOrigin(0.5).setDepth(142).setShadow(0,2,'rgba(0,0,0,0.5)',6);
-            
-            const s = this.add.text(W/2,H*0.50,"Tap anywhere to resume",{
-              fontFamily:uiFont,fontSize:"15px",color:"#b7b7ff"
-            }).setOrigin(0.5).setDepth(142).setAlpha(0.9);
             
             // Add animated pulse effect
             this.tweens.add({
@@ -2406,14 +2402,46 @@
               ease: 'Sine.easeInOut'
             });
             
-            this.pauseOverlay.on("pointerdown", ()=>this.togglePause(false));
-            this._pauseText=t; this._pauseSub=s; this._pausePanel=panelBg;
+            // Buttons
+            const btnY = H*0.46;
+            const btnGap = 56;
+            
+            // Store buttons for cleanup
+            this._pauseButtons = [];
+            
+            // Resume (primary)
+            this._pauseButtons.push(
+              makePillButton(this, "▶ RESUME", btnY, () => this.togglePause(false), this.wcfg.glowB, this.wcfg.border)
+            );
+            
+            // Restart
+            this._pauseButtons.push(
+              makePillButton(this, "🔄 RESTART", btnY + btnGap, () => {
+                this.togglePause(false);
+                if (this.mode === "campaign") {
+                  this.scene.restart({mode:"campaign",world:this.world,level:this.level});
+                } else {
+                  this.scene.restart({mode:"endless"});
+                }
+              }, 0x3a3a50, this.wcfg.border)
+            );
+            
+            // Main Menu
+            this._pauseButtons.push(
+              makePillButton(this, "🏠 MAIN MENU", btnY + btnGap*2, () => {
+                this.togglePause(false);
+                window.GRIDRUN.backToMainMenu();
+              }, 0x2b2b3e, this.wcfg.border)
+            );
+            
+            this._pauseText=t; this._pausePanel=panelBg;
           } else {
             this.pauseOverlay?.destroy(); 
             this._pauseText?.destroy(); 
-            this._pauseSub?.destroy();
             this._pausePanel?.destroy();
+            this._pauseButtons?.forEach(btn => btn.destroy());
             this.pauseOverlay=null;
+            this._pauseButtons=null;
           }
         }
 
@@ -3006,7 +3034,7 @@
             return { world:nw, level:nl };
           };
 
-          const y0 = H*0.62;
+          const y0 = H*0.68;  // Moved down from 0.62 to avoid overlapping tier panel
 
           if (mode==="campaign"){
             makePillButton(this, "🔄 RETRY", y0, () => this.scene.start("Play",{mode:"campaign",world:data.world,level:data.level}), accent, glow);

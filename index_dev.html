@@ -1111,10 +1111,11 @@
       const clearBonus = TIER_MODEL.clearBonusBase;  // Now 0 - no level clear bonus
       const expected = survival + streakScore + dodgeScore + nearScore + clearBonus;
 
-      // Rebalanced tier targets: Bronze 70%, Silver 90%, Gold 110%+
-      const bronze = Math.floor(expected * 0.70);
-      const silver = Math.floor(expected * 0.90);
-      const gold   = Math.floor(expected * 1.10);
+      // Rebalanced tier targets - Made more challenging
+      // Bronze: 85% (was 70%), Silver: 110% (was 90%), Gold: 140% (was 110%)
+      const bronze = Math.floor(expected * 0.85);
+      const silver = Math.floor(expected * 1.10);
+      const gold   = Math.floor(expected * 1.40);
       return { time: t, scores: { bronze, silver, gold } };
     }
     function levelData(worldIdx, levelIdx){ return computeTierTargets(worldIdx, levelIdx); }
@@ -2953,13 +2954,49 @@
             else if (score >= tiers.silver) { tier = "SILVER"; tierEmoji = "🥈"; tierColor = "#c0c0c0"; }
             else if (score >= tiers.bronze) { tier = "BRONZE"; tierEmoji = "🥉"; tierColor = "#cd7f32"; }
 
+            // Achieved tier display
             this.add.text(W/2,H*0.48,`${tierEmoji} ${tier}`,{
-              fontFamily:uiFont,fontSize:"18px",color:tierColor,fontStyle:"bold"
-            }).setOrigin(0.5).setShadow(0,0,tierColor,8);
+              fontFamily:uiFont,fontSize:"22px",color:tierColor,fontStyle:"bold"
+            }).setOrigin(0.5).setShadow(0,0,tierColor,12);
 
-            this.add.text(W/2,H*0.54,`🥉 ${tiers.bronze}  •  🥈 ${tiers.silver}  •  🥇 ${tiers.gold}`,{
-              fontFamily:uiFont,fontSize:"11px",color:"rgba(255,255,255,0.70)",align:"center"
-            }).setOrigin(0.5);
+            // Tier thresholds - redesigned for cleaner look
+            const tierPanelBg = this.add.graphics();
+            tierPanelBg.fillStyle(0x000000, 0.3);
+            tierPanelBg.fillRoundedRect(W/2-150, H*0.54, 300, 50, 12);
+            tierPanelBg.lineStyle(1, 0xffffff, 0.1);
+            tierPanelBg.strokeRoundedRect(W/2-150, H*0.54, 300, 50, 12);
+
+            // Display tier thresholds in a clean grid
+            const tierSpacing = 100;
+            const startX = W/2 - 100;
+            const tierY = H*0.565;
+            
+            // Bronze
+            const bronzeActive = score >= tiers.bronze;
+            this.add.text(startX, tierY, "🥉", {
+              fontFamily:uiFont, fontSize:"16px"
+            }).setOrigin(0.5).setAlpha(bronzeActive ? 1.0 : 0.5);
+            this.add.text(startX, tierY + 16, `${tiers.bronze}`, {
+              fontFamily:uiFont, fontSize:"10px", color:"#cd7f32", fontStyle:"bold"
+            }).setOrigin(0.5).setAlpha(bronzeActive ? 1.0 : 0.6);
+            
+            // Silver
+            const silverActive = score >= tiers.silver;
+            this.add.text(startX + tierSpacing, tierY, "🥈", {
+              fontFamily:uiFont, fontSize:"16px"
+            }).setOrigin(0.5).setAlpha(silverActive ? 1.0 : 0.5);
+            this.add.text(startX + tierSpacing, tierY + 16, `${tiers.silver}`, {
+              fontFamily:uiFont, fontSize:"10px", color:"#c0c0c0", fontStyle:"bold"
+            }).setOrigin(0.5).setAlpha(silverActive ? 1.0 : 0.6);
+            
+            // Gold
+            const goldActive = score >= tiers.gold;
+            this.add.text(startX + tierSpacing * 2, tierY, "🥇", {
+              fontFamily:uiFont, fontSize:"16px"
+            }).setOrigin(0.5).setAlpha(goldActive ? 1.0 : 0.5);
+            this.add.text(startX + tierSpacing * 2, tierY + 16, `${tiers.gold}`, {
+              fontFamily:uiFont, fontSize:"10px", color:"#ffd700", fontStyle:"bold"
+            }).setOrigin(0.5).setAlpha(goldActive ? 1.0 : 0.6);
           }
 
           const nextFor = (w,l) => {
